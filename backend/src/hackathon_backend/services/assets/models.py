@@ -1,6 +1,5 @@
 """Member 4 boundary types; callers supply a validated organizer principal."""
 
-from datetime import datetime
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -104,12 +103,12 @@ class AssetRecord(BoundaryModel):
     event_revision: int = Field(ge=1)
     kind: Literal["event_document", "flyer_png"]
     object_key: str
-    sha256: str
-    byte_length: int
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    byte_length: int = Field(ge=1, le=10_000_000)
     content_type: str
     go_generation_id: Identifier
     review_state: Literal["needs_review", "reviewed"]
-    created_at: datetime
+    created_at: AwareDatetime
     canva_design_id: str | None = None
     canva_export_id: str | None = None
     canva_generation_id: str | None = None

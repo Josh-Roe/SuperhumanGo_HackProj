@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, Protocol
 from urllib.parse import urlsplit
 
-from pydantic import AwareDatetime, Field
+from pydantic import AwareDatetime, Field, TypeAdapter
 
 from hackathon_backend.services.assets.models import (
     Approval,
@@ -58,6 +58,44 @@ class EditPreview(BoundaryModel):
     expected: dict[str, str]
     previous: dict[str, str]
     thumbnail_urls: tuple[str, ...] = ()
+
+    def preview_metadata(self) -> dict[str, Any]:
+        return {
+            "event_id": self.design.event_id,
+            "event_revision": self.target_revision,
+            "design_id": self.design.design_id,
+            "digest": self.digest,
+            "expected": dict(self.expected),
+            "previous": dict(self.previous),
+            "thumbnail_urls": self.thumbnail_urls,
+        }
+
+
+class FlyerReviewPreview(BoundaryModel):
+    design: DesignRef
+    digest: str
+    created_at: AwareDatetime
+    provider_version: str
+    expected: dict[str, str]
+    thumbnail_urls: tuple[str, ...]
+
+    def preview_metadata(self) -> dict[str, Any]:
+        return {
+            "event_id": self.design.event_id,
+            "event_revision": self.design.event_revision,
+            "design_id": self.design.design_id,
+            "digest": self.digest,
+            "expected": dict(self.expected),
+            "thumbnail_urls": self.thumbnail_urls,
+        }
+
+
+class ExportReceipt(BoundaryModel):
+    design: DesignRef
+    export_id: str
+    state: Literal["pending", "completed", "failed"]
+    failure_code: str | None = None
+    download_url: str | None = Field(default=None, repr=False, exclude=True)
 
 
 class VerifiedDesign(BoundaryModel):
@@ -112,9 +150,16 @@ def _text(value: Any) -> str:
 
 
 def _canva_url(value: str) -> str:
-    url = urlsplit(value)
+    if not isinstance(value, str):
+        raise CanvaError("invalid_canva_design_url")
+    try:
+        url = urlsplit(value)
+        port = url.port
+    except ValueError:
+        raise CanvaError("invalid_canva_design_url") from None
     if (
         url.scheme != "https"
+        or port not in (None, 443)
         or url.username
         or url.password
         or not (url.hostname == "canva.com" or (url.hostname or "").endswith(".canva.com"))
@@ -129,6 +174,7 @@ def _preview_digest(
     design_id: str,
     expected: dict,
     previous: dict,
+    thumbnails: tuple[str, ...],
 ) -> str:
     return hashlib.sha256(
         json.dumps(
@@ -138,10 +184,41 @@ def _preview_digest(
                 "design_id": design_id,
                 "expected": expected,
                 "previous": previous,
+                "thumbnails": thumbnails,
             },
             sort_keys=True,
         ).encode()
     ).hexdigest()
+
+
+def _review_digest(preview: FlyerReviewPreview) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            {
+                "design": preview.design.model_dump(),
+                "expected": preview.expected,
+                "version": preview.provider_version,
+                "thumbnails": preview.thumbnail_urls,
+            },
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+
+
+def _thumbnail_urls(metadata: dict[str, Any]) -> tuple[str, ...]:
+    value = metadata.get("thumbnail", {}).get("url")
+    if not isinstance(value, str):
+        raise CanvaError("flyer_preview_unavailable")
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "media.canva.com"
+        or parsed.port not in (None, 443)
+        or parsed.username
+        or parsed.password
+    ):
+        raise CanvaError("invalid_flyer_preview_url")
+    return (value,)
 
 
 class CanvaMCPAdapter:
@@ -159,6 +236,9 @@ class CanvaMCPAdapter:
         owner_id: str,
         tool_names: dict[str, str] | None = None,
     ) -> None:
+        if getattr(session, "owner_id", owner_id) != owner_id:
+            raise PermissionError("Canva session is outside the current organizer scope")
+        TypeAdapter(Identifier).validate_python(owner_id)
         self.session = session
         self.owner_id = owner_id
         self.tool_names = dict(tool_names or {})
@@ -167,6 +247,8 @@ class CanvaMCPAdapter:
         arguments.setdefault("user_intent", "Prepare and review the organizer's event flyer.")
         try:
             result = await self.session.call_tool(self.tool_names.get(name, name), arguments)
+        except CanvaError:
+            raise
         except Exception:
             raise CanvaError("canva_transport_failed_reconcile_before_retry") from None
         return _object(result)
@@ -196,9 +278,11 @@ class CanvaMCPAdapter:
             format="Flyer (Portrait A4)",
             user_intent="Create a custom event flyer from the organizer's Go-prepared brief.",
         )
-        return self._creation_state(event, brief.generation_id, result, now or datetime.now(UTC))
+        return await self._creation_state(
+            event, brief.generation_id, result, now or datetime.now(UTC)
+        )
 
-    def _creation_state(
+    async def _creation_state(
         self,
         event: EventSnapshot,
         generation_id: str,
@@ -232,11 +316,40 @@ class CanvaMCPAdapter:
         if status == "completed":
             design = result.get("design", {})
             try:
+                # Creation can return canva.link rather than a full design URL. Resolve by
+                # the returned design ID through Canva, never by following arbitrary redirects.
+                design_id = design["id"]
+                TypeAdapter(Identifier).validate_python(design_id)
+                view_url = design["url"]
+                edit_url = design.get("edit_url") or view_url
+                for candidate in (view_url, edit_url):
+                    parsed = urlsplit(candidate)
+                    if parsed.hostname == "canva.link":
+                        if (
+                            parsed.scheme != "https"
+                            or parsed.port not in (None, 443)
+                            or parsed.username
+                            or parsed.password
+                        ):
+                            raise CanvaError("invalid_canva_design_url")
+                    else:
+                        _canva_url(candidate)
+                if any(
+                    urlsplit(candidate).hostname == "canva.link"
+                    for candidate in (view_url, edit_url)
+                ):
+                    metadata = (await self._call("get-design", design_id=design_id)).get(
+                        "design", {}
+                    )
+                    if metadata.get("id") != design_id:
+                        raise CanvaError("created_design_identity_mismatch")
+                    view_url = metadata.get("urls", {}).get("view_url")
+                    edit_url = metadata.get("urls", {}).get("edit_url") or view_url
                 ref = DesignRef(
                     **base,
-                    design_id=design["id"],
-                    edit_url=_canva_url(design.get("edit_url") or design["url"]),
-                    view_url=_canva_url(design["url"]),
+                    design_id=design_id,
+                    edit_url=_canva_url(edit_url),
+                    view_url=_canva_url(view_url),
                 )
             except (KeyError, ValueError):
                 raise CanvaError("incomplete_created_design") from None
@@ -280,7 +393,7 @@ class CanvaMCPAdapter:
             continuation_token=job.continuation_token,
             user_intent="Check completion of the requested custom event flyer.",
         )
-        return self._creation_state(event, job.generation_id, result, now)
+        return await self._creation_state(event, job.generation_id, result, now)
 
     async def stage_update(
         self,
@@ -329,13 +442,44 @@ class CanvaMCPAdapter:
                     for m in mappings
                 ],
             )
+            outcomes = result.get("edit_operation_results", [])
+            if (
+                len(outcomes) != len(mappings)
+                or any(
+                    outcome.get("status") != "success"
+                    or outcome.get("operation_info", {}).get("type") != "replace_text"
+                    for outcome in outcomes
+                )
+                or {outcome.get("operation_info", {}).get("element_id") for outcome in outcomes}
+                != {mapping.element_id for mapping in mappings}
+            ):
+                raise CanvaError("flyer_edit_operation_failed")
+            if not result.get("thumbnails"):
+                raise CanvaError("flyer_preview_unavailable")
+            thumbnails = tuple(t["url"] for t in result["thumbnails"] if t.get("url"))
+            if not thumbnails:
+                raise CanvaError("flyer_preview_unavailable")
+            for url in thumbnails:
+                parsed = urlsplit(url)
+                if (
+                    parsed.scheme != "https"
+                    or parsed.hostname
+                    not in {
+                        "media.canva.com",
+                        "design-manipulation-download.canva.com",
+                    }
+                    or parsed.port not in (None, 443)
+                    or parsed.username
+                    or parsed.password
+                ):
+                    raise CanvaError("invalid_flyer_preview_url")
         except Exception:
             await self._call("cancel-editing-transaction", transaction_id=transaction_id)
             raise
         expected = {m.role: expected[m.role] for m in mappings}
         previous = {m.role: m.previous_text for m in mappings}
         digest = _preview_digest(
-            transaction_id, event.revision, design.design_id, expected, previous
+            transaction_id, event.revision, design.design_id, expected, previous, thumbnails
         )
         return EditPreview(
             design=design.model_copy(update={"generation_id": copy.generation_id}),
@@ -345,8 +489,70 @@ class CanvaMCPAdapter:
             created_at=now or datetime.now(UTC),
             expected=expected,
             previous=previous,
-            thumbnail_urls=tuple(t["url"] for t in result.get("thumbnails", []) if "url" in t),
+            thumbnail_urls=thumbnails,
         )
+
+    async def cancel_update(self, event: EventSnapshot, preview: EditPreview) -> None:
+        """Discard an abandoned or superseded preview without committing anything."""
+        self._design_scope(preview.design, event)
+        await self._call("cancel-editing-transaction", transaction_id=preview.transaction_id)
+
+    async def preview_flyer(
+        self,
+        event: EventSnapshot,
+        design: DesignRef,
+        *,
+        now: datetime | None = None,
+    ) -> FlyerReviewPreview:
+        verified = await self.verify_text(event, design, event.flyer_fields())
+        if verified.state != "verified":
+            raise CanvaError("flyer_text_needs_review")
+        metadata = (await self._call("get-design", design_id=design.design_id)).get("design", {})
+        if metadata.get("id") != design.design_id or metadata.get("page_count") != 1:
+            raise CanvaError("flyer_identity_or_page_count_mismatch")
+        if not isinstance(metadata.get("updated_at"), (str, int)):
+            raise CanvaError("flyer_version_unavailable")
+        preview = FlyerReviewPreview(
+            design=design,
+            digest="",
+            created_at=now or datetime.now(UTC),
+            provider_version=str(metadata["updated_at"]),
+            expected=event.flyer_fields(),
+            thumbnail_urls=_thumbnail_urls(metadata),
+        )
+        return preview.model_copy(update={"digest": _review_digest(preview)})
+
+    async def approve_flyer(
+        self,
+        event: EventSnapshot,
+        preview: FlyerReviewPreview,
+        approval: Approval,
+    ) -> VerifiedDesign:
+        """Record initial/manual-edit review; does not modify the Canva design."""
+        self._design_scope(preview.design, event)
+        if preview.design.event_revision != event.revision:
+            raise StaleRevisionError("Flyer review was superseded")
+        if (
+            approval.owner_id != self.owner_id
+            or approval.event_id != event.id
+            or approval.event_revision != event.revision
+            or approval.preview_digest != preview.digest
+            or preview.digest != _review_digest(preview)
+            or approval.approved_at < preview.created_at
+            or preview.expected != event.flyer_fields()
+        ):
+            raise PermissionError("Organizer must approve this exact flyer preview")
+        metadata = (await self._call("get-design", design_id=preview.design.design_id)).get(
+            "design", {}
+        )
+        if (
+            metadata.get("id") != preview.design.design_id
+            or metadata.get("page_count") != 1
+            or str(metadata.get("updated_at")) != preview.provider_version
+        ):
+            raise CanvaError("flyer_changed_since_preview")
+        verified = await self.verify_text(event, preview.design, preview.expected)
+        return verified.model_copy(update={"organizer_reviewed": verified.state == "verified"})
 
     async def commit_update(
         self,
@@ -369,6 +575,7 @@ class CanvaMCPAdapter:
                 preview.design.design_id,
                 preview.expected,
                 preview.previous,
+                preview.thumbnail_urls,
             )
             or approval.approved_at < preview.created_at
         ):
@@ -415,7 +622,9 @@ class CanvaMCPAdapter:
             stale_roles=stale,
         )
 
-    async def export_png(self, event: EventSnapshot, design: VerifiedDesign) -> dict[str, str]:
+    async def request_png_export(
+        self, event: EventSnapshot, design: VerifiedDesign
+    ) -> ExportReceipt:
         self._design_scope(design.design, event)
         if design.state != "verified" or design.design.event_revision != event.revision:
             raise StaleRevisionError("Only the verified current flyer can be exported")
@@ -426,6 +635,33 @@ class CanvaMCPAdapter:
             user_intent="Export the verified event flyer for private versioned Storage.",
         )
         job = result.get("job", {})
+        if not isinstance(job.get("id"), str) or not job["id"]:
+            raise CanvaError("missing_export_job_id")
+        base = {"design": design.design, "export_id": job["id"]}
+        if job.get("status") in {"in_progress", "pending"}:
+            return ExportReceipt(**base, state="pending")
+        if job.get("status") == "failed":
+            return ExportReceipt(**base, state="failed", failure_code="canva_export_failed")
         if job.get("status") != "success" or len(job.get("urls", [])) != 1:
             raise CanvaError("export_not_ready_or_not_single_page")
-        return {"export_id": job["id"], "download_url": job["urls"][0]}
+        url = job["urls"][0]
+        parsed = urlsplit(url)
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != "export-download.canva.com"
+            or parsed.port not in (None, 443)
+            or parsed.username
+            or parsed.password
+        ):
+            raise CanvaError("invalid_export_download_url")
+        return ExportReceipt(**base, state="completed", download_url=url)
+
+    async def export_png(self, event: EventSnapshot, design: VerifiedDesign) -> dict[str, str]:
+        """Compatibility helper for callers that only accept a completed export.
+
+        Durable coordinators should use request_png_export to retain pending/failed job IDs.
+        """
+        receipt = await self.request_png_export(event, design)
+        if receipt.state != "completed" or receipt.download_url is None:
+            raise CanvaError("export_not_ready_or_not_single_page")
+        return {"export_id": receipt.export_id, "download_url": receipt.download_url}

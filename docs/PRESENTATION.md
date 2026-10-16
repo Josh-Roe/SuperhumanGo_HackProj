@@ -2,7 +2,7 @@
 
 Member 4 working script, 2026-10-16. Website name undecided. Primary track recommendation: Productivity, with inclusion review demonstrated as a core feature. Final track belongs to the team lead. Rubric mapping follows the team's [hackathon brief](HACKATHON.md); no weights or guaranteed scores are assumed.
 
-**Current readiness:** Member 4 services pass local/synthetic tests. The full website → Go → Canva → Storage → Gmail/Calendar flow has not been run in this branch. This script is a rehearsal plan, not evidence of a completed live demo.
+**Current readiness:** Member 4 services pass local/synthetic tests, including a temporary combined suite against Member 3's actual queue and Gmail MIME code. A standalone fictional Canva flyer was created live through this chat; its editable elements were inspected and the transaction cancelled without edits. Local synthetic document HTML was visually inspected. Native Python Canva OAuth, real Go generation, Canva edit commit/export, Supabase and the full website → Go → Canva → Storage → Gmail/Calendar flow remain unverified. This script is a rehearsal plan, not evidence of a completed live demo.
 
 ## Story and speaking cues
 
