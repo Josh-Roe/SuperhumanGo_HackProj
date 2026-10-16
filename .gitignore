@@ -2,7 +2,10 @@
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/settings.json
 *.swp
 *.swo
 
@@ -22,3 +25,18 @@ dist/
 build/
 coverage/
 *.log
+
+# Pack CLI credentials and local installation identity
+.coda.json
+.coda-pack.json
+.coda-credentials.json
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+*.tsbuildinfo
+
+# Keep model artifacts outside source control
+models/*
+!models/README.md

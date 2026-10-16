@@ -1,0 +1,19 @@
+{
+  "name": "superhuman-go-project-connector",
+  "private": true,
+  "version": "0.1.0",
+  "engines": { "node": ">=24 <27" },
+  "scripts": {
+    "configure": "node configure.mjs",
+    "validate": "packs validate pack.ts",
+    "check": "tsc --noEmit && packs validate pack.ts",
+    "build": "packs build pack.ts",
+    "register": "packs register",
+    "precreate": "node require-endpoint.mjs",
+    "create": "packs create pack.ts --name 'Hackathon Workspace'",
+    "preupload": "node require-endpoint.mjs",
+    "upload": "packs upload pack.ts"
+  },
+  "dependencies": { "@codahq/packs-sdk": "1.18.3" },
+  "devDependencies": { "typescript": "~5.9.3", "@types/node": "^24.0.0" }
+}

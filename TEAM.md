@@ -17,9 +17,21 @@ The hackathon overview requires a team of 2–4 people. Teammate usernames will 
 - Ask an available teammate to review a PR before merging. This is a team convention; branch protection is not configured by this setup.
 - Record project decisions in the relevant issue and update the README with agreed setup instructions.
 
+## Development agents
+
+Use three agents with clear ownership. These are development responsibilities, not the product's eventual agents or assignments to named teammates.
+
+| Agent | Owns | Handoff |
+| --- | --- | --- |
+| Backend | `backend/`, `inference/` | API schemas, integration configuration, tests, model input/output contract |
+| Frontend | `frontend/` | React UI, API client, loading/error states, browser validation |
+| Documentation and presentation | `docs/`, team/contribution guides, Canva and pitch preparation | Accurate setup guide, screenshots, pitch script, submission evidence |
+
+Coordinate changes to root tooling, CI, deployment, and the Superhuman connector before editing. See [the agent instructions](AGENTS.md) and [team workflow](docs/TEAM_WORKFLOW.md).
+
 ## Decisions still open
 
-Project idea, primary track, technical stack, task ownership, team communication channel, and demo/submission owner will be chosen together after further instructions.
+Project idea, primary track, named task owners, team communication channel, and demo/submission owner remain to be agreed. The stack is React with TypeScript, Python APIs/ML, and an optional CPU VPS and ONNX inference path. The scaffold supports those choices; no product idea, trained model, or live deployment is assumed.
 
 ## Adding teammates later
 

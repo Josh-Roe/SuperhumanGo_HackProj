@@ -1,6 +1,6 @@
 # Contributing
 
-Implementation starts after the team has agreed the project and given instructions. Until then, keep changes limited to repository setup and coordination.
+The project scaffold is authorized. Implement product features once their issue defines the intended behavior; the project idea and primary track are still open. Use the three [development agent roles](AGENTS.md) to avoid overlapping edits.
 
 ## Pick up a task
 
@@ -38,4 +38,6 @@ After merging, update your local `main` and remove the merged branch when it is 
 
 Keep credentials in local environment files. Commit only placeholder configuration such as `.env.example`; the repository is public. Document any required environment variables when implementation begins.
 
-No build, test, or CI commands are defined yet because the stack is undecided. Each PR should state the checks actually run; add shared validation commands to the README once the stack exists.
+Use the setup and check commands in the [README](README.md). Each PR must record the checks actually run and any checks blocked by missing credentials, services, or model files. A passing local scaffold check does not establish a working Superhuman Go installation or a deployed model.
+
+For frontend/backend integration, follow [the Live Share workflow](docs/TEAM_WORKFLOW.md). The host commits changes from the shared checkout to the agreed feature branch, then opens a PR.

@@ -1,0 +1,7 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+  "python.envFile": "${workspaceFolder}/backend/.env",
+  "eslint.workingDirectories": ["frontend"],
+  "files.exclude": { "**/__pycache__": true },
+  "search.exclude": { "**/node_modules": true, "**/.venv": true }
+}

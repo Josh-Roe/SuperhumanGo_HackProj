@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json.schemastore.org/vsls",
+  "excludeFiles": [
+    ".env",
+    "**/.env",
+    "**/.env.*",
+    "**/.coda.json",
+    "**/.coda-credentials.json",
+    "**/.venv/**",
+    "**/node_modules/**",
+    "models/**"
+  ],
+  "hideFiles": ["**/.env*", "**/.coda*.json"]
+}

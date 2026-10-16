@@ -1,0 +1,15 @@
+{
+  "name": "superhuman-go-hackproj",
+  "private": true,
+  "version": "0.1.0",
+  "engines": { "node": ">=24 <27" },
+  "scripts": {
+    "setup": "npm --prefix frontend ci && npm --prefix integrations/superhuman ci",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "uv run --project backend --env-file backend/.env python -m uvicorn hackathon_backend.main:app --reload --host 127.0.0.1 --port 8000",
+    "check:frontend": "npm --prefix frontend run lint && npm --prefix frontend run test && npm --prefix frontend run build",
+    "check:backend": "uv run --project backend --frozen --extra dev ruff check backend && uv run --project backend --frozen --extra dev pytest backend/tests",
+    "check:connector": "npm --prefix integrations/superhuman run check",
+    "check": "npm run check:frontend && npm run check:backend && npm run check:connector"
+  }
+}

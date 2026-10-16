@@ -14,7 +14,7 @@ Choose one primary track:
 | Inclusion & Accessibility | Reduce barriers to communication, learning, work, or information |
 | Wildcard | Explore a creative or unexpected use of agents |
 
-The team has not selected an idea or track yet.
+The team has not selected an idea or track yet. The approved scaffold uses React/TypeScript, Python APIs/ML, and a Superhuman Go connector. Those tools support the prototype; the eventual agent contribution must still be demonstrated in the chosen user workflow.
 
 ## Published schedule
 
@@ -53,4 +53,6 @@ Impact and usefulness, agent integration, technical execution, creativity and in
 
 ## Existing work disclosure
 
-Before application development, this repository contains its original Git attributes plus repository documentation, ignore rules, and collaboration templates. No application code or project implementation was added during this setup. Update the submission's tools and credits with any reused code, templates, or assets introduced later.
+The repository began with Git attributes, repository documentation, ignore rules, and collaboration templates. The next setup phase adds a React/TypeScript frontend, Python API and MCP scaffold, Superhuman Go connector, optional ONNX/C++ inference support, and development/deployment tooling. Disclose that scaffold and any reused code, templates, or assets in the submission's tools and credits. Keep scaffold work distinguishable from the eventual hackathon product features.
+
+See [the architecture](ARCHITECTURE.md) for the technical starting point and [the presentation brief](PRESENTATION.md) for pitch and Canva preparation. Actual Go installation, external credentials, model training, VPS deployment, and submission remain separate tasks.

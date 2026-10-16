@@ -1,0 +1,8 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Frontend", "type": "shell", "command": "npm run dev:frontend", "isBackground": true, "problemMatcher": [] },
+    { "label": "Backend", "type": "shell", "command": "npm run dev:backend", "isBackground": true, "problemMatcher": [] },
+    { "label": "Check project", "type": "shell", "command": "npm run check", "problemMatcher": [] }
+  ]
+}
