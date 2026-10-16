@@ -4,9 +4,9 @@ GitHub holds the shared source of truth. Use Issues for tasks and PRs for change
 
 ## Divide the work
 
-Start each task with one owner, a small outcome, and a completion check. Backend owns `backend/` and `inference/`; frontend owns `frontend/`; the documentation agent owns the guides and presentation materials. Agree shared-file changes in the issue before editing. Named teammates will be added to [the roster](../TEAM.md) when their usernames arrive.
+Start each task with one owner, a small outcome, and a completion check. Use the [four-member plan and prompts](TEAM_TASKS.md): 1 frontend; 2 backend/Supabase; 3 Superhuman Go/Google; 4 Canva/inclusion/presentation. Read the global context and all four personal contexts before work, but update only your own personal context. Member 2 coordinates shared contracts/dependencies/config; Member 3 owns `main.py` registration. Named teammates join [the roster](../TEAM.md) when usernames arrive.
 
-The backend and frontend owners should agree an endpoint's method, URL, payload, response, error states, and a sample before building against it. Use FastAPI's `/docs` and `/openapi.json` for the current REST schema. The initial integration points are `GET /api/health` and `GET /api/status`. Product endpoints come after the idea is selected.
+Agree method, URL, payload, response, errors and sample before building. [The initial event contract](INTEGRATION_CONTRACT.md) is a planning baseline; Member 2 freezes exact schemas with the consumers. FastAPI `/docs` and `/openapi.json` describe only currently implemented endpoints. `/api/health` and `/api/status` remain scaffold endpoints; event features are assigned work, not already implemented.
 
 Each handoff should include:
 

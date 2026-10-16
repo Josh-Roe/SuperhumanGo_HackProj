@@ -17,21 +17,22 @@ The hackathon overview requires a team of 2–4 people. Teammate usernames will 
 - Ask an available teammate to review a PR before merging. This is a team convention; branch protection is not configured by this setup.
 - Record project decisions in the relevant issue and update the README with agreed setup instructions.
 
-## Development agents
+## Four development members
 
-Use three agents with clear ownership. These are development responsibilities, not the product's eventual agents or assignments to named teammates.
+Each person sends one [assigned prompt](docs/TEAM_TASKS.md) to their own agent. All agents read every member's context but write only their own. Human names/usernames are still pending; these are role assignments, not claims about a named teammate.
 
-| Agent | Owns | Handoff |
+| Member | Owns | Handoff |
 | --- | --- | --- |
-| Backend | `backend/`, `inference/` | API schemas, integration configuration, tests, model input/output contract |
-| Frontend | `frontend/` | React UI, API client, loading/error states, browser validation |
-| Documentation and presentation | `docs/`, team/contribution guides, Canva and pitch preparation | Accurate setup guide, screenshots, pitch script, submission evidence |
+| 1: Frontend | `frontend/` | Login/event/review/distribution/update/RSVP screens and typed API needs |
+| 2: Backend/Supabase and integration lead | Event API/domain/auth/repositories, `supabase/`, shared tooling/contracts/VPS | Auth/RLS, versioned data/Storage/queue, exact schemas and CI |
+| 3: Superhuman Go/Google | Go connector/tools, Google adapters/workflows, `main.py` | Live Go writing/coordination, Gmail/Calendar changes, RSVP and provider receipts |
+| 4: Canva/inclusion/presentation | Canva/inclusion/assets services and product/pitch assets | Flyer create/update/export, inclusion findings, Go-written documents and demo |
 
-Coordinate changes to root tooling, CI, deployment, and the Superhuman connector before editing. See [the agent instructions](AGENTS.md) and [team workflow](docs/TEAM_WORKFLOW.md).
+See [AGENTS.md](AGENTS.md) for exact module/test/context ownership and [the workflow](docs/TEAM_WORKFLOW.md) for pairing. Member 2 edits dependencies/config/contracts; Member 3 registers everyone's factories in `main.py`. Shared-file changes go through their owner.
 
 ## Decisions still open
 
-Project idea, primary track, named task owners, team communication channel, and demo/submission owner remain to be agreed. The stack is React with TypeScript, Python APIs/ML, and an optional CPU VPS and ONNX inference path. The scaffold supports those choices; no product idea, trained model, or live deployment is assumed.
+The event-management idea and React/Python/Supabase/Go stack are selected. Website name, final primary track, human role assignments, account credentials, and live deployment/trigger configuration remain open. The existing optional ML/ONNX path is deferred behind the event workflow. No live product integration is implied by the scaffold.
 
 ## Adding teammates later
 

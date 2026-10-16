@@ -2,7 +2,7 @@
 
 React + TypeScript frontend, Python API and MCP tools, and an optional CPU model-serving path for [MTC x Grammarly: Agents in Action](https://mtc-x-grammarly.devpost.com/).
 
-This is the shared project foundation. The product idea and track are still open. The starter UI reports real service readiness; it does not simulate an AI response.
+The approved product is an event organizer website: create event details, prepare Canva material and inclusion checks, distribute invitations through Gmail/Google Calendar, and propagate changes. **Superhuman Go powers the writing and coordination, with Grammarly assistance.** The website name and final primary track remain undecided. Current code is a scaffold; the product plan and assigned tasks are documented, not implemented by the planning update.
 
 ## Run locally
 
@@ -54,8 +54,10 @@ Live activation needs a public HTTPS endpoint and an eligible Superhuman account
 
 ## Team and deployment
 
-- [Shared project context and latest handoffs](PROJECT_CONTEXT.md) — read before starting work; update material decisions with your changes.
-- [Three-agent workflow and VS Code Live Share](docs/TEAM_WORKFLOW.md)
+- [Shared product context](PROJECT_CONTEXT.md) — read with all four member contexts before work; update only your own member context.
+- [Four assignments and copy-ready agent prompts](docs/TEAM_TASKS.md)
+- [Initial integration contract](docs/INTEGRATION_CONTRACT.md)
+- [Four-member workflow and VS Code Live Share](docs/TEAM_WORKFLOW.md)
 - [Team roster](TEAM.md) and [contribution guide](CONTRIBUTING.md)
 - [Architecture and API handoff](docs/ARCHITECTURE.md)
 - [VPS deployment and CPU models](docs/DEPLOYMENT.md)
