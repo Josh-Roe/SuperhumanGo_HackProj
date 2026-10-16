@@ -2,54 +2,68 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import App from "./App";
-async function preview() {
+async function workspace() {
   const user = userEvent.setup();
   render(<App />);
-  await user.click(screen.getByRole("button", { name: /Open local preview/ }));
   await screen.findByRole("button", { name: /A neighborhood, together/ });
   return user;
 }
 async function sample() {
-  const user = await preview();
+  const user = await workspace();
   await user.click(
     screen.getByRole("button", { name: /A neighborhood, together/ }),
   );
   await screen.findByRole("button", { name: "Save & continue" });
   return user;
 }
-describe("organizer workspace", () => {
-  it("keeps sign-in distinct from the synthetic, non-publishing preview", async () => {
-    const user = await preview();
+describe("simplified event workspace", () => {
+  it("opens directly to events with only the three requested sidebar destinations", async () => {
+    await workspace();
+    expect(screen.getByRole("heading", { name: "Your events" })).toBeVisible();
     expect(
-      screen.getByText(/Synthetic sample writing and receipts/),
-    ).toBeVisible();
-    expect(screen.getByText(/MCP event creation is awaiting/)).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /Leave preview/ }));
-    expect(screen.getByRole("heading", { name: "Welcome in." })).toBeVisible();
+      screen.queryByRole("button", { name: "Sign in" }),
+    ).not.toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Workspace" });
+    expect(
+      within(nav)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["▦Your events", "⚙Settings", "○Profile"]);
+    expect(screen.getByRole("button", { name: "Add event" })).toBeVisible();
+    expect(
+      screen.queryByText("A little planning. A great gathering."),
+    ).not.toBeInTheDocument();
   });
-  it("offers keyboard navigation, private RSVP evidence, and partial provider states", async () => {
+  it("keeps the three creation stages inside an event and opens Go at its official URL", async () => {
     const user = await sample();
-    await user.click(screen.getByRole("button", { name: /Updates & sync/ }));
-    expect(
-      screen.getByText("Unsent draft · update existing draft"),
-    ).toBeVisible();
-    expect(screen.getAllByText("Stale").length).toBeGreaterThan(0);
-    expect(screen.getByText("integration not connected")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /RSVPs/ }));
-    expect(screen.getByText("Conflict · needs review")).toBeVisible();
-    expect(
-      screen.getByText(
-        /Private dietary and accessibility details are excluded/,
-      ),
-    ).toBeVisible();
-    expect(screen.getByRole("heading", { name: "RSVPs" })).toHaveFocus();
-    expect(screen.getByRole("table")).toHaveAccessibleName(
-      "Invited people and response evidence",
+    const flow = screen.getByRole("navigation", { name: "Event creation" });
+    expect(within(flow).getAllByRole("button")).toHaveLength(3);
+    await user.click(
+      screen.getByRole("button", { name: /2Design & inclusion/ }),
     );
+    expect(
+      screen.getByRole("link", { name: /Continue in Superhuman Go/ }),
+    ).toHaveAttribute("href", "https://go.superhuman.com/");
+    expect(
+      screen.getByRole("link", { name: /Connect Canva in Go/ }),
+    ).toHaveAttribute("href", "https://go.superhuman.com/");
+    await user.click(
+      screen.getByText("Connect the custom MCP & get your prompt"),
+    );
+    expect(
+      (screen.getByLabelText("Prompt for Go") as HTMLTextAreaElement).value,
+    ).toContain("preview-gathering");
+    expect(
+      screen.getByText(/hosted MCP address is awaiting setup/),
+    ).toBeVisible();
+    expect(screen.getByText(/does not install the connector/)).toBeVisible();
   });
-  it("saves manual events, then waits truthfully for Go without inventing content", async () => {
-    const user = await preview();
-    await user.click(screen.getByRole("button", { name: /Create manually/ }));
+  it("adds an event and advances through design to distribution without making up Go output", async () => {
+    const user = await workspace();
+    await user.click(screen.getByRole("button", { name: "Add event" }));
+    expect(
+      screen.getByRole("button", { name: /2Design & inclusion/ }),
+    ).toBeDisabled();
     await user.type(screen.getByLabelText("Event title"), "Garden meetup");
     await user.type(
       screen.getByLabelText("Location or online meeting link"),
@@ -63,28 +77,41 @@ describe("organizer workspace", () => {
     await user.type(screen.getByLabelText("End time"), "2026-11-07T12:00");
     await user.click(screen.getByRole("button", { name: "Save & continue" }));
     expect(
-      await screen.findByText("Waiting for Go’s first draft"),
+      await screen.findByText(/Waiting for Go’s first draft/),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /2Design & inclusion/ }),
+    ).toHaveAttribute("aria-current", "step");
+    await user.click(screen.getByRole("button", { name: "Queue preparation" }));
+    expect(
+      await screen.findByText(/Awaiting Go. Open Superhuman Go/),
     ).toBeVisible();
     await user.click(
-      screen.getByRole("button", { name: "Request preparation" }),
+      screen.getByRole("button", { name: "Preview distribution" }),
     );
-    expect(
-      await screen.findByText(/Awaiting Go. Ask your Go agent/),
-    ).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /Distribution/ }));
     expect(
       screen.getByRole("button", { name: "Confirm & publish" }),
     ).toBeDisabled();
+    await user.click(
+      within(screen.getByRole("navigation", { name: "Workspace" })).getByRole(
+        "button",
+        { name: "Your events" },
+      ),
+    );
+    expect(
+      await screen.findByRole("button", { name: /Garden meetup/ }),
+    ).toBeVisible();
   });
-  it("edits Go previews with provenance and records explicit review without sending", async () => {
+  it("edits writing with provenance and requires explicit review", async () => {
     const user = await sample();
     await user.click(
-      screen.getByRole("button", { name: /Design & inclusion/ }),
+      screen.getByRole("button", { name: /2Design & inclusion/ }),
     );
-    const editor = screen.getByLabelText(
-      /Event description.*needs review.*Superhuman Go/s,
+    await user.click(
+      screen.getByText("Event description", { selector: "summary" }),
     );
-    await user.type(editor, " Please bring a notebook.");
+    const editor = screen.getByLabelText(/Event description.*Superhuman Go/s);
+    await user.type(editor, " Bring a notebook.");
     expect(screen.getByText("Edited by organizer · revision 2")).toBeVisible();
     expect(
       screen.getByRole("button", { name: "Save review & continue" }),
@@ -101,15 +128,21 @@ describe("organizer workspace", () => {
     expect(
       screen.getByRole("button", { name: "Confirm & publish" }),
     ).toBeDisabled();
-    expect(
-      screen.getByText(/Local preview: publish is disabled/),
-    ).toBeVisible();
   });
-  it("blocks unsourced inclusion claims and preserves unknown options", async () => {
+  it("retains holiday and diet questions and blocks unsourced accessibility claims", async () => {
     const user = await sample();
     await user.click(
-      screen.getByRole("button", { name: /Design & inclusion/ }),
+      screen.getByRole("button", { name: /2Design & inclusion/ }),
     );
+    expect(
+      screen.getByLabelText("Which holidays or observances should Go check?"),
+    ).toBeVisible();
+    expect(
+      screen.getByLabelText(
+        "Is food served? Which dietary options are confirmed?",
+      ),
+    ).toBeVisible();
+    await user.click(screen.getByText("Access, captions & sensory details"));
     const fact = screen.getByRole("group", { name: "Step-free entrance" });
     await user.selectOptions(within(fact).getByRole("combobox"), "yes");
     await user.click(
@@ -122,50 +155,43 @@ describe("organizer workspace", () => {
       "Add a source and confirmation date",
     );
   });
-  it("refreshes the existing real health contract and handles backend failure", async () => {
-    const user = await preview();
+  it("keeps provider failures and private RSVP evidence available within distribution", async () => {
+    const user = await sample();
+    await user.click(screen.getByRole("button", { name: /3Distribution/ }));
+    expect(screen.getByText(/Your invitation is unsent/)).toBeVisible();
+    await user.click(screen.getByText("Provider status & revisions"));
+    expect(screen.getByText("integration not connected")).toBeVisible();
+    await user.click(screen.getByText("Guest responses"));
+    expect(screen.getByText("Conflict · needs review")).toBeVisible();
+    expect(screen.getByRole("table")).toHaveAccessibleName(
+      "Invited people and response evidence",
+    );
+  });
+  it("provides Go setup in settings and saves a local profile without sign-up", async () => {
+    const user = await workspace();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByText("Your connected tools")).toBeVisible();
+    expect(screen.getAllByRole("link", { name: /Connect in Go/ })).toHaveLength(
+      3,
+    );
+    expect(screen.getByLabelText("Prompt for Go")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Profile" }));
+    await user.clear(screen.getByLabelText("Your name"));
+    await user.type(screen.getByLabelText("Your name"), "Alex");
+    await user.click(screen.getByRole("button", { name: "Save profile" }));
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Profile saved in this tab.",
+    );
+    expect(screen.getByText("Alex")).toBeVisible();
+  });
+  it("handles a backend error in settings without claiming Go is connected", async () => {
+    const user = await workspace();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByText("Workspace connection status"));
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
-    await user.click(
-      screen.getByRole("button", { name: "Backend not checked" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Check connection" }));
     expect(
-      await screen.findByRole("button", {
-        name: "Backend unavailable · retry connection",
-      }),
-    ).toBeVisible();
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockImplementation((path: string) =>
-          Promise.resolve(
-            new Response(
-              JSON.stringify(
-                path === "/api/health"
-                  ? { status: "ok", service: "backend" }
-                  : {
-                      superhuman: {
-                        transport: "mcp",
-                        configured: true,
-                        verified: false,
-                        endpoint: "/mcp",
-                      },
-                      model: { configured: false, runtime: "not_configured" },
-                    },
-              ),
-            ),
-          ),
-        ),
-    );
-    await user.click(
-      screen.getByRole("button", {
-        name: "Backend unavailable · retry connection",
-      }),
-    );
-    expect(
-      await screen.findByRole("button", {
-        name: /Backend online · MCP configured · Go unverified/,
-      }),
+      await screen.findByText("Backend unavailable. Try again."),
     ).toBeVisible();
   });
 });

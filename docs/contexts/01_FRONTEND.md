@@ -6,6 +6,18 @@ Branch: `codex/member-1-frontend`, based on `3bd33b3`.
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four member contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/01_FRONTEND.md) before work. Write only this personal context. Preserve other members' changes.
 
+## Current UI simplification — 2026-10-16
+
+**User request | agreed, implemented:** skip signup/login for now and open directly into the organizer space. Sidebar has exactly **Your events**, **Settings**, and **Profile**. Event cards and a plus button lead to **1. Event details → 2. Design & inclusion → 3. Distribution** inside each event. Removed the dashboard marketing hero/metrics and the separate provider/RSVP sidebar destinations. Holiday/diet questions remain visible; access/sensory facts and editable writing previews are collapsed. Provider receipts and private guest responses are expandable inside distribution. Profile name/email edits are local to this tab.
+
+**User clarification | agreed, implemented UI:** send the organizer to Superhuman Go, have them add the team's custom MCP connector, then prompt Go to update website records and provider materials. Settings and event step 2 now contain **Continue in Superhuman Go** (`https://go.superhuman.com/`), connector setup instructions, an optional public hosted `VITE_PUBLIC_MCP_URL`, and a copyable event-ID/revision prompt. The prompt requires saved previews and organizer approval before sending. Clipboard failure on insecure LAN pages falls back to selecting/copying the text. Opening the Go tab does not install a connector, submit a prompt, or prove a connected account. Official URL/connector path checked against [Superhuman connector help](https://support.grammarly.com/hc/en-us/articles/40642362241293-About-Superhuman-Go-agents-and-connectors).
+
+**Current boundary:** the simplified shell opens the local in-memory preview directly. The earlier login screen is removed, and the existing proposed auth/REST adapter remains isolated for later integration. No real organizer API is activated by bypassing authentication. Live private data, MCP receipts, and cross-provider synchronization remain pending; current sample records are not connected to Go. Member 3 supplies the actual connector/hosted address and trusted event creation/update tools; Member 2 supplies accepted authenticated records/read APIs. Existing contract proposals below remain proposals, not agreements. Future account UI should be coordinated through Settings/Profile without restoring the initial signup gate unless requested.
+
+**Tested:** lint, production build, and **18 tests** pass after simplification. Updated UI tests cover direct entry, exactly three sidebar destinations, internal event stages, plus/create flow, official Go links, event-scoped prompts, missing-MCP setup messaging, inclusion/source gates, local profile editing, provider/RSVP sections, and backend errors. LAN root again returned HTTP 200. Native browser QA could not complete while the user's active Chrome session was changing; no new desktop/mobile visual verification is claimed. LAN development server remains running. Only `frontend/**` and this personal context changed; PR #2 will be updated on the existing branch.
+
+The remaining sections preserve the original implementation/API handoff history; login/dashboard descriptions there are superseded by this section.
+
 ## Accepted direction and scope
 
 - **2026-10-16 | user request | agreed:** implement `frontend/**` during this assigned task. Superhuman Go remains the central writing/coordination agent. Product name remains undecided; “Event Workspace” is a descriptive UI label.

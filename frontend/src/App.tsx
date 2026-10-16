@@ -1,36 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import {
-  ApiError,
-  authConfigured,
-  createLiveGateway,
-  loadProjectStatus,
-  signIn,
-} from "./api";
+import { loadProjectStatus } from "./api";
 import { createPreviewGateway } from "./preview";
 import { emptyFacts, factLabels, friendlyState, safeUrl } from "./types";
 import type {
   Content,
-  EventGateway,
   EventInput,
   EventRecord,
   FactKey,
-  Session,
   WorkspaceEvent,
 } from "./types";
 import { eventDate, localTime, toInstant } from "./dates";
 import "./App.css";
 
-type Page =
-  "dashboard" | "details" | "review" | "distribution" | "updates" | "rsvps";
-const pages: { id: Page; name: string; icon: string }[] = [
-  { id: "dashboard", name: "Overview", icon: "▦" },
-  { id: "details", name: "Event details", icon: "◷" },
-  { id: "review", name: "Design & inclusion", icon: "◇" },
-  { id: "distribution", name: "Distribution", icon: "↗" },
-  { id: "updates", name: "Updates & sync", icon: "↻" },
-  { id: "rsvps", name: "RSVPs", icon: "♧" },
+type Page = "events" | "settings" | "profile";
+type Step = "details" | "review" | "distribution";
+const steps: { id: Step; name: string }[] = [
+  { id: "details", name: "Event details" },
+  { id: "review", name: "Design & inclusion" },
+  { id: "distribution", name: "Distribution" },
 ];
+const GO_URL = "https://go.superhuman.com/";
+const MCP_URL = safeUrl(import.meta.env.VITE_PUBLIC_MCP_URL);
 const contentLabels: Record<Content["kind"], string> = {
   description: "Event description",
   plain_language_summary: "Plain-language summary",
@@ -61,118 +52,116 @@ function ExternalLink({
     </a>
   ) : null;
 }
-function Login({
-  onEnter,
+function GoHandoff({
+  event,
+  expanded = false,
 }: {
-  onEnter: (gateway: EventGateway, session?: Session) => void;
+  event?: EventRecord;
+  expanded?: boolean;
 }) {
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const data = new FormData(e.currentTarget);
-    setBusy(true);
-    setError("");
+  const [copyMessage, setCopyMessage] = useState("");
+  const prompt = event
+    ? `Use the Event Workspace connector to read event ${event.id} (${event.title}), revision ${event.revision}. Update its Canva flyer, event document, plain-language summary, and invitation in the website. Check holiday conflicts, dietary options, and accessibility, keeping unknown facts unknown. Save previews for my review. Do not send invitations until I approve distribution in the website.`
+    : "Use the Event Workspace connector to create my event, then prepare its Canva flyer, event document, and invitation. Check inclusion and save everything to the website for my review. Do not send until I approve distribution.";
+  async function copy(value: string) {
     try {
-      const session = await signIn(
-        String(data.get("email")),
-        String(data.get("password")),
-      );
-      onEnter(createLiveGateway(session.access_token), session);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to sign in.");
-    } finally {
-      setBusy(false);
+      if (!navigator.clipboard) throw new Error();
+      await navigator.clipboard.writeText(value);
+      setCopyMessage("Copied. Paste it in Superhuman Go.");
+    } catch {
+      setCopyMessage("Select the text below and copy it to Superhuman Go.");
     }
   }
   return (
-    <main className="login-page">
-      <section className="login-story">
-        <a className="wordmark" href="#login">
-          <span className="brand-icon">↗</span> EVENT WORKSPACE
-        </a>
+    <section className="go-handoff" aria-label="Superhuman Go connection">
+      <div className="go-handoff-top">
         <div>
-          <p className="eyebrow">
-            A LITTLE LESS ORGANIZING. A LOT MORE TOGETHER.
-          </p>
-          <h1>
-            Good things
-            <br />
-            start with
-            <br />
-            <em>a gathering.</em>
-          </h1>
+          <span className="eyebrow">SUPERHUMAN GO</span>
+          <h2>
+            {event ? "Let Go take it from here." : "Plan in Go. See it here."}
+          </h2>
           <p>
-            Tell Superhuman Go what you’re planning. Bring the details, writing,
-            and people together here.
+            Connect this workspace to Go, then ask it to update your flyer,
+            writing, email, and Calendar plan.
           </p>
-          <div className="story-steps">
-            <span>01 · Plan with Go</span>
-            <span>02 · Make it yours</span>
-            <span>03 · Bring people together</span>
-          </div>
         </div>
-        <p className="small">
-          Your events. Your review. Your decision to send.
-        </p>
-      </section>
-      <section className="login-form">
-        <p className="eyebrow">YOUR ORGANIZER WORKSPACE</p>
-        <h2>Welcome in.</h2>
-        <p>
-          Sign in to review the events Go creates for you, or start one
-          yourself.
-        </p>
-        <form onSubmit={submit}>
-          <label>
-            Email
-            <input
-              name="email"
-              type="email"
-              autoComplete="username"
-              required
-              disabled={busy || !authConfigured}
-            />
-          </label>
-          <label>
-            Password
-            <input
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              disabled={busy || !authConfigured}
-            />
-          </label>
-          {error && (
-            <p role="alert" className="error-box">
-              {error}
-            </p>
-          )}
-          <button className="primary" disabled={busy || !authConfigured}>
-            {busy ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-        {!authConfigured && (
-          <p className="notice">
-            Live sign-in is awaiting a connected organizer account.
-          </p>
-        )}
-        <div className="preview-entry">
-          <span className="eyebrow">EXPLORE THE EXPERIENCE</span>
-          <p>
-            Try a sample event. Preview changes stay in this tab and disappear
-            when you leave. No accounts connect and no invitations send.
-          </p>
-          <button
-            className="secondary"
-            onClick={() => onEnter(createPreviewGateway())}
+        <a className="primary" href={GO_URL} target="_blank" rel="noreferrer">
+          Continue in Superhuman Go ↗
+        </a>
+      </div>
+      <details open={expanded || undefined}>
+        <summary>Connect the custom MCP & get your prompt</summary>
+        <ol className="setup-steps">
+          <li>
+            <strong>Open Superhuman Go.</strong> Go to Connectors and add the
+            Event Workspace custom MCP connector provided by your team.
+          </li>
+          <li>
+            <strong>Connect this website.</strong> Use its hosted MCP address
+            and sign in with your organizer account.{" "}
+            {MCP_URL ? (
+              <>
+                <label>
+                  Website MCP address
+                  <input
+                    readOnly
+                    value={MCP_URL}
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => copy(MCP_URL)}
+                >
+                  Copy MCP address
+                </button>
+              </>
+            ) : (
+              <p className="connection-note">
+                The hosted MCP address is awaiting setup. Your team needs to
+                configure it before Go can write to this workspace.
+              </p>
+            )}
+          </li>
+          <li>
+            <strong>Prompt Go, then come back.</strong> Ask Go to save changes
+            through the connector. Return here and refresh to review the
+            results.
+            <label>
+              Prompt for Go
+              <textarea
+                readOnly
+                rows={5}
+                value={prompt}
+                onFocus={(e) => e.currentTarget.select()}
+              />
+            </label>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => copy(prompt)}
+            >
+              Copy prompt
+            </button>
+          </li>
+        </ol>
+        <p className="small muted">
+          Opening Go does not install the connector or send this prompt
+          automatically. Connection has not been verified.{" "}
+          <a
+            href="https://support.grammarly.com/hc/en-us/articles/40642362241293-About-Superhuman-Go-agents-and-connectors"
+            target="_blank"
+            rel="noreferrer"
           >
-            Open local preview <span aria-hidden="true">↗</span>
-          </button>
-        </div>
-      </section>
-    </main>
+            Connector help ↗
+          </a>
+        </p>
+        <p className="small" role="status">
+          {copyMessage}
+        </p>
+      </details>
+    </section>
   );
 }
 function Details({
@@ -243,17 +232,12 @@ function Details({
       <div className="section-heading">
         <div>
           <p className="eyebrow">01 / THE PLAN</p>
-          <h2>
-            {event
-              ? "Every detail, in one place."
-              : "What are you bringing people together for?"}
-          </h2>
+          <h2>{event ? "Event details" : "Add the basics."}</h2>
         </div>
         {event && <Badge>Revision {event.revision}</Badge>}
       </div>
       <p className="muted">
-        Go can create these details through the website’s MCP tools. You can
-        always edit them here.
+        Name your event, set the place and time, and add your guests.
       </p>
       <fieldset disabled={busy}>
         <label>
@@ -325,8 +309,7 @@ function Details({
           </label>
         </div>
         <p id="timezone-hint" className="small muted">
-          Times use the named IANA timezone. Daylight-saving clock changes are
-          checked before saving.
+          Start and end times use this timezone.
         </p>
         <label>
           Organizer description
@@ -364,7 +347,7 @@ function Details({
       )}
       <div className="action-row">
         <p className="small muted">
-          Saving changes creates a new revision. Earlier material becomes stale.
+          Save your details, then prepare the design and inclusion review.
         </p>
         <button className="primary" disabled={busy}>
           {busy ? "Saving…" : "Save & continue"}
@@ -379,22 +362,25 @@ function Review({
   onPrepare,
   onReview,
   onDirty,
+  onContinue,
 }: {
   record: WorkspaceEvent;
   busy: boolean;
   onPrepare: () => void;
   onReview: (content: Content[], facts: WorkspaceEvent["facts"]) => void;
   onDirty: () => void;
+  onContinue: () => void;
 }) {
   const [content, setContent] = useState(record.content);
   const [facts, setFacts] = useState(record.facts ?? emptyFacts());
   const [ack, setAck] = useState(false);
   const [error, setError] = useState("");
-  const currentContent = content.filter(
+  const current = content.filter(
     (c) => c.event_revision === record.event.revision,
   );
   function save(e: FormEvent) {
     e.preventDefault();
+    setError("");
     if (
       Object.values(facts).some(
         (f) => f.value !== "unknown" && (!f.source.trim() || !f.confirmed_on),
@@ -405,10 +391,8 @@ function Review({
       );
       return;
     }
-    if (currentContent.some((c) => !c.body.trim())) {
-      setError(
-        "Writing previews cannot be empty. Restore the text or request preparation again.",
-      );
+    if (current.some((c) => !c.body.trim())) {
+      setError("Writing previews cannot be empty.");
       return;
     }
     onReview(
@@ -420,127 +404,111 @@ function Review({
       facts,
     );
   }
-  return (
-    <form onSubmit={save} onChange={onDirty}>
-      <section className="go-banner">
-        <span className="go-symbol" aria-hidden="true">
-          ✳
-        </span>
-        <div>
-          <p className="eyebrow">YOUR WRITING & COORDINATION AGENT</p>
-          <h2>Your writing, coordinated by Go.</h2>
-          <p>
-            Go writes through its own agent and saves work through our MCP
-            tools. New work waits until your Go session processes it.
-          </p>
-        </div>
-        <button
-          className="secondary"
-          type="button"
-          disabled={busy}
-          onClick={onPrepare}
-        >
-          Request preparation
-        </button>
-      </section>
-      <div className="work-queue" aria-label="Go preparation status">
-        {record.work.map((work) => (
-          <p className="small" key={work.id}>
-            <Badge
-              tone={
-                work.event_revision !== record.event.revision ||
-                work.state === "failed"
-                  ? "warning"
-                  : ""
+  function fact(key: FactKey) {
+    const label = factLabels[key];
+    return (
+      <fieldset className="fact" key={key} disabled={busy}>
+        <legend>{label}</legend>
+        <label>
+          What do you know?
+          <select
+            aria-label={`${label}: availability`}
+            value={facts[key].value}
+            onChange={(e) =>
+              setFacts((all) => ({
+                ...all,
+                [key]: {
+                  ...all[key],
+                  value: e.target.value as "yes" | "no" | "unknown",
+                },
+              }))
+            }
+          >
+            <option value="unknown">Unknown / not checked</option>
+            <option value="yes">Yes · confirmed</option>
+            <option value="no">No · confirmed</option>
+          </select>
+        </label>
+        <label>
+          {key === "observances"
+            ? "Which holidays or observances should Go check?"
+            : key === "diet"
+              ? "Is food served? Which dietary options are confirmed?"
+              : "Notes"}
+          <textarea
+            rows={2}
+            value={facts[key].detail}
+            onChange={(e) =>
+              setFacts((all) => ({
+                ...all,
+                [key]: { ...all[key], detail: e.target.value },
+              }))
+            }
+          />
+        </label>
+        <details>
+          <summary>Source & confirmation date</summary>
+          <label>
+            Source / confirmed by
+            <input
+              value={facts[key].source}
+              onChange={(e) =>
+                setFacts((all) => ({
+                  ...all,
+                  [key]: { ...all[key], source: e.target.value },
+                }))
               }
-            >
-              {work.event_revision !== record.event.revision
-                ? "Stale"
-                : friendlyState(work.state)}
-            </Badge>{" "}
-            Go preparation · revision {work.event_revision}
-          </p>
-        ))}
-      </div>
-      <div className="two-column">
+            />
+          </label>
+          <label>
+            Confirmation date
+            <input
+              type="date"
+              value={facts[key].confirmed_on}
+              onChange={(e) =>
+                setFacts((all) => ({
+                  ...all,
+                  [key]: { ...all[key], confirmed_on: e.target.value },
+                }))
+              }
+            />
+          </label>
+        </details>
+      </fieldset>
+    );
+  }
+  return (
+    <>
+      <GoHandoff event={record.event} />
+      <form onSubmit={save} onChange={onDirty}>
         <section className="panel">
-          <p className="eyebrow">02 / MAKE IT YOURS</p>
-          <h2>Words worth reviewing.</h2>
+          <div className="section-heading">
+            <h2>Design your event.</h2>
+            <a
+              className="secondary"
+              href={GO_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Connect Canva in Go ↗
+            </a>
+          </div>
           <p className="muted">
-            Edit before approving. Organizer edits are labeled. Grammarly
-            assistance can be used in a supported writing client; it is
-            unverified here.
+            Ask Go to create or update your Canva flyer and event document, then
+            review them here.
           </p>
-          {content.length === 0 && (
-            <div className="empty">
-              <h3>Waiting for Go’s first draft</h3>
-              <p>
-                No writing has been returned yet. Ask Go to process your event
-                work.
-              </p>
-            </div>
-          )}
-          {content.map((c, i) => (
-            <label key={c.id} className="content-editor">
-              <span className="spread">
-                {contentLabels[c.kind]}
-                <Badge
-                  tone={
-                    c.event_revision !== record.event.revision ? "warning" : ""
-                  }
-                >
-                  {c.event_revision !== record.event.revision
-                    ? `Stale · r${c.event_revision}`
-                    : friendlyState(c.state)}
-                </Badge>
-              </span>
-              <span className="small muted">
-                {c.producer === "superhuman_go"
-                  ? "Superhuman Go"
-                  : c.producer === "gemini"
-                    ? "Gemini-assisted portion"
-                    : "Edited by organizer"}{" "}
-                · revision {c.event_revision}
-              </span>
-              <textarea
-                rows={
-                  c.kind === "invitation" || c.kind === "event_document" ? 7 : 4
-                }
-                value={c.body}
-                disabled={busy || c.event_revision !== record.event.revision}
-                onChange={(e) =>
-                  setContent((all) =>
-                    all.map((item, index) =>
-                      index === i
-                        ? {
-                            ...item,
-                            body: e.target.value,
-                            producer: "organizer",
-                            state: "needs_review",
-                          }
-                        : item,
-                    ),
-                  )
-                }
-              />
-            </label>
-          ))}
-        </section>
-        <aside className="asset-column">
-          <section className="panel">
-            <p className="eyebrow">CANVA & DOCUMENTS</p>
-            <h2>The shape of your event.</h2>
+          <div className="asset-grid">
             {(["flyer", "document"] as const).map((kind) => {
               const asset = record.assets.find((a) => a.kind === kind);
               return (
-                <div className="asset" key={kind}>
+                <article className="asset" key={kind}>
                   <div className="asset-preview">
-                    {asset && safeUrl(asset.preview_url) && kind === "flyer" ? (
+                    {kind === "flyer" && safeUrl(asset?.preview_url) ? (
                       <img
-                        src={safeUrl(asset.preview_url)}
+                        src={safeUrl(asset?.preview_url)}
                         alt={
-                          asset.alt_text ||
-                          "Flyer preview; accessible text awaits review"
+                          asset?.alt_text ||
+                          "Flyer preview awaiting accessible text"
                         }
                       />
                     ) : (
@@ -549,13 +517,11 @@ function Review({
                       </span>
                     )}
                   </div>
-                  <h3>
-                    {kind === "flyer" ? "Custom Canva flyer" : "Event document"}
-                  </h3>
+                  <h3>{kind === "flyer" ? "Canva flyer" : "Event document"}</h3>
                   <p className="small muted">
                     {asset
-                      ? `Revision ${asset.event_revision} · ${asset.event_revision !== record.event.revision ? "stale" : friendlyState(asset.state)}`
-                      : "Awaiting an actual artifact. No preview available."}
+                      ? `Revision ${asset.event_revision} · ${asset.event_revision === record.event.revision ? friendlyState(asset.state) : "stale"}`
+                      : "Waiting for Go to save an artifact."}
                   </p>
                   <ExternalLink url={asset?.edit_url}>
                     Edit in Canva
@@ -563,135 +529,159 @@ function Review({
                   <ExternalLink url={asset?.current_url}>
                     Open current {kind}
                   </ExternalLink>
-                  {asset?.alt_text && <p className="small">{asset.alt_text}</p>}
-                </div>
+                </article>
               );
             })}
-          </section>
-        </aside>
-      </div>
-      <section className="panel inclusion">
-        <p className="eyebrow">INCLUSION / ORGANIZER REVIEW</p>
-        <h2>Make room for everyone.</h2>
-        <p className="muted">
-          Confirm what you know. Keep everything else unknown. This review does
-          not certify the venue. Individual dietary and access needs stay
-          private.
-        </p>
-        <div className="fact-grid">
-          {(Object.entries(factLabels) as [FactKey, string][]).map(
-            ([key, label]) => (
-              <fieldset key={key} className="fact" disabled={busy}>
-                <legend>{label}</legend>
-                <label className="small">
-                  Confirmed availability
-                  <select
-                    aria-label={`${label}: availability`}
-                    value={facts[key].value}
-                    onChange={(e) =>
-                      setFacts((all) => ({
-                        ...all,
-                        [key]: {
-                          ...all[key],
-                          value: e.target.value as "yes" | "no" | "unknown",
-                        },
-                      }))
-                    }
-                  >
-                    <option value="unknown">Unknown / not checked</option>
-                    <option value="yes">Yes · organizer confirmed</option>
-                    <option value="no">No · organizer confirmed</option>
-                  </select>
-                </label>
-                <label className="small">
-                  {key === "observances"
-                    ? "Which observances should be checked? Include dated sources."
-                    : "Details and follow-up questions"}
-                  <textarea
-                    rows={2}
-                    value={facts[key].detail}
-                    onChange={(e) =>
-                      setFacts((all) => ({
-                        ...all,
-                        [key]: { ...all[key], detail: e.target.value },
-                      }))
-                    }
-                  />
-                </label>
-                <label className="small">
-                  Source / confirmed by
-                  <input
-                    value={facts[key].source}
-                    onChange={(e) =>
-                      setFacts((all) => ({
-                        ...all,
-                        [key]: { ...all[key], source: e.target.value },
-                      }))
-                    }
-                  />
-                </label>
-                <label className="small">
-                  Confirmation date
-                  <input
-                    type="date"
-                    value={facts[key].confirmed_on}
-                    onChange={(e) =>
-                      setFacts((all) => ({
-                        ...all,
-                        [key]: { ...all[key], confirmed_on: e.target.value },
-                      }))
-                    }
-                  />
-                </label>
-              </fieldset>
-            ),
-          )}
-        </div>
-        {record.findings.length > 0 && (
-          <div className="findings">
-            <h3>Inclusion findings</h3>
-            {record.findings.map((f, i) => (
-              <article key={i}>
-                <Badge>{friendlyState(f.status)}</Badge>
-                <strong>{f.category}</strong>
-                <p>{friendlyState(f.reason)}</p>
-                {f.sources.map((s, n) => (
-                  <p className="small" key={n}>
-                    {s.reference} · checked {s.checked_on}
-                  </p>
-                ))}
-              </article>
-            ))}
           </div>
-        )}
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={ack}
-            onChange={(e) => setAck(e.target.checked)}
-            required
-          />
-          I reviewed this revision’s writing, design, and inclusion questions,
-          including unresolved unknowns.
-        </label>
-        {error && (
-          <p role="alert" className="error-box">
-            {error}
+        </section>
+        <section className="panel">
+          <h2>A quick inclusion check.</h2>
+          <p className="muted">
+            Check holidays and food options before you send. Leave unconfirmed
+            details unknown.
           </p>
-        )}
-        <div className="action-row">
+          <div className="fact-grid">
+            {fact("observances")}
+            {fact("diet")}
+          </div>
+          <details className="more-details">
+            <summary>Access, captions & sensory details</summary>
+            <div className="fact-grid">
+              {(
+                [
+                  "step_free",
+                  "elevator",
+                  "captions",
+                  "loud_sound",
+                  "strobes",
+                ] as FactKey[]
+              ).map(fact)}
+            </div>
+          </details>
+          {record.findings.map((f, i) => (
+            <article className="finding" key={i}>
+              <Badge>{friendlyState(f.status)}</Badge>{" "}
+              <strong>{f.category}</strong>
+              <p>{friendlyState(f.reason)}</p>
+              {f.sources.map((source, n) => (
+                <p className="small" key={n}>
+                  {source.reference} · {source.checked_on}
+                </p>
+              ))}
+            </article>
+          ))}
           <p className="small muted">
-            Review saves your changes. Sending requires a separate confirmation.
+            This review does not certify the venue. Private guest needs stay out
+            of shared invitations.
           </p>
-          <button
-            className="primary"
-            disabled={busy || !ack || currentContent.length === 0}
-          >
-            Save review & continue
-          </button>
-        </div>
-      </section>
-    </form>
+        </section>
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Review Go’s writing.</h2>
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy}
+              onClick={onPrepare}
+            >
+              Queue preparation
+            </button>
+          </div>
+          {record.work.map((work) => (
+            <p className="small queue-state" key={work.id}>
+              <Badge>
+                {work.event_revision === record.event.revision
+                  ? friendlyState(work.state)
+                  : "stale"}
+              </Badge>{" "}
+              Revision {work.event_revision}
+            </p>
+          ))}
+          {!current.length && (
+            <p className="notice">
+              Waiting for Go’s first draft. Open Go and use the event prompt
+              above.
+            </p>
+          )}
+          {content.map((c, i) => (
+            <details className="writing-preview" key={c.id}>
+              <summary>
+                {contentLabels[c.kind]}{" "}
+                <Badge
+                  tone={
+                    c.event_revision !== record.event.revision ? "warning" : ""
+                  }
+                >
+                  {c.event_revision === record.event.revision
+                    ? friendlyState(c.state)
+                    : `Stale · r${c.event_revision}`}
+                </Badge>
+              </summary>
+              <label>
+                {contentLabels[c.kind]}
+                <span className="small muted">
+                  {c.producer === "superhuman_go"
+                    ? "Superhuman Go"
+                    : c.producer === "gemini"
+                      ? "Gemini-assisted portion"
+                      : "Edited by organizer"}{" "}
+                  · revision {c.event_revision}
+                </span>
+                <textarea
+                  rows={5}
+                  value={c.body}
+                  disabled={busy || c.event_revision !== record.event.revision}
+                  onChange={(e) =>
+                    setContent((all) =>
+                      all.map((item, index) =>
+                        index === i
+                          ? {
+                              ...item,
+                              body: e.target.value,
+                              producer: "organizer",
+                              state: "needs_review",
+                            }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+              </label>
+            </details>
+          ))}
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={ack}
+              onChange={(e) => setAck(e.target.checked)}
+            />
+            I reviewed this revision’s writing, design, and inclusion questions,
+            including unknowns.
+          </label>
+          {error && (
+            <p role="alert" className="error-box">
+              {error}
+            </p>
+          )}
+          <div className="action-row">
+            <button
+              type="button"
+              className="secondary"
+              disabled={busy}
+              onClick={onContinue}
+            >
+              Preview distribution
+            </button>
+            <button
+              className="primary"
+              disabled={busy || !ack || !current.length}
+            >
+              Save review & continue
+            </button>
+          </div>
+        </section>
+      </form>
+    </>
   );
 }
 function SyncStatus({ record }: { record: WorkspaceEvent }) {
@@ -820,8 +810,8 @@ function Distribution({
                 `Awaiting reviewed ${sent ? "change notice" : "invitation"} for revision ${record.event.revision}.`}
             </div>
             <div className="mail-footer">
-              Current event and flyer links are supplied by the backend.
-              Attached files are revision snapshots.
+              Invitations include current event and flyer links. Attached files
+              are revision snapshots.
             </div>
           </div>
         </section>
@@ -883,7 +873,10 @@ function Distribution({
           )}
         </section>
       </div>
-      <SyncStatus record={record} />
+      <details className="panel">
+        <summary>Provider status & revisions</summary>
+        <SyncStatus record={record} />
+      </details>
     </>
   );
 }
@@ -979,110 +972,75 @@ function Rsvps({ record }: { record: WorkspaceEvent }) {
   );
 }
 function App() {
-  const [gateway, setGateway] = useState<EventGateway | null>(null);
-  const [session, setSession] = useState<Session>();
-  const [page, setPage] = useState<Page>("dashboard");
+  const [gateway] = useState(createPreviewGateway);
+  const [page, setPage] = useState<Page>("events");
+  const [step, setStep] = useState<Step>("details");
+  const [editing, setEditing] = useState(false);
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [record, setRecord] = useState<WorkspaceEvent | null>(null);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [dirty, setDirty] = useState(false);
-  const [search, setSearch] = useState("");
-  const [backend, setBackend] = useState("Backend not checked");
   const [editorKey, setEditorKey] = useState(0);
+  const [backend, setBackend] = useState("Not checked");
+  const [profile, setProfile] = useState({ name: "Organizer", email: "" });
   const heading = useRef<HTMLHeadingElement>(null);
-  const epoch = useRef(0);
-  const publishKeys = useRef(new Map<string, string>());
+  useEffect(() => {
+    let active = true;
+    gateway
+      .list()
+      .then((value) => {
+        if (active) setEvents(value);
+      })
+      .catch(() => {
+        if (active) setError("Could not load events. Try refreshing.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [gateway]);
   useEffect(() => {
     heading.current?.focus();
-  }, [page, gateway]);
-  useEffect(() => {
-    if (!session) return;
-    const timer = window.setTimeout(
-      () => {
-        epoch.current++;
-        setSession(undefined);
-        setGateway(null);
-        setRecord(null);
-        setEvents([]);
-        setBusy(false);
-        setLoading(false);
-      },
-      Math.max(0, session.expires_at - Date.now()),
-    );
-    return () => clearTimeout(timer);
-  }, [session]);
+  }, [page, step, editing]);
   useEffect(() => {
     if (!dirty) return;
-    const guard = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
+    const guard = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
   }, [dirty]);
   async function run<T>(action: () => Promise<T>, done: (value: T) => void) {
-    const requestEpoch = epoch.current;
     setBusy(true);
     setError("");
     setMessage("");
     try {
-      const value = await action();
-      if (epoch.current === requestEpoch) done(value);
+      done(await action());
     } catch (err) {
-      if (epoch.current === requestEpoch) {
-        if (err instanceof ApiError && err.code === "unauthenticated") {
-          setSession(undefined);
-          setGateway(null);
-          setRecord(null);
-          setEvents([]);
-        }
-        setError(
-          err instanceof Error ? err.message : "Request failed. Try again.",
-        );
-      }
+      setError(
+        err instanceof Error ? err.message : "Something went wrong. Try again.",
+      );
     } finally {
-      if (epoch.current === requestEpoch) {
-        setBusy(false);
-        setLoading(false);
-      }
+      setBusy(false);
     }
   }
   function canLeave() {
-    return (
-      !dirty || window.confirm("Leave this screen and discard unsaved changes?")
-    );
+    return !dirty || window.confirm("Discard unsaved changes?");
   }
   function navigate(next: Page) {
-    if (canLeave()) {
-      setPage(next);
-      setDirty(false);
-      setError("");
-      setMessage("");
-      setEditorKey((k) => k + 1);
-    }
+    if (!canLeave()) return;
+    setPage(next);
+    setEditing(false);
+    setDirty(false);
+    setError("");
+    setMessage("");
   }
-  function enter(api: EventGateway, nextSession?: Session) {
-    epoch.current++;
-    setGateway(api);
-    setSession(nextSession);
-    setPage("dashboard");
-    setLoading(true);
-    void run(() => api.list(), setEvents);
-  }
-  function openEvent(event: EventRecord) {
-    if (!gateway || !canLeave()) return;
-    setLoading(true);
-    void run(
-      () => gateway.get(event.id),
-      (value) => {
-        setRecord(value);
-        setPage("details");
-        setDirty(false);
-        setEditorKey((k) => k + 1);
-      },
-    );
+  function changeStep(next: Step) {
+    if (!canLeave()) return;
+    setStep(next);
+    setDirty(false);
+    setEditorKey((k) => k + 1);
+    setError("");
+    setMessage("");
   }
   function update(value: WorkspaceEvent) {
     setRecord(value);
@@ -1094,46 +1052,59 @@ function App() {
     setEditorKey((k) => k + 1);
   }
   function refresh() {
-    if (!gateway || !canLeave()) return;
-    setLoading(true);
+    if (!canLeave()) return;
     void run(
       async () => ({
-        events: await gateway.list(),
-        record: record ? await gateway.get(record.event.id) : null,
+        list: await gateway.list(),
+        item: record && editing ? await gateway.get(record.event.id) : null,
       }),
       (value) => {
-        setEvents(value.events);
-        setRecord(value.record);
-        setDirty(false);
-        setEditorKey((k) => k + 1);
+        setEvents(value.list);
+        if (value.item) update(value.item);
         setMessage("Latest available state loaded.");
       },
     );
   }
+  function addEvent() {
+    if (canLeave()) {
+      setRecord(null);
+      setEditing(true);
+      setStep("details");
+      setDirty(false);
+      setEditorKey((k) => k + 1);
+      setMessage("");
+    }
+  }
+  function openEvent(id: string) {
+    void run(
+      () => gateway.get(id),
+      (value) => {
+        setRecord(value);
+        setEditing(true);
+        setStep("details");
+        setEditorKey((k) => k + 1);
+      },
+    );
+  }
   async function checkBackend() {
-    setBackend("Checking backend…");
+    setBackend("Checking…");
     try {
       const status = await loadProjectStatus(AbortSignal.timeout(8000));
       setBackend(
         `Backend online · MCP ${status.superhuman.configured ? "configured" : "not configured"} · Go unverified`,
       );
     } catch {
-      setBackend("Backend unavailable · retry connection");
+      setBackend("Backend unavailable. Try again.");
     }
   }
-  if (!gateway) return <Login onEnter={enter} />;
-  const preview = gateway.mode === "preview";
   const title =
-    page === "dashboard"
-      ? "A little planning. A great gathering."
-      : page === "details"
-        ? (record?.event.title ?? "Create an event")
-        : (pages.find((p) => p.id === page)?.name ?? "");
-  const filtered = events.filter((event) =>
-    `${event.title} ${event.location}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
+    page === "settings"
+      ? "Settings"
+      : page === "profile"
+        ? "Profile"
+        : editing
+          ? (record?.event.title ?? "New event")
+          : "Your events";
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main">
@@ -1145,443 +1116,341 @@ function App() {
           href="#main"
           onClick={(e) => {
             e.preventDefault();
-            navigate("dashboard");
+            navigate("events");
           }}
         >
           <span className="brand-icon" aria-hidden="true">
             ↗
           </span>
-          <span>
-            EVENT
-            <br />
-            <b>WORKSPACE</b>
-          </span>
+          Event Workspace
         </a>
-        <div className="workspace-label">
-          <span className="avatar">O</span>
-          <div>
-            Organizer workspace
-            <small>{preview ? "Local preview" : session?.email}</small>
-          </div>
-        </div>
-        <p className="nav-label">YOUR WORKSPACE</p>
         <nav aria-label="Workspace">
-          {pages.map((p) => (
+          {(
+            [
+              { id: "events", name: "Your events", icon: "▦" },
+              { id: "settings", name: "Settings", icon: "⚙" },
+              { id: "profile", name: "Profile", icon: "○" },
+            ] as const
+          ).map((item) => (
             <button
-              key={p.id}
-              disabled={
-                busy || (p.id !== "dashboard" && p.id !== "details" && !record)
-              }
-              className={page === p.id ? "active" : ""}
-              aria-current={page === p.id ? "page" : undefined}
-              onClick={() => navigate(p.id)}
+              key={item.id}
+              className={page === item.id ? "active" : ""}
+              aria-current={page === item.id ? "page" : undefined}
+              disabled={busy}
+              onClick={() => navigate(item.id)}
             >
-              <span aria-hidden="true">{p.icon}</span>
-              {p.name}
-              {p.id === "rsvps" &&
-                record?.rsvps.some(
-                  (r) => r.status === "needs_review" || r.conflict,
-                ) && <span className="nav-count">!</span>}
+              <span aria-hidden="true">{item.icon}</span>
+              {item.name}
             </button>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <div className="go-note">
-            <span aria-hidden="true">✳</span>
-            <strong>Better together, with Go.</strong>
-            <p>Start in Superhuman Go. Review and organize here.</p>
-          </div>
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() => {
-              if (canLeave()) {
-                epoch.current++;
-                setGateway(null);
-                setSession(undefined);
-                setRecord(null);
-                setEvents([]);
-                setDirty(false);
-              }
-            }}
-          >
-            ← {preview ? "Leave preview" : "Sign out"}
-          </button>
+        <div className="sidebar-profile">
+          <span className="avatar" aria-hidden="true">
+            {profile.name.charAt(0).toUpperCase()}
+          </span>
+          <span>
+            {profile.name}
+            <small>Local workspace</small>
+          </span>
         </div>
       </aside>
       <div className="main-shell">
-        <header className="topbar">
-          <span>
-            Workspace{" "}
-            <span className="breadcrumb">
-              / {pages.find((p) => p.id === page)?.name}
-            </span>
-          </span>
-          <div className="topbar-actions">
-            <button className="text-button" onClick={checkBackend}>
-              {backend}
-            </button>
-            <span className="avatar" aria-label="Organizer">
-              O
-            </span>
-          </div>
-        </header>
-        <div className={`mode-banner ${preview ? "" : "live"}`}>
-          {preview
-            ? "LOCAL PREVIEW · Synthetic sample writing and receipts. Changes stay in memory. No live Go, Canva, Gmail, or Calendar activity."
-            : "LIVE API · Actions use your signed-in session. Provider success requires a current receipt."}
-        </div>
         <main id="main">
-          <div className="page-heading">
+          <header className="page-heading">
             <div>
-              <p className="eyebrow">
-                {page === "dashboard"
-                  ? "BRING PEOPLE TOGETHER"
-                  : `EVENT WORKSPACE ${record ? ` / REVISION ${record.event.revision}` : ""}`}
-              </p>
-              <h1 tabIndex={-1} ref={heading}>
+              {editing && page === "events" && (
+                <button
+                  className="text-button back-button"
+                  disabled={busy}
+                  onClick={() => navigate("events")}
+                >
+                  ← Your events
+                </button>
+              )}
+              <h1 ref={heading} tabIndex={-1}>
                 {title}
               </h1>
               <p className="muted">
-                {page === "dashboard"
-                  ? "Go gets the plan started. You make it happen."
-                  : record
-                    ? `${eventDate(record.event.starts_at, record.event.timezone)} · ${record.event.location}`
-                    : "Start manually, then let Go help with the writing."}
+                {page === "settings"
+                  ? "Connect Go to your workspace."
+                  : page === "profile"
+                    ? "A few details about you."
+                    : editing
+                      ? "Details, design, then distribution."
+                      : "All your gatherings, in one place."}
               </p>
             </div>
-            <button className="secondary" disabled={busy} onClick={refresh}>
-              ↻ Refresh {record ? "event" : "events"}
-            </button>
-          </div>
-          {error && (
-            <div role="alert" className="error-box">
-              {error}
-              <button className="text-button" onClick={refresh} disabled={busy}>
-                Reload current state
+            {page === "events" && (
+              <button className="secondary" disabled={busy} onClick={refresh}>
+                ↻ Refresh
               </button>
-            </div>
-          )}
-          <p className="status-message" role="status" aria-live="polite">
-            {busy
-              ? loading
-                ? "Loading current event state…"
-                : "Saving your request…"
-              : message}
+            )}
+          </header>
+          <p className="preview-note">
+            Local preview · sample data · changes stay in this tab · no
+            invitations send
           </p>
-          {page === "dashboard" && (
+          {error && (
+            <p role="alert" className="error-box">
+              {error}
+            </p>
+          )}
+          <p className="status-message" role="status">
+            {busy ? "Saving your request…" : message}
+          </p>
+          {page === "events" && !editing && (
             <>
-              <section className="dashboard-hero">
-                <div>
-                  <Badge>✳ SUPERHUMAN GO + YOUR WORKSPACE</Badge>
-                  <h2>
-                    Start with an idea.
-                    <br />
-                    <em>Let Go bring the plan.</em>
-                  </h2>
-                  <p>
-                    Ask Go to create an event through our MCP tools. It appears
-                    here for you to edit, review, and bring to life.
-                  </p>
-                  <div className="prompt-example">
-                    <span aria-hidden="true">↗</span>
-                    <p>
-                      “Create a neighborhood gathering next Saturday. Help me
-                      prepare a clear invitation and a flyer.”
-                    </p>
-                    <span className="small">Example prompt · use in Go</span>
-                  </div>
-                  <p className="small">
-                    MCP event creation is awaiting a connected event tool. This
-                    example does not contact Go.
-                  </p>
-                </div>
-                <div className="hero-art" aria-hidden="true">
-                  <div className="orbit orbit-one" />
-                  <div className="orbit orbit-two" />
-                  <div className="art-star">✳</div>
-                  <div className="floating-note">
-                    THE NEXT
-                    <br />
-                    <strong>good thing.</strong>
-                    <span>Starts with people.</span>
-                  </div>
-                  <span className="art-spark">✦</span>
-                </div>
-              </section>
-              <section className="metric-grid dashboard-metrics">
-                <article>
-                  <strong>{events.length.toString().padStart(2, "0")}</strong>
-                  <span>Events in your workspace</span>
-                </article>
-                <article>
-                  <strong>
-                    {events
-                      .filter((e) => e.created_via === "superhuman_go")
-                      .length.toString()
-                      .padStart(2, "0")}
-                  </strong>
-                  <span>Started through Go {preview && "· sample"}</span>
-                </article>
-                <article>
-                  <strong>
-                    {events
-                      .filter((e) => e.status === "draft")
-                      .length.toString()
-                      .padStart(2, "0")}
-                  </strong>
-                  <span>Drafts to shape & review</span>
-                </article>
-              </section>
-              <section className="panel event-list">
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">YOUR GATHERINGS</p>
-                    <h2>On the horizon.</h2>
-                  </div>
+              <div className="events-toolbar">
+                <h2>
+                  Upcoming events <span>{events.length}</span>
+                </h2>
+                <button
+                  className="primary add-event"
+                  aria-label="Add event"
+                  disabled={busy}
+                  onClick={addEvent}
+                >
+                  <span aria-hidden="true">+</span> New event
+                </button>
+              </div>
+              <div className="events-grid">
+                {events.map((event) => (
                   <button
-                    className="primary"
-                    disabled={busy}
-                    onClick={() => {
-                      if (canLeave()) {
-                        setRecord(null);
-                        setPage("details");
-                        setDirty(false);
-                        setEditorKey((k) => k + 1);
-                      }
-                    }}
-                  >
-                    + Create manually
-                  </button>
-                </div>
-                <label className="search">
-                  <span>Find an event</span>
-                  <input
-                    type="search"
-                    placeholder="Search events or locations…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </label>
-                {filtered.map((event) => (
-                  <button
-                    className="event-row"
+                    className="event-card"
                     key={event.id}
                     disabled={busy}
-                    onClick={() => openEvent(event)}
+                    onClick={() => openEvent(event.id)}
                   >
-                    <span className="date-tile">
-                      <small>
-                        {new Intl.DateTimeFormat("en", {
-                          timeZone: event.timezone,
-                          month: "short",
-                        }).format(new Date(event.starts_at))}
-                      </small>
-                      <strong>
-                        {new Intl.DateTimeFormat("en", {
-                          timeZone: event.timezone,
-                          day: "numeric",
-                        }).format(new Date(event.starts_at))}
-                      </strong>
-                    </span>
-                    <span className="event-summary">
-                      <strong>{event.title}</strong>
-                      <span>{event.location}</span>
-                      <small>
-                        {eventDate(event.starts_at, event.timezone)}
-                      </small>
-                    </span>
-                    <span className="event-meta">
-                      <Badge>
-                        {event.created_via === "superhuman_go"
-                          ? "✳ Started in Go"
-                          : "Created manually"}
-                      </Badge>
-                      <span className="small muted">
-                        {event.status} · revision {event.revision}
+                    <div className="event-card-top">
+                      <span className="date-tile">
+                        <small>
+                          {new Intl.DateTimeFormat("en", {
+                            timeZone: event.timezone,
+                            month: "short",
+                          }).format(new Date(event.starts_at))}
+                        </small>
+                        <strong>
+                          {new Intl.DateTimeFormat("en", {
+                            timeZone: event.timezone,
+                            day: "numeric",
+                          }).format(new Date(event.starts_at))}
+                        </strong>
                       </span>
-                    </span>
-                    <span aria-hidden="true">↗</span>
+                      <Badge>{friendlyState(event.status)}</Badge>
+                    </div>
+                    <h3>{event.title}</h3>
+                    <p>{event.location}</p>
+                    <p className="small">
+                      {eventDate(event.starts_at, event.timezone)}
+                    </p>
+                    <div className="event-card-footer">
+                      <span>{event.invitees.length} guests</span>
+                      <span>Open event ↗</span>
+                    </div>
                   </button>
                 ))}
-                {filtered.length === 0 && !loading && (
-                  <div className="empty">
-                    <h3>
-                      {search
-                        ? "No matching events"
-                        : "Your next gathering starts here."}
-                    </h3>
-                    <p>
-                      {search
-                        ? "Try another search."
-                        : "Create an event manually, or ask Go once the MCP connection is available."}
-                    </p>
-                  </div>
-                )}
-              </section>
-            </>
-          )}
-          {page === "details" && (
-            <Details
-              key={editorKey}
-              record={record}
-              busy={busy}
-              onDirty={() => setDirty(true)}
-              onSave={(input) =>
-                void run(
-                  () =>
-                    gateway.save(
-                      record?.event.id ?? null,
-                      input,
-                      record?.event.revision,
-                    ),
-                  (value) => {
-                    update(value);
-                    setPage("review");
-                    setMessage(
-                      preview
-                        ? "Saved in this tab only."
-                        : "Event revision saved.",
-                    );
-                  },
-                )
-              }
-            />
-          )}
-          {record && page === "review" && (
-            <Review
-              key={editorKey}
-              record={record}
-              busy={busy}
-              onDirty={() => setDirty(true)}
-              onPrepare={() => {
-                if (canLeave())
-                  void run(
-                    () =>
-                      gateway.prepare(record.event.id, record.event.revision),
-                    (value) => {
-                      update(value);
-                      setMessage(
-                        "Awaiting Go. Ask your Go agent to process the event work; the website has not triggered generation.",
-                      );
-                    },
-                  );
-              }}
-              onReview={(content, facts) =>
-                void run(
-                  () =>
-                    gateway.review(
-                      record.event.id,
-                      record.event.revision,
-                      content,
-                      facts,
-                    ),
-                  (value) => {
-                    update(value);
-                    setPage("distribution");
-                    setMessage("Review saved for this revision.");
-                  },
-                )
-              }
-            />
-          )}
-          {record && page === "distribution" && (
-            <Distribution
-              key={editorKey}
-              record={record}
-              preview={preview}
-              busy={busy}
-              onPublish={() => {
-                const action = record.gmail?.sent ? "update" : "publish";
-                const lookup = `${record.event.id}:${record.event.revision}:${action}`;
-                const key =
-                  publishKeys.current.get(lookup) ?? crypto.randomUUID();
-                publishKeys.current.set(lookup, key);
-                void run(
-                  () =>
-                    gateway.publish(
-                      record.event.id,
-                      record.event.revision,
-                      action,
-                      key,
-                    ),
-                  (value) => {
-                    update(value);
-                    setMessage(
-                      "Request recorded. Check provider receipts for completion.",
-                    );
-                  },
-                );
-              }}
-            />
-          )}
-          {record && page === "updates" && (
-            <>
-              <section className="panel">
-                <p className="eyebrow">A CHANGE OF PLANS</p>
-                <h2>Keep the details current.</h2>
-                <p className="muted">
-                  Save your changed time or location in event details. A new
-                  revision requires fresh Go writing, artifact exports, and
-                  organizer review.
-                </p>
-                <div className="update-steps">
-                  <article>
-                    <span>01</span>
-                    <h3>Revise the plan</h3>
-                    <p>
-                      Edit time, location, or other details. The saved event is
-                      the canonical version.
-                    </p>
-                  </article>
-                  <article>
-                    <span>02</span>
-                    <h3>Review the changes</h3>
-                    <p>
-                      Compare the new writing and Canva/document revision before
-                      authorizing distribution.
-                    </p>
-                  </article>
-                  <article>
-                    <span>03</span>
-                    <h3>Update with evidence</h3>
-                    <p>
-                      Keep the same Calendar event.{" "}
-                      {record.gmail?.sent
-                        ? "Create a new change-notification draft after the sent invitation."
-                        : "Replace the existing unsent Gmail draft."}
-                    </p>
-                  </article>
-                </div>
-                <div className="notice">
-                  <strong>
-                    {record.gmail?.sent
-                      ? "Previous invitation sent · new notification required"
-                      : record.gmail?.draft_id
-                        ? "Unsent draft · update existing draft"
-                        : "No Gmail draft recorded"}
-                  </strong>
-                  <p>
-                    Sent email and attached flyer bytes are immutable. A current
-                    link and a new notification/export carry the latest details.
-                  </p>
-                </div>
                 <button
-                  className="secondary"
-                  onClick={() => navigate("details")}
+                  className="add-event-card"
                   disabled={busy}
+                  onClick={addEvent}
                 >
-                  Edit event details ↗
+                  <span aria-hidden="true">+</span>Add a new event
                 </button>
-              </section>
-              <SyncStatus record={record} />
+              </div>
+              <div className="go-shortcut">
+                <span aria-hidden="true">✳</span>
+                <p>
+                  Prefer to plan with Go? Connect this workspace, then prompt Go
+                  to create and update your events.
+                </p>
+                <button
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => navigate("settings")}
+                >
+                  Set up Go ↗
+                </button>
+              </div>
             </>
           )}
-          {record && page === "rsvps" && <Rsvps record={record} />}
-          <footer>
-            <span>Made for the moments that bring us together.</span>
-            <span>Superhuman Go · Organizer reviewed</span>
-          </footer>
+          {page === "events" && editing && (
+            <>
+              <nav className="stepper" aria-label="Event creation">
+                {steps.map((item, i) => (
+                  <button
+                    key={item.id}
+                    className={step === item.id ? "active" : ""}
+                    aria-current={step === item.id ? "step" : undefined}
+                    disabled={busy || (!record && item.id !== "details")}
+                    onClick={() => changeStep(item.id)}
+                  >
+                    <span>{i + 1}</span>
+                    {item.name}
+                  </button>
+                ))}
+              </nav>
+              {step === "details" && (
+                <Details
+                  key={editorKey}
+                  record={record}
+                  busy={busy}
+                  onDirty={() => setDirty(true)}
+                  onSave={(input) =>
+                    void run(
+                      () =>
+                        gateway.save(
+                          record?.event.id ?? null,
+                          input,
+                          record?.event.revision,
+                        ),
+                      (value) => {
+                        update(value);
+                        setStep("review");
+                        setMessage(
+                          "Event saved. Continue in Go to prepare your materials.",
+                        );
+                      },
+                    )
+                  }
+                />
+              )}
+              {record && step === "review" && (
+                <Review
+                  key={editorKey}
+                  record={record}
+                  busy={busy}
+                  onDirty={() => setDirty(true)}
+                  onContinue={() => changeStep("distribution")}
+                  onPrepare={() => {
+                    if (canLeave())
+                      void run(
+                        () =>
+                          gateway.prepare(
+                            record.event.id,
+                            record.event.revision,
+                          ),
+                        (value) => {
+                          update(value);
+                          setMessage(
+                            "Awaiting Go. Open Superhuman Go and ask it to process this event.",
+                          );
+                        },
+                      );
+                  }}
+                  onReview={(content, facts) =>
+                    void run(
+                      () =>
+                        gateway.review(
+                          record.event.id,
+                          record.event.revision,
+                          content,
+                          facts,
+                        ),
+                      (value) => {
+                        update(value);
+                        setStep("distribution");
+                        setMessage("Review saved for this revision.");
+                      },
+                    )
+                  }
+                />
+              )}
+              {record && step === "distribution" && (
+                <>
+                  <div className="distribution-go">
+                    <p>
+                      Ask Go to prepare emails, personalized invitations, and
+                      Calendar updates. Review the results here before sending.
+                    </p>
+                    <a
+                      className="secondary"
+                      href={GO_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open Superhuman Go ↗
+                    </a>
+                  </div>
+                  <Distribution
+                    key={editorKey}
+                    record={record}
+                    preview
+                    busy={busy}
+                    onPublish={() =>
+                      setError("Sending is unavailable in the local preview.")
+                    }
+                  />
+                  <details className="panel">
+                    <summary>Guest responses</summary>
+                    <Rsvps record={record} />
+                  </details>
+                </>
+              )}
+            </>
+          )}
+          {page === "settings" && (
+            <>
+              <GoHandoff expanded />
+              <section className="panel settings-connections">
+                <h2>Your connected tools</h2>
+                <p className="muted">
+                  Authorize Canva, Gmail, and Calendar in Go. Go uses the
+                  website’s custom MCP to save event changes back here.
+                </p>
+                {["Canva", "Gmail", "Google Calendar"].map((provider) => (
+                  <div className="connection-row" key={provider}>
+                    <strong>{provider}</strong>
+                    <span>Connection unverified</span>
+                    <a href={GO_URL} target="_blank" rel="noreferrer">
+                      Connect in Go ↗
+                    </a>
+                  </div>
+                ))}
+              </section>
+              <details className="panel">
+                <summary>Workspace connection status</summary>
+                <p className="small muted">{backend}</p>
+                <button className="secondary" onClick={checkBackend}>
+                  Check connection
+                </button>
+              </details>
+            </>
+          )}
+          {page === "profile" && (
+            <form
+              className="panel profile-form"
+              onChange={() => setDirty(true)}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const data = new FormData(e.currentTarget);
+                setProfile({
+                  name: String(data.get("name")).trim(),
+                  email: String(data.get("email")).trim(),
+                });
+                setDirty(false);
+                setMessage("Profile saved in this tab.");
+              }}
+            >
+              <label>
+                Your name
+                <input
+                  name="name"
+                  required
+                  maxLength={100}
+                  defaultValue={profile.name}
+                />
+              </label>
+              <label>
+                Email <span className="optional">optional</span>
+                <input name="email" type="email" defaultValue={profile.email} />
+              </label>
+              <p className="small muted">
+                These details stay in this tab. Account sign-in is skipped for
+                now.
+              </p>
+              <button className="primary">Save profile</button>
+            </form>
+          )}
         </main>
       </div>
     </div>

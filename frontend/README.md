@@ -1,42 +1,31 @@
-# Organizer frontend · Member 1
+# Event workspace · Member 1
 
-React/TypeScript organizer screens for events created by Superhuman Go through the website’s MCP tools, with manual creation/editing preserved. The product name remains undecided.
+The site opens directly to **Your events**. The sidebar has Your events, Settings, and Profile. Click an event or the plus button to use the three steps: event details → design/inclusion → distribution. Signup/login is skipped at the user's request.
 
 ```sh
 npm ci
-npm run dev
+npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
 npm run lint
 npm test
 npm run build
 ```
 
-Open Vite’s local URL and choose **Open local preview**. Sample writing and provider receipts are synthetic and visibly labeled. Changes exist only in memory; leaving preview or reloading resets them. Preview cannot publish, send, or connect accounts. No automatic Go responses are simulated.
+Share Vite's Network URL with teammates on the same Wi-Fi. Keep the host awake and the process running. The current workspace is an explicitly labeled **local preview**: sample data and profile edits exist only in each browser tab. Reload resets them. It cannot publish or send invitations. No account authentication or private backend access is bypassed.
+
+## Superhuman Go handoff
+
+Settings and the design step open [Superhuman Go](https://go.superhuman.com/) in another tab. The organizer adds the team's custom MCP connector in Go and authorizes its tools. They then prompt Go to save event details, Canva artifacts, prose, and distribution preparation into the canonical website records. Return to the event and refresh to review actual results once integration is connected.
+
+Set `VITE_PUBLIC_MCP_URL` to the public hosted HTTPS connector address supplied by Member 3. Without it, the UI clearly says setup is pending. No localhost URL, auth token, fabricated install deep link, or automatic connection success is substituted. The UI supplies a copyable event-ID/revision prompt, with a manual-copy fallback on HTTP LAN pages where Clipboard access is unavailable. Opening Go does not transmit the prompt or install anything automatically. See [official connector help](https://support.grammarly.com/hc/en-us/articles/40642362241293-About-Superhuman-Go-agents-and-connectors).
+
+The Go handoff is implemented; the actual custom MCP and backend/provider round trip still belong to Members 2–4. Current sample events do not synchronize with Go. Canva/Gmail/Calendar connection rows are labeled unverified. Organizer review and send confirmation remain required.
 
 ## Integration boundary
 
-`src/types.ts` defines the **proposed**, normalized UI contract. `src/api.ts` isolates HTTP/auth. The event REST API has not been accepted or implemented on the baseline branch; do not enable it until Member 2 connects and verifies these shapes. Member 3's `/api/dev` workflow response is a different shape and is intentionally not treated as production Supabase data.
+`src/types.ts` and `src/api.ts` preserve the proposed normalized REST gateway, runtime validation, authenticated writes, expected revisions, and stable publish idempotency keys. The current simplified shell intentionally uses only the in-memory preview gateway while sign-in is skipped. Auth utilities remain available for the future accepted account flow; environment flags alone do not activate live mode in this shell.
 
-Copy `.env.example` to `.env` and configure only public settings after agreement:
+Member 2 must accept/normalize `GET /api/events` → `EventRecord[]`, event read/mutation responses → `WorkspaceEvent`, and authenticated create/PATCH/prepare/review/publish/sync endpoints. Member 3's `/api/dev` shape differs and must not be treated as production Supabase data. Private records, trusted Go provenance, exact asset/approval revisions, ownership/RLS, and idempotency must be validated server-side. Public browser config must never include connector tokens, OAuth secrets, or service-role keys.
 
-- `VITE_EVENT_API_ENABLED=true`
-- `VITE_SUPABASE_URL` (HTTPS project origin)
-- `VITE_SUPABASE_PUBLISHABLE_KEY` (public browser key, never service-role)
-- `BACKEND_PROXY_TARGET` (development Vite proxy only)
+Canva previews render actual HTTPS metadata when supplied. Unknown inclusion facts remain unknown; sourced yes/no facts require confirmation dates. Access/sensory details and prose previews are collapsed to keep the main flow small. Provider status and private guest responses are expandable sections inside distribution. Sent email/attachments remain immutable; sent invitations require a new change notice, while unsent drafts are replaced. Exact Canva transaction digest approval and public event links remain pending backend handoffs.
 
-Sign-in uses the [Supabase password grant](https://supabase.github.io/auth/). Its access token is held in React memory and sent as `Authorization: Bearer` to same-origin `/api/events` requests. The session ends at expiry or local sign-out; no tokens are persisted or logged. Refresh, registration, password recovery, Google/Canva account-connect routes, and global Supabase session revocation remain future auth-owner handoffs. Local sign-out drops this tab’s session. Secrets and connector tokens never belong in browser environment settings.
-
-The adapter expects `GET /api/events` → `EventRecord[]`; `GET /api/events/{id}` and mutation responses → `WorkspaceEvent`. `POST /api/events` creates; `PATCH /api/events/{id}` includes `expected_revision`; `/prepare`, `/review`, `/publish`, `/sync` use POST and expected revision. Review carries content edits, facts, and acknowledgment. Publish/update carries a stable idempotency key in JSON and `Idempotency-Key`. The server must revalidate content IDs/provenance, ownership, review/approval, current artifacts, revision, and recipients before any side effect. Client gating is UX only.
-
-Go MCP event-creation tools belong to Member 3, durable task/event state and organizer REST/auth to Member 2. The frontend does not implement a second MCP server or an invented Go chat API. Refresh reloads API-backed Go-created events; push/realtime delivery is pending a contract. Artifact preview/edit/current links accept HTTPS only. Document prose is displayed as text; no untrusted HTML is injected.
-
-Review includes source/date fields and unresolved inclusion facts. Live Canva transaction approval still needs the operation/digest/revision endpoint from Members 2–4; the generic review button does not commit Canva transactions. Provider state and receipts stay distinct from event phase. Stale output is visible and cannot be approved for the current revision. Missing artifacts prevent publishing. Existing sent mail is immutable and requires a change notice. Unsent drafts are labeled as replacements.
-
-All previews require organizer authentication in live mode; there is no public event route until the backend supplies a separately approved public schema/link policy. Private RSVP source evidence is organizer-only. No attendee-sensitive fixtures or credentials are committed.
-
-## Same-Wi-Fi preview
-
-```sh
-npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
-```
-
-Share the Network URL printed by Vite with teammates on the same Wi-Fi. Keep the host awake and the process running. Each browser has separate, ephemeral sample data. Guest Wi-Fi client isolation or the host firewall can block access even when the host responds locally. This is a LAN development preview, not a production deployment.
+Checks cover direct entry, the three sidebar links/stages, event creation, Go links/prompts/setup-pending states, writing provenance/review gates, inclusion sources, provider errors, private RSVP evidence, local profile editing, auth/REST boundary errors, revision conflicts, and timezone/DST conversion. Desktop/mobile browser and full screen-reader verification for this revision remain separate checks.
