@@ -1,89 +1,171 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import App from "./App";
-
-const projectStatus = {
-  superhuman: {
-    transport: "mcp",
-    configured: true,
-    verified: false,
-    endpoint: "/mcp",
-  },
-  model: { configured: false, runtime: "not_configured" },
-};
-
-function mockBackend() {
-  return vi
-    .fn()
-    .mockImplementation((path: string) =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify(
-            path === "/api/health"
-              ? { status: "ok", service: "backend" }
-              : projectStatus,
-          ),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      ),
-    );
+async function preview() {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: /Open local preview/ }));
+  await screen.findByRole("button", { name: /A neighborhood, together/ });
+  return user;
 }
-
-describe("workspace readiness", () => {
-  it("uses the real API contract and distinguishes configured credentials from verification", async () => {
-    const fetchMock = mockBackend();
-    vi.stubGlobal("fetch", fetchMock);
-    render(<App />);
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Checking the Python backend",
-    );
+async function sample() {
+  const user = await preview();
+  await user.click(
+    screen.getByRole("button", { name: /A neighborhood, together/ }),
+  );
+  await screen.findByRole("button", { name: "Save & continue" });
+  return user;
+}
+describe("organizer workspace", () => {
+  it("keeps sign-in distinct from the synthetic, non-publishing preview", async () => {
+    const user = await preview();
     expect(
-      await screen.findByText("Backend connected · Health check passed"),
+      screen.getByText(/Synthetic sample writing and receipts/),
     ).toBeVisible();
-    expect(screen.getByText("Credentials configured")).toBeVisible();
+    expect(screen.getByText(/MCP event creation is awaiting/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /Leave preview/ }));
+    expect(screen.getByRole("heading", { name: "Welcome in." })).toBeVisible();
+  });
+  it("offers keyboard navigation, private RSVP evidence, and partial provider states", async () => {
+    const user = await sample();
+    await user.click(screen.getByRole("button", { name: /Updates & sync/ }));
+    expect(
+      screen.getByText("Unsent draft · update existing draft"),
+    ).toBeVisible();
+    expect(screen.getAllByText("Stale").length).toBeGreaterThan(0);
+    expect(screen.getByText("integration not connected")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /RSVPs/ }));
+    expect(screen.getByText("Conflict · needs review")).toBeVisible();
     expect(
       screen.getByText(
-        /A live Superhuman connection has not yet been verified/,
+        /Private dietary and accessibility details are excluded/,
       ),
     ).toBeVisible();
-    expect(screen.getByText("No model configured")).toBeVisible();
-    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
-      "/api/health",
-      "/api/status",
-    ]);
-  });
-
-  it("lets the user recover after a failed backend request", async () => {
-    const user = userEvent.setup();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
+    expect(screen.getByRole("heading", { name: "RSVPs" })).toHaveFocus();
+    expect(screen.getByRole("table")).toHaveAccessibleName(
+      "Invited people and response evidence",
     );
-    render(<App />);
-    expect(await screen.findByText(/Backend unavailable/)).toBeVisible();
+  });
+  it("saves manual events, then waits truthfully for Go without inventing content", async () => {
+    const user = await preview();
+    await user.click(screen.getByRole("button", { name: /Create manually/ }));
+    await user.type(screen.getByLabelText("Event title"), "Garden meetup");
+    await user.type(
+      screen.getByLabelText("Location or online meeting link"),
+      "Community garden",
+    );
+    await user.type(
+      screen.getByLabelText("Organizer email"),
+      "organizer@example.com",
+    );
+    await user.type(screen.getByLabelText("Start time"), "2026-11-07T10:00");
+    await user.type(screen.getByLabelText("End time"), "2026-11-07T12:00");
+    await user.click(screen.getByRole("button", { name: "Save & continue" }));
     expect(
-      screen.queryByText("Credentials configured"),
-    ).not.toBeInTheDocument();
-    vi.stubGlobal("fetch", mockBackend());
-    await user.click(screen.getByRole("button", { name: /Refresh status/ }));
+      await screen.findByText("Waiting for Go’s first draft"),
+    ).toBeVisible();
+    await user.click(
+      screen.getByRole("button", { name: "Request preparation" }),
+    );
     expect(
-      await screen.findByText("Backend connected · Health check passed"),
+      await screen.findByText(/Awaiting Go. Ask your Go agent/),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /Distribution/ }));
+    expect(
+      screen.getByRole("button", { name: "Confirm & publish" }),
+    ).toBeDisabled();
+  });
+  it("edits Go previews with provenance and records explicit review without sending", async () => {
+    const user = await sample();
+    await user.click(
+      screen.getByRole("button", { name: /Design & inclusion/ }),
+    );
+    const editor = screen.getByLabelText(
+      /Event description.*needs review.*Superhuman Go/s,
+    );
+    await user.type(editor, " Please bring a notebook.");
+    expect(screen.getByText("Edited by organizer · revision 2")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Save review & continue" }),
+    ).toBeDisabled();
+    await user.click(
+      screen.getByRole("checkbox", { name: /I reviewed this revision/ }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Save review & continue" }),
+    );
+    expect(
+      await screen.findByText("Review saved for this revision."),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Confirm & publish" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/Local preview: publish is disabled/),
     ).toBeVisible();
   });
-
-  it("rejects incompatible or malformed backend responses", async () => {
+  it("blocks unsourced inclusion claims and preserves unknown options", async () => {
+    const user = await sample();
+    await user.click(
+      screen.getByRole("button", { name: /Design & inclusion/ }),
+    );
+    const fact = screen.getByRole("group", { name: "Step-free entrance" });
+    await user.selectOptions(within(fact).getByRole("combobox"), "yes");
+    await user.click(
+      screen.getByRole("checkbox", { name: /I reviewed this revision/ }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Save review & continue" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Add a source and confirmation date",
+    );
+  });
+  it("refreshes the existing real health contract and handles backend failure", async () => {
+    const user = await preview();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    await user.click(
+      screen.getByRole("button", { name: "Backend not checked" }),
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: "Backend unavailable · retry connection",
+      }),
+    ).toBeVisible();
     vi.stubGlobal(
       "fetch",
       vi
         .fn()
-        .mockImplementation(() =>
-          Promise.resolve(new Response("{}", { status: 200 })),
+        .mockImplementation((path: string) =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify(
+                path === "/api/health"
+                  ? { status: "ok", service: "backend" }
+                  : {
+                      superhuman: {
+                        transport: "mcp",
+                        configured: true,
+                        verified: false,
+                        endpoint: "/mcp",
+                      },
+                      model: { configured: false, runtime: "not_configured" },
+                    },
+              ),
+            ),
+          ),
         ),
     );
-    render(<App />);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Backend unavailable · retry connection",
+      }),
+    );
     expect(
-      await screen.findByText(/health response did not match the API contract/),
+      await screen.findByRole("button", {
+        name: /Backend online · MCP configured · Go unverified/,
+      }),
     ).toBeVisible();
   });
 });
