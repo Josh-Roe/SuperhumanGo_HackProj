@@ -19,6 +19,8 @@ The team lead has selected an event organizer website. Organizers create an even
 
 The distinctive demo is a real change of time/location causing a visible, versioned update across Calendar, Gmail, and Canva. Keep the latest event accessible through one stable link while clearly identifying older snapshots.
 
+**Agreed workflow update, 2026-10-16:** the organizer primarily prompts Superhuman Go. Go connects to the website's custom authenticated MCP server, creates/edits canonical tasks/events, prepares writing and coordinates approved provider work, then records IDs/revisions/results for the website to display. Manual website creation/editing remains available. This follows the team lead's Member 2 instruction and the matching Member 1/4 context handoffs. Connecting MCP does not itself prove an automatic website-to-Go trigger or authorize publication. A separate standalone-task schema and the frontend wire mapping are published as implementation proposals in Member 2's context pending consumer agreement.
+
 ## Organizer flow
 
 1. **Log in:** Supabase Auth; connect the organizer's Gmail/Calendar/Canva accounts as supported by their real integrations.
@@ -69,7 +71,7 @@ Gemini is available for explicitly approved supporting subtasks or separately la
 
 ## Current evidence and blockers
 
-The repository currently contains a tested React/Python/MCP scaffold, optional ONNX boundaries, and Docker/Caddy deployment files. These planning documents **do not implement** Supabase auth/data, event CRUD, provider OAuth, invitations, Canva edits, inclusion checks, or RSVP workflows.
+The initial handoff contained a tested React/Python/MCP scaffold, optional ONNX boundaries, and Docker/Caddy deployment files. Implementation now exists on member branches; the Member 2 integration branch combines the frontend preview, Go/Google workflows, Canva/inclusion services, and Supabase repositories/migrations. See each owner's context for actual evidence. Supabase SQL/RLS checks and local tests pass; router/MCP registration, frontend live wire mapping, account grants, and the complete provider demo remain pending. Planning documents alone are not live integration evidence.
 
 Historical evidence: scaffold revision `78d5477` passed [Linux CI and Docker smoke testing](https://github.com/Josh-Roe/SuperhumanGo_HackProj/actions/runs/38876793067). Local scaffold validation reported 37 backend and 3 frontend tests; optional ML behavior differs from base CI. This is not evidence that planned event features work.
 

@@ -1,13 +1,19 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap");
 :root {
-  font-family: "DM Sans", system-ui, sans-serif;
-  color: #182c2a;
-  background: #f7f9f6;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #273c35;
+  background: #f7f8f4;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   font-weight: 400;
+  font-size: 14px;
+  line-height: 1.6;
 }
 * {
   box-sizing: border-box;
@@ -17,19 +23,32 @@ body {
   min-width: 320px;
 }
 button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button,
 a {
   -webkit-tap-highlight-color: transparent;
 }
 button {
-  font: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 a {
   color: inherit;
 }
 button:focus-visible,
-a:focus-visible {
-  outline: 3px solid #326e5f;
-  outline-offset: 5px;
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid #386852;
+  outline-offset: 4px;
 }
 h1,
 h2,
@@ -37,9 +56,69 @@ h3,
 p {
   margin: 0;
 }
-button:disabled {
-  cursor: wait;
+h1,
+h2,
+h3 {
+  line-height: 1.2;
 }
-code {
-  font-family: ui-monospace, SFMono-Regular, monospace;
+h1 {
+  font-size: clamp(28px, 3.2vw, 42px);
+  letter-spacing: -0.045em;
+  font-weight: 500;
+}
+h2 {
+  font-size: 24px;
+  letter-spacing: -0.035em;
+  font-weight: 500;
+}
+h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+em {
+  font-family: Georgia, serif;
+  font-weight: 400;
+}
+p {
+  overflow-wrap: anywhere;
+}
+input,
+textarea,
+select {
+  width: 100%;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #cbd3c7;
+  border-radius: 7px;
+  padding: 11px 12px;
+  color: #273c35;
+}
+textarea {
+  resize: vertical;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+}
+fieldset {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+button {
+  transition: background 0.15s;
+}
+::selection {
+  background: #d5ecb4;
+}
+img {
+  max-width: 100%;
+  display: block;
+}
+strong {
+  font-weight: 600;
 }
