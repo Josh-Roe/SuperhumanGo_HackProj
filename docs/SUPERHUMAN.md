@@ -20,7 +20,31 @@ python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
 npm run dev:backend
 ```
 
-The MCP server rejects requests without the configured bearer token. `workspace_status` returns service readiness; `count_text` is a deterministic utility for checking a tool round trip. Neither is AI writing or the chosen event workflow. Member 3 adds event/content/operation tools and organizer-scoped authorization per [the contract](INTEGRATION_CONTRACT.md); a single global development token cannot authorize access to every organizer's data.
+The MCP server rejects requests without a valid bearer token. `MCP_AUTH_TOKEN` is a deployment check token: it reaches only `workspace_status` and `count_text`. Event tools require a **per-organizer connector token**, which resolves to that organizer's events only.
+
+### Event tools (Member 3)
+
+| Tool | Effect |
+| --- | --- |
+| `get_event` | Current revision, facts, and saved Go content; no invitee emails |
+| `list_go_work` / `claim_go_work` | Queue of prose to write and replies to classify |
+| `save_generated_content` | Stores Go-written prose for one revision (`producer: superhuman_go`, `needs_review`) |
+| `preview_distribution` | Calendar create/update and Gmail draft/replace/change-notice plan, with blockers |
+| `execute_distribution` | Runs an organizer-made approval; idempotent Calendar upsert + Gmail send |
+| `sync_rsvps` / `get_reply` / `record_rsvp_classification` / `list_rsvps` | Calendar statuses plus Go-classified replies |
+
+The backend is the only writer to Calendar and Gmail. Go agent instructions: [`integrations/superhuman/agent/INSTRUCTIONS.md`](../integrations/superhuman/agent/INSTRUCTIONS.md).
+
+### Dev mode (before Supabase)
+
+```sh
+WORKFLOW_DEV_MODE=1 DEV_CONNECTOR_TOKEN="$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')" \
+DEV_INVITEES=you+test@example.com npm run dev:backend
+```
+
+This seeds the in-memory event `dev-event-1`. `DEV_CONNECTOR_TOKEN` is both the Go connector token and the bearer for `/api/dev/*`: `POST .../events/dev-event-1/prepare`, `GET .../events/dev-event-1`, `POST .../approve {content_id, action}`, `POST .../revise {location, starts_at, ends_at}`, `POST /api/dev/google/connect`. State is lost on restart and is not Supabase evidence.
+
+Google: create an OAuth client (Web application) with redirect `https://YOUR-DOMAIN/api/dev/google/callback`. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REDIRECT_URI`. Scopes: `calendar.events`, `gmail.compose`, `gmail.readonly`, `openid`, `email`. In testing mode, add test users. Use only invitees who agreed to receive test mail.
 
 The [official tutorial](https://coda.io/packs/build/latest/tutorials/build/mcp/) requires a hosted endpoint. A localhost server and SDK validation alone cannot verify live Go behavior.
 
@@ -48,7 +72,7 @@ The [official tutorial](https://coda.io/packs/build/latest/tutorials/build/mcp/)
    Registration requires your account token. The generated `.coda.json` contains credentials and is ignored by Git. `.coda-pack.json` tracks the remote Pack identity and is also ignored; share access through the account rather than committing credentials. `config.ts` contains only the public endpoint and can be committed.
 
 4. In Superhuman Go, open **Connectors**, find the connector, install it, and enter the same bearer token used by the server. The official tutorial lists Pro or higher for Go and Doc Maker access to create the Pack; use the hackathon’s provisioned access if supplied.
-5. Start a chat and ask Go to use `workspace_status`, then to use `count_text` on a short sample. Confirm the tool call and response in connector session logs.
+5. Start a chat and ask Go to use `workspace_status`. Then install with the organizer connector token (dev: `DEV_CONNECTOR_TOKEN`), queue work with `POST /api/dev/events/dev-event-1/prepare`, and say "Process my event work." Confirm in the connector session logs that `list_go_work`, `get_event` and `save_generated_content` were called, and that `GET /api/dev/events/dev-event-1` shows content with `producer: superhuman_go`.
 
 Until step 5 succeeds, record the state as **locally tested; live Go connection unverified**. Backend `verified` remains false deliberately: the server cannot infer remote installation from configuration.
 
