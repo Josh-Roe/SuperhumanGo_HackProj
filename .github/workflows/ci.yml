@@ -6,6 +6,25 @@ on:
 permissions:
   contents: read
 jobs:
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+      - name: Replay migrations in an isolated local Supabase stack
+        run: |
+          supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,supavisor,realtime,mailpit
+          supabase db reset --local --no-seed
+      - name: Database ownership, revision, privacy and retry checks
+        run: psql 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' --set ON_ERROR_STOP=1 --file supabase/tests/organizer_isolation.sql
+      - name: Stop test Supabase
+        if: always()
+        run: supabase stop
   checks:
     runs-on: ubuntu-latest
     steps:

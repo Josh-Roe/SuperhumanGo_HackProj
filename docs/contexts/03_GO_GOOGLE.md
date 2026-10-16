@@ -1,6 +1,6 @@
 # Member 3 context: Superhuman Go, Google, synchronization, RSVP
 
-Owner: Member 3 (human name/GitHub pending). Updated 2026-10-16. Status: **assigned; product integration not started by this handoff**.
+Owner: Member 3 (human name/GitHub pending). Updated 2026-10-16. Status: **implemented and tested locally with mocks on `codex/member-3-go-google`; live Go/Google/Supabase unverified**.
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), [all four member contexts](../TEAM_TASKS.md), and [contract](../INTEGRATION_CONTRACT.md) before work. Write only this personal context. [Copy-ready prompt](../prompts/03_GO_GOOGLE.md).
 
@@ -24,11 +24,37 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
 ## Decisions and progress
 
 - Agreed from user: Superhuman Go and Grammarly power writing/coordination; Gmail, Calendar and reply-based RSVP are core.
-- Supported route verified in documentation: Go calls a hosted Streamable HTTP MCP connector; no general backend Go completion endpoint has been established.
-- Open: native Go Google connectors vs backend OAuth tools; pick and document one executor per operation to avoid double writes. A shared global MCP token is not organizer authorization.
-- Verification: starter Pack validation is historical; no live product generation, Google write, trigger, or RSVP ingestion is proven yet.
-- Blockers: eligible Go/account access, hosted URL, scoped identity, Google OAuth/grants, first event repository contract.
-- Next action: Go → scoped test event → save generated content proof, then publish tool/trigger/provider execution decisions here.
+- **2026-10-16 | `codex/member-3-go-google` | implemented, tested (local/mocked) | executor decision:** the backend OAuth adapters are the single writer for Calendar and Gmail. Go writes prose and classifies replies through our MCP tools, and its own native Gmail/Calendar write actions stay disabled for this agent (`integrations/superhuman/agent/INSTRUCTIONS.md`). Reason: idempotency keys, provider IDs and receipts live in one place.
+- **2026-10-16 | implemented, tested (local/mocked) | per-organizer MCP tools** (`mcp_tools/event_tools.py`): `get_event` (no emails/owner), `list_go_work`, `claim_go_work`, `save_generated_content` (producer fixed to `superhuman_go`, `expected_revision` CAS), `preview_distribution`, `execute_distribution` (requires organizer approval ID), `sync_rsvps`, `get_reply`, `record_rsvp_classification`, `list_rsvps` (private notes excluded). Each call resolves its bearer token to a principal; the global `MCP_AUTH_TOKEN` reaches only the scaffold tools.
+- **2026-10-16 | implemented, tested (mocked HTTP) | Google** (`providers/google/**`, `workflows/distribution.py`, `workflows/rsvp.py`):
+  - Calendar: a deterministic event ID, and a 409 adopts the existing event. Changes patch the same ID with If-Match and `sendUpdates=all`. The app revision is verified by read-back.
+  - Gmail: invitees go in Bcc. An unsent draft is replaced in place. After a send, a `change_notice` is required in the same thread. Gmail is reconciled before acting, so a draft sent manually or a crash after send never causes a resend.
+  - RSVP: Calendar `responseStatus` is mapped. A reply must match both the invitee and the thread. Forwarded, conditional, low-confidence or unquoted replies stay `needs_review`. Calendar/email conflicts are flagged. Private notes are organizer-only.
+  - Evidence: 106 backend tests pass on Python 3.11 and 3.14. None of the following is live-verified: Google 409 on a duplicate ID, Bcc stripping, a 412 on a stale etag, or calendar.events scope limits.
+- **2026-10-16 | implemented | dev mode** (`workflows/dev.py`, `WORKFLOW_DEV_MODE=1`): an in-memory store with one seeded test event, plus `/api/dev/*` routes (prepare, revise, approve, connect Google) guarded by `DEV_CONNECTOR_TOKEN`. This proves the live Go loop before Supabase lands. It is **not** Supabase evidence. Smoke-tested with a real uvicorn server and MCP over HTTP locally.
+- **Website-to-Go trigger:** unverified. The fallback is the visible `awaiting_go` queue, which Go drains when the organizer says "Process my event work".
+- Grammarly path (proposed): the organizer edits Go drafts in the website with the Grammarly extension, and edits are recorded as `producer: organizer`. Must be verified on the deployed page.
+
+## Handoffs (proposed, awaiting recipient agreement)
+
+- **Member 2:**
+  - Implement the `WorkflowStore` Protocol (`workflows/ports.py`) on Supabase: owner-scoped, `save_content` CAS on the event revision, and an atomic work-item insert per `payload.idempotency_key`.
+  - Implement `PrincipalResolver.resolve(token)` for per-organizer connector tokens (store SHA-256 hashes only).
+  - Implement `CredentialVault` (`providers/google/oauth.py`) as encrypted refresh-token storage.
+  - Provide a REST route that creates `Approval` records from the organizer's click.
+  - Add these env names to `config.py` and `.env.example`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `WORKFLOW_DEV_MODE`, `DEV_CONNECTOR_TOKEN`, `DEV_INVITEES`, `DEV_ORGANIZER_CONTACT`.
+  - Add the five asset `ContentKind` values to the canonical contract.
+- **Member 4 (implemented on my side, tested locally):** `workflows/asset_queue.py`:
+  - `GoAssetQueue.enqueue(ProseRequest)` conforms structurally to `GoPreparationQueue`. It checks owner and current revision, dedupes by `idempotency_key`, and returns `awaiting_go`/`queued` receipts. The asset batch supersedes only older asset batches, never invitation prep.
+  - `load_go_content(...)` returns `GoContent` fields from server records (`generation_id` = content ID; `reviewed_by_organizer` = state `ready`).
+  - Still needed from 4: `AttachmentSource.current_attachments(owner_id, event)` for MIME flyer attachments (currently `None`, so no attachment is sent), and the Canva session/tool-name map before I register adapters in `main.py`.
+- **Member 1:** to show status, read the dev `GET /api/dev/events/{id}` shape until Member 2's API exists: work states, content `state` (`needs_review`/`ready`), operations (`state`, `error_code`, `receipt`), calendar and gmail bindings, and RSVPs with a `conflict` flag.
+
+## Blockers / next action
+
+1. A human creates the Google OAuth client, deploys over HTTPS, and installs the Pack in Go (see `docs/SUPERHUMAN.md`).
+2. Live proof: Go → `list_go_work` → `get_event` → `save_generated_content` on `dev-event-1`. Then run publish → revise → change notice → RSVP against authorized test inboxes only.
+3. Merge with Member 2's repositories and Member 4's branch, then swap the in-memory store in composition.
 
 ## Update format
 
