@@ -12,7 +12,11 @@ export type ContentKind =
   | "plain_language_summary"
   | "invitation"
   | "change_notice"
-  | "event_document";
+  | "event_document"
+  | "flyer_brief"
+  | "flyer_copy"
+  | "flyer_alt_text"
+  | "notion_note";
 export interface EventInput {
   title: string;
   description: string;
@@ -34,6 +38,7 @@ export interface Content {
   id: string;
   kind: ContentKind;
   body: string;
+  subject?: string | null;
   producer: "superhuman_go" | "organizer" | "gemini";
   event_revision: number;
   state: WorkState;

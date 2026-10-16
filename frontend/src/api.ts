@@ -1,3 +1,4 @@
+import { normalizeContentKind } from "./content";
 export interface ProjectStatus {
   superhuman: {
     transport: "mcp";
@@ -117,12 +118,48 @@ export function parseEvent(value: unknown): EventRecord {
     throw new Error("Event timestamps are invalid.");
   return value as unknown as EventRecord;
 }
-export function parseWorkspace(value: unknown): WorkspaceEvent {
+function normalizeAsset(
+  value: unknown,
+  eventId: string,
+): Record<string, unknown> {
+  if (
+    !isRecord(value) ||
+    (value.event_id !== undefined && value.event_id !== eventId)
+  )
+    throw new Error("Artifact response did not match this event.");
+  const kind =
+    value.kind === "flyer_png"
+      ? "flyer"
+      : value.kind === "event_document"
+        ? "document"
+        : value.kind;
+  const state =
+    value.state ??
+    (value.review_state === "reviewed"
+      ? "ready"
+      : value.review_state === "needs_review"
+        ? "needs_review"
+        : undefined);
+  // Member 4 preview metadata uses a content hash, not a provider/database ID. This is a UI key only.
+  const id =
+    value.id ??
+    (typeof value.sha256 === "string" && /^[a-f0-9]{64}$/.test(value.sha256)
+      ? `${kind}:${value.event_revision}:${value.sha256}`
+      : undefined);
+  return { ...value, kind, state, id };
+}
+export function parseWorkspace(raw: unknown): WorkspaceEvent {
   const fail = () => {
     throw new Error("Review response did not match the proposed API contract.");
   };
-  if (!isRecord(value)) return fail();
-  parseEvent(value.event);
+  if (!isRecord(raw)) return fail();
+  const event = parseEvent(raw.event);
+  const value: Record<string, unknown> = {
+    ...raw,
+    assets: Array.isArray(raw.assets)
+      ? raw.assets.map((asset) => normalizeAsset(asset, event.id))
+      : raw.assets,
+  };
   const collections = [
     "content",
     "work",
@@ -138,6 +175,8 @@ export function parseWorkspace(value: unknown): WorkspaceEvent {
         !isRecord(item) ||
         typeof item.id !== "string" ||
         !Number.isInteger(item.event_revision) ||
+        Number(item.event_revision) < 1 ||
+        (item.event_id !== undefined && item.event_id !== event.id) ||
         !states.includes(String(item.state))
       )
         return fail();
@@ -149,13 +188,9 @@ export function parseWorkspace(value: unknown): WorkspaceEvent {
         isRecord(c) &&
         typeof c.body === "string" &&
         ["superhuman_go", "organizer", "gemini"].includes(String(c.producer)) &&
-        [
-          "description",
-          "plain_language_summary",
-          "invitation",
-          "change_notice",
-          "event_document",
-        ].includes(String(c.kind)),
+        (c.subject === undefined ||
+          c.subject === null ||
+          typeof c.subject === "string"),
     )
   )
     return fail();
@@ -253,7 +288,16 @@ export function parseWorkspace(value: unknown): WorkspaceEvent {
       !Number.isInteger(value.gmail.event_revision))
   )
     return fail();
-  return value as unknown as WorkspaceEvent;
+  const content = (value.content as Record<string, unknown>[]).map((item) => ({
+    ...item,
+    kind: normalizeContentKind(item.kind),
+  }));
+  if (
+    new Set((value.content as Record<string, unknown>[]).map((item) => item.id))
+      .size !== content.length
+  )
+    return fail();
+  return { ...value, content } as unknown as WorkspaceEvent;
 }
 export class ApiError extends Error {
   code: string;

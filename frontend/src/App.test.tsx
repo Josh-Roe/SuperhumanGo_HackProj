@@ -195,3 +195,78 @@ describe("simplified event workspace", () => {
     ).toBeVisible();
   });
 });
+
+describe("Go-backed event read model", () => {
+  it("fills event fields and routes design and email content to their named groups on refresh", async () => {
+    const { createPreviewGateway } = await import("./preview");
+    const { parseWorkspace } = await import("./api");
+    const base = createPreviewGateway();
+    const snapshot = await base.get("preview-gathering");
+    const incoming = parseWorkspace({
+      ...snapshot,
+      event: {
+        ...snapshot.event,
+        title: "Community picnic",
+        location: "Lakeside garden",
+      },
+      content: [
+        {
+          id: "design-output",
+          kind: "flyer_brief",
+          body: "Blue and yellow. Hand-drawn lemons. Date prominently at the top.",
+          producer: "superhuman_go",
+          event_revision: 2,
+          state: "needs_review",
+        },
+        {
+          id: "email-output",
+          kind: "invitation",
+          body: "Bring a picnic blanket.",
+          subject: "Join our community picnic",
+          producer: "superhuman_go",
+          event_revision: 2,
+          state: "needs_review",
+        },
+      ],
+    });
+    const gateway = {
+      ...base,
+      list: vi.fn().mockResolvedValue([incoming.event]),
+      get: vi.fn().mockResolvedValue(incoming),
+    };
+    const user = userEvent.setup();
+    render(<App eventGateway={gateway} />);
+    await user.click(
+      await screen.findByRole("button", { name: /Community picnic/ }),
+    );
+    expect(screen.getByLabelText("Event title")).toHaveValue(
+      "Community picnic",
+    );
+    expect(
+      screen.getByLabelText("Location or online meeting link"),
+    ).toHaveValue("Lakeside garden");
+    await user.click(
+      screen.getByRole("button", { name: /2Design & inclusion/ }),
+    );
+    const design = screen.getByRole("group", {
+      name: "Go output: Canva design",
+    });
+    await user.click(
+      within(design).getByText("Canva design instructions", {
+        selector: "summary",
+      }),
+    );
+    expect(within(design).getByRole("textbox")).toHaveValue(
+      "Blue and yellow. Hand-drawn lemons. Date prominently at the top.",
+    );
+    const mail = screen.getByRole("group", { name: "Go output: Distribution" });
+    await user.click(
+      within(mail).getByText("Invitation", { selector: "summary" }),
+    );
+    expect(within(mail).getByLabelText("Email subject")).toHaveValue(
+      "Join our community picnic",
+    );
+    await user.click(screen.getByRole("button", { name: "↻ Refresh" }));
+    expect(gateway.get).toHaveBeenCalledTimes(2);
+  });
+});

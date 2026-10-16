@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { loadProjectStatus } from "./api";
 import { createPreviewGateway } from "./preview";
+import { contentDefinitions, destinations, routeContent } from "./content";
 import { emptyFacts, factLabels, friendlyState, safeUrl } from "./types";
 import type {
   Content,
+  EventGateway,
   EventInput,
   EventRecord,
   FactKey,
@@ -22,13 +24,6 @@ const steps: { id: Step; name: string }[] = [
 ];
 const GO_URL = "https://go.superhuman.com/";
 const MCP_URL = safeUrl(import.meta.env.VITE_PUBLIC_MCP_URL);
-const contentLabels: Record<Content["kind"], string> = {
-  description: "Event description",
-  plain_language_summary: "Plain-language summary",
-  invitation: "Invitation",
-  change_notice: "Change notice",
-  event_document: "Event document",
-};
 function Badge({
   children,
   tone = "",
@@ -81,8 +76,8 @@ function GoHandoff({
             {event ? "Let Go take it from here." : "Plan in Go. See it here."}
           </h2>
           <p>
-            Connect this workspace to Go, then ask it to update your flyer,
-            writing, email, and Calendar plan.
+            Describe the whole event in your own words in Go—details, design,
+            guests, and invitations. Go saves each part into its place here.
           </p>
         </div>
         <a className="primary" href={GO_URL} target="_blank" rel="noreferrer">
@@ -125,9 +120,10 @@ function GoHandoff({
             )}
           </li>
           <li>
-            <strong>Prompt Go, then come back.</strong> Ask Go to save changes
-            through the connector. Return here and refresh to review the
-            results.
+            <strong>Describe what you want.</strong> Use any order or wording in
+            Go. Ask it to save event details, design instructions, and writing
+            through the connector. If something is unclear, Go should ask you
+            rather than guess. Return here to review the results.
             <label>
               Prompt for Go
               <textarea
@@ -375,6 +371,7 @@ function Review({
   const [facts, setFacts] = useState(record.facts ?? emptyFacts());
   const [ack, setAck] = useState(false);
   const [error, setError] = useState("");
+  const groupedContent = routeContent(content);
   const current = content.filter(
     (c) => c.event_revision === record.event.revision,
   );
@@ -499,7 +496,15 @@ function Review({
           </p>
           <div className="asset-grid">
             {(["flyer", "document"] as const).map((kind) => {
-              const asset = record.assets.find((a) => a.kind === kind);
+              const asset =
+                record.assets.find(
+                  (a) =>
+                    a.kind === kind &&
+                    a.event_revision === record.event.revision,
+                ) ??
+                record.assets
+                  .filter((a) => a.kind === kind)
+                  .sort((a, b) => b.event_revision - a.event_revision)[0];
               return (
                 <article className="asset" key={kind}>
                   <div className="asset-preview">
@@ -603,52 +608,95 @@ function Review({
               above.
             </p>
           )}
-          {content.map((c, i) => (
-            <details className="writing-preview" key={c.id}>
-              <summary>
-                {contentLabels[c.kind]}{" "}
-                <Badge
-                  tone={
-                    c.event_revision !== record.event.revision ? "warning" : ""
-                  }
+          {destinations.map(
+            (destination) =>
+              groupedContent[destination.id].length > 0 && (
+                <div
+                  key={destination.id}
+                  className="content-group"
+                  role="group"
+                  aria-label={`Go output: ${destination.label}`}
                 >
-                  {c.event_revision === record.event.revision
-                    ? friendlyState(c.state)
-                    : `Stale · r${c.event_revision}`}
-                </Badge>
-              </summary>
-              <label>
-                {contentLabels[c.kind]}
-                <span className="small muted">
-                  {c.producer === "superhuman_go"
-                    ? "Superhuman Go"
-                    : c.producer === "gemini"
-                      ? "Gemini-assisted portion"
-                      : "Edited by organizer"}{" "}
-                  · revision {c.event_revision}
-                </span>
-                <textarea
-                  rows={5}
-                  value={c.body}
-                  disabled={busy || c.event_revision !== record.event.revision}
-                  onChange={(e) =>
-                    setContent((all) =>
-                      all.map((item, index) =>
-                        index === i
-                          ? {
-                              ...item,
-                              body: e.target.value,
-                              producer: "organizer",
-                              state: "needs_review",
+                  <h3>{destination.label}</h3>
+                  {groupedContent[destination.id].map((c) => (
+                    <details className="writing-preview" key={c.id}>
+                      <summary>
+                        {contentDefinitions[c.kind].label}{" "}
+                        <Badge
+                          tone={
+                            c.event_revision !== record.event.revision
+                              ? "warning"
+                              : ""
+                          }
+                        >
+                          {c.event_revision === record.event.revision
+                            ? friendlyState(c.state)
+                            : `Stale · r${c.event_revision}`}
+                        </Badge>
+                      </summary>
+                      {(c.kind === "invitation" ||
+                        c.kind === "change_notice") && (
+                        <label>
+                          Email subject
+                          <input
+                            value={c.subject ?? ""}
+                            disabled={
+                              busy || c.event_revision !== record.event.revision
                             }
-                          : item,
-                      ),
-                    )
-                  }
-                />
-              </label>
-            </details>
-          ))}
+                            onChange={(e) =>
+                              setContent((all) =>
+                                all.map((item) =>
+                                  item.id === c.id
+                                    ? {
+                                        ...item,
+                                        subject: e.target.value,
+                                        producer: "organizer",
+                                        state: "needs_review",
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                      )}
+                      <label>
+                        {contentDefinitions[c.kind].label}
+                        <span className="small muted">
+                          {c.producer === "superhuman_go"
+                            ? "Superhuman Go"
+                            : c.producer === "gemini"
+                              ? "Gemini-assisted portion"
+                              : "Edited by organizer"}{" "}
+                          · revision {c.event_revision}
+                        </span>
+                        <textarea
+                          rows={5}
+                          value={c.body}
+                          disabled={
+                            busy || c.event_revision !== record.event.revision
+                          }
+                          onChange={(e) =>
+                            setContent((all) =>
+                              all.map((item) =>
+                                item.id === c.id
+                                  ? {
+                                      ...item,
+                                      body: e.target.value,
+                                      producer: "organizer",
+                                      state: "needs_review",
+                                    }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                    </details>
+                  ))}
+                </div>
+              ),
+          )}
           <label className="checkbox">
             <input
               type="checkbox"
@@ -803,7 +851,7 @@ function Distribution({
                 {record.event.invitees.length === 1 ? "person" : "people"} ·
                 private recipients
               </p>
-              <strong>{record.event.title}</strong>
+              <strong>{mail?.subject || record.event.title}</strong>
             </div>
             <div className="mail-body">
               {mail?.body ??
@@ -971,8 +1019,9 @@ function Rsvps({ record }: { record: WorkspaceEvent }) {
     </section>
   );
 }
-function App() {
-  const [gateway] = useState(createPreviewGateway);
+function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
+  // A live gateway must already carry organizer auth; default remains the public local preview.
+  const [gateway] = useState(() => eventGateway ?? createPreviewGateway());
   const [page, setPage] = useState<Page>("events");
   const [step, setStep] = useState<Step>("details");
   const [editing, setEditing] = useState(false);
@@ -986,6 +1035,7 @@ function App() {
   const [backend, setBackend] = useState("Not checked");
   const [profile, setProfile] = useState({ name: "Organizer", email: "" });
   const heading = useRef<HTMLHeadingElement>(null);
+  const publishKeys = useRef(new Map<string, string>());
   useEffect(() => {
     let active = true;
     gateway
@@ -1187,8 +1237,9 @@ function App() {
             )}
           </header>
           <p className="preview-note">
-            Local preview · sample data · changes stay in this tab · no
-            invitations send
+            {gateway.mode === "preview"
+              ? "Local preview · sample data · changes stay in this tab · no invitations send"
+              : "Connected organizer workspace · review changes before sending"}
           </p>
           {error && (
             <p role="alert" className="error-box">
@@ -1374,11 +1425,30 @@ function App() {
                   <Distribution
                     key={editorKey}
                     record={record}
-                    preview
+                    preview={gateway.mode === "preview"}
                     busy={busy}
-                    onPublish={() =>
-                      setError("Sending is unavailable in the local preview.")
-                    }
+                    onPublish={() => {
+                      const action = record.gmail?.sent ? "update" : "publish";
+                      const keyId = `${record.event.id}:${record.event.revision}:${action}`;
+                      const key =
+                        publishKeys.current.get(keyId) ?? crypto.randomUUID();
+                      publishKeys.current.set(keyId, key);
+                      void run(
+                        () =>
+                          gateway.publish(
+                            record.event.id,
+                            record.event.revision,
+                            action,
+                            key,
+                          ),
+                        (value) => {
+                          update(value);
+                          setMessage(
+                            "Request recorded. Check provider receipts for completion.",
+                          );
+                        },
+                      );
+                    }}
                   />
                   <details className="panel">
                     <summary>Guest responses</summary>
