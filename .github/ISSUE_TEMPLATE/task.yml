@@ -1,0 +1,25 @@
+name: Task
+description: Define a small piece of team work with an owner and completion check.
+title: "[Task] "
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What should be true when this task is done?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and coordination
+      description: Identify affected files or areas, dependencies, and teammates to coordinate with. Assign one owner using the issue's Assignees field.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Completion check
+      description: How will the team verify the outcome?
+    validations:
+      required: true
