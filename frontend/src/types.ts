@@ -118,6 +118,7 @@ export interface Session {
 }
 export interface EventGateway {
   mode: "preview" | "live";
+  readOnly?: boolean;
   list(): Promise<EventRecord[]>;
   get(id: string): Promise<WorkspaceEvent>;
   save(

@@ -6,6 +6,22 @@ Branch: `codex/member-1-frontend`, based on `3bd33b3`.
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four member contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/01_FRONTEND.md) before work. Write only this personal context. Preserve other members' changes.
 
+## Go-first creation and first transfer test — 2026-10-16
+
+**User | agreed, implemented:** New event now begins by prompting standalone Superhuman Go, with expanded MCP setup and copyable prompt. It creates no local/server placeholder. Manual entry is secondary. After Go saves, the organizer checks Your events; sample preview cannot claim to import a real Go event.
+
+**User clarification | blocked live test:** project is still LAN-only, with no deployed/connected MCP endpoint. A real Go write cannot be tested against the browser-only sample store. No backend publication/tunnel/account action was performed.
+
+**Member 2 handoff inspected:** newly fetched `origin/codex/member-2-backend-supabase` at `726a944`. Its owner-scoped Supabase models/repositories and REST factory now exist on that branch, with that owner's separately reported SQL/RLS evidence. This supersedes the earlier statement that all backend storage is unimplemented. Its `main.py` still lacks `api.create_router(settings)` registration; current Member 3 tools still lack create/update event MCP tools. No backend branch was merged or edited in this task.
+
+**Implemented/tested frontend read handoff:** accept Member 2's canonical `GET /api/events` and `GET /api/events/{id}` response shapes in a new **read-only** `createEventTransferGateway`, using 100-row limit/offset pagination and an organizer Supabase access token. This is the first narrow schema acceptance; the earlier full mutation adapter remains proposed and disabled in default composition. Settings now checks `GET /api/config` (public Supabase config) before displaying existing-account sign-in. Runtime password auth uses only the configured HTTPS Supabase origin; access tokens stay in React memory, expire, and clear on disconnect. In-flight results are discarded after session/gateway changes. Initial signup remains skipped. No live anonymous event access is allowed. Event-details test mode disables writes/design/distribution and clearly states that materials are not loaded.
+
+**Evidence:** `npm test` **28 tests**, lint, build and whitespace pass. New tests exercise Go-first/no-placeholder creation, manual fallback, the exact canonical read shape, pagination query/auth header, read-only writes rejected, API-readiness failure before asking for credentials, and a mocked saved event appearing with its returned ID/details. **Actual local HTTP:** LAN/Vite `GET /api/config` returned **404**. Thus no live Supabase session, Go event write, or end-to-end transfer is claimed. No browser/mobile audit was repeated.
+
+**Exact next-owner actions:** Member 3 registers Member 2's authenticated router before the catch-all MCP mount, wires scoped tool dependencies, and implements canonical create/update event tools using Member 2 repository models/idempotency. Member 2 supplies accepted public config/read identity setup and validates API ownership; read-only UI mapping is ready for those routes. Configure a reachable public HTTPS MCP endpoint and install it into the organizer's Go account. Then run the synthetic prompt in `frontend/README.md`; verify saved ID, revision and fields in the website, followed by a same-ID update and reload. Canva/email/Calendar remain outside this first proof and require their own later receipts. User has not yet authorized or supplied a deployment.
+
+Only `frontend/**` and this context changed. PR #2 carries the UI/test preparation. The actual current objective remains **blocked on endpoint/tool registration and hosting**, rather than complete.
+
 ## Standalone Go → structured workspace transfer — 2026-10-16
 
 **User goal | agreed:** users describe the entire event freely in the standalone Superhuman Go app, including event facts and Canva design preferences. No prescribed wording, order, or manual JSON should be required. Go interprets that request and invokes typed MCP tools; the backend validates/stores their data and the website places each record using its explicit schema. Ambiguous/missing dates, timezone, venue facts or design instructions require Go follow-up or preserved unknowns; arbitrary wording is not a guarantee that an ambiguous request can be inferred correctly.

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { loadProjectStatus } from "./api";
+import {
+  createEventTransferGateway,
+  loadPublicAuthConfig,
+  loadProjectStatus,
+  signIn,
+} from "./api";
 import { createPreviewGateway } from "./preview";
 import { contentDefinitions, destinations, routeContent } from "./content";
 import { emptyFacts, factLabels, friendlyState, safeUrl } from "./types";
@@ -11,6 +16,7 @@ import type {
   EventRecord,
   FactKey,
   WorkspaceEvent,
+  Session,
 } from "./types";
 import { eventDate, localTime, toInstant } from "./dates";
 import "./App.css";
@@ -160,16 +166,127 @@ function GoHandoff({
     </section>
   );
 }
+function TransferConnection({
+  onConnected,
+}: {
+  onConnected: (gateway: EventGateway, session: Session) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [config, setConfig] =
+    useState<Awaited<ReturnType<typeof loadPublicAuthConfig>>>();
+  async function check() {
+    setBusy(true);
+    setError("");
+    try {
+      setConfig(await loadPublicAuthConfig());
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to check the event API.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function connect(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!config) return;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setBusy(true);
+    setError("");
+    try {
+      const session = await signIn(
+        String(data.get("email")),
+        String(data.get("password")),
+        config,
+      );
+      const gateway = createEventTransferGateway(session.access_token);
+      await gateway.list();
+      form.reset();
+      onConnected(gateway, session);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to connect.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel">
+      <h2>Test Go → website.</h2>
+      <p className="muted">
+        Once the backend and Go connector are hosted, connect an existing
+        organizer account here to read its real events. This test loads event
+        details only.
+      </p>
+      <ol className="setup-steps">
+        <li>Connect Go to the public HTTPS MCP endpoint.</li>
+        <li>
+          Ask Go to create a uniquely named test event and return its saved
+          event ID.
+        </li>
+        <li>
+          Connect the same organizer account below, then refresh Your events and
+          compare the saved details.
+        </li>
+      </ol>
+      {!config && (
+        <button className="secondary" disabled={busy} onClick={check}>
+          {busy ? "Checking…" : "Check event API"}
+        </button>
+      )}
+      {error && (
+        <p role="alert" className="error-box">
+          {error}
+        </p>
+      )}
+      {config && (
+        <form onSubmit={connect} className="profile-form">
+          <fieldset disabled={busy}>
+            <label>
+              Organizer account email
+              <input
+                name="email"
+                type="email"
+                autoComplete="username"
+                required
+              />
+            </label>
+            <label>
+              Account password
+              <input
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+            </label>
+          </fieldset>
+          <button className="secondary" disabled={busy}>
+            {busy ? "Connecting…" : "Connect existing workspace"}
+          </button>
+        </form>
+      )}
+      <p className="small muted">
+        No signup is required here. Session access stays in this tab and expires
+        automatically. A connected event list alone does not prove a Go write;
+        compare it with Go’s saved ID.
+      </p>
+    </section>
+  );
+}
 function Details({
   record,
   onSave,
   busy,
   onDirty,
+  readOnly = false,
 }: {
   record: WorkspaceEvent | null;
   onSave: (input: EventInput) => void;
   busy: boolean;
   onDirty: () => void;
+  readOnly?: boolean;
 }) {
   const event = record?.event;
   const [formError, setFormError] = useState("");
@@ -235,7 +352,12 @@ function Details({
       <p className="muted">
         Name your event, set the place and time, and add your guests.
       </p>
-      <fieldset disabled={busy}>
+      {event && (
+        <p className="small muted">
+          Saved event ID: <code>{event.id}</code>
+        </p>
+      )}
+      <fieldset disabled={busy || readOnly}>
         <label>
           Event title
           <input
@@ -345,8 +467,8 @@ function Details({
         <p className="small muted">
           Save your details, then prepare the design and inclusion review.
         </p>
-        <button className="primary" disabled={busy}>
-          {busy ? "Saving…" : "Save & continue"}
+        <button className="primary" disabled={busy || readOnly}>
+          {readOnly ? "Read-only event" : busy ? "Saving…" : "Save & continue"}
         </button>
       </div>
     </form>
@@ -1021,7 +1143,11 @@ function Rsvps({ record }: { record: WorkspaceEvent }) {
 }
 function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   // A live gateway must already carry organizer auth; default remains the public local preview.
-  const [gateway] = useState(() => eventGateway ?? createPreviewGateway());
+  const [gateway, setGateway] = useState(
+    () => eventGateway ?? createPreviewGateway(),
+  );
+  const [session, setSession] = useState<Session>();
+  const [starting, setStarting] = useState(false);
   const [page, setPage] = useState<Page>("events");
   const [step, setStep] = useState<Step>("details");
   const [editing, setEditing] = useState(false);
@@ -1036,6 +1162,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   const [profile, setProfile] = useState({ name: "Organizer", email: "" });
   const heading = useRef<HTMLHeadingElement>(null);
   const publishKeys = useRef(new Map<string, string>());
+  const epoch = useRef(0);
   useEffect(() => {
     let active = true;
     gateway
@@ -1052,25 +1179,49 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   }, [gateway]);
   useEffect(() => {
     heading.current?.focus();
-  }, [page, step, editing]);
+  }, [page, step, editing, starting]);
   useEffect(() => {
     if (!dirty) return;
     const guard = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
   }, [dirty]);
+  useEffect(() => {
+    if (!session) return;
+    const timer = window.setTimeout(
+      () => {
+        epoch.current++;
+        setBusy(false);
+        setEvents([]);
+        setGateway(createPreviewGateway());
+        setSession(undefined);
+        setRecord(null);
+        setEditing(false);
+        setStarting(false);
+        setDirty(false);
+        setMessage("The workspace session expired. Reconnect in Settings.");
+      },
+      Math.max(0, session.expires_at - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [session]);
   async function run<T>(action: () => Promise<T>, done: (value: T) => void) {
+    const requestEpoch = epoch.current;
     setBusy(true);
     setError("");
     setMessage("");
     try {
-      done(await action());
+      const result = await action();
+      if (requestEpoch === epoch.current) done(result);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong. Try again.",
-      );
+      if (requestEpoch === epoch.current)
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong. Try again.",
+        );
     } finally {
-      setBusy(false);
+      if (requestEpoch === epoch.current) setBusy(false);
     }
   }
   function canLeave() {
@@ -1079,6 +1230,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   function navigate(next: Page) {
     if (!canLeave()) return;
     setPage(next);
+    setStarting(false);
     setEditing(false);
     setDirty(false);
     setError("");
@@ -1118,7 +1270,8 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   function addEvent() {
     if (canLeave()) {
       setRecord(null);
-      setEditing(true);
+      setStarting(true);
+      setEditing(false);
       setStep("details");
       setDirty(false);
       setEditorKey((k) => k + 1);
@@ -1152,9 +1305,11 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
       ? "Settings"
       : page === "profile"
         ? "Profile"
-        : editing
-          ? (record?.event.title ?? "New event")
-          : "Your events";
+        : starting
+          ? "Start your event with Go"
+          : editing
+            ? (record?.event.title ?? "New event")
+            : "Your events";
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main">
@@ -1208,7 +1363,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
         <main id="main">
           <header className="page-heading">
             <div>
-              {editing && page === "events" && (
+              {(editing || starting) && page === "events" && (
                 <button
                   className="text-button back-button"
                   disabled={busy}
@@ -1225,9 +1380,11 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   ? "Connect Go to your workspace."
                   : page === "profile"
                     ? "A few details about you."
-                    : editing
-                      ? "Details, design, then distribution."
-                      : "All your gatherings, in one place."}
+                    : starting
+                      ? "Describe the plan in Go, then review it here."
+                      : editing
+                        ? "Details, design, then distribution."
+                        : "All your gatherings, in one place."}
               </p>
             </div>
             {page === "events" && (
@@ -1239,7 +1396,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           <p className="preview-note">
             {gateway.mode === "preview"
               ? "Local preview · sample data · changes stay in this tab · no invitations send"
-              : "Connected organizer workspace · review changes before sending"}
+              : gateway.readOnly
+                ? "Connected event-details test · read-only · materials and distribution are not loaded"
+                : "Connected organizer workspace · review changes before sending"}
           </p>
           {error && (
             <p role="alert" className="error-box">
@@ -1249,7 +1408,57 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           <p className="status-message" role="status">
             {busy ? "Saving your request…" : message}
           </p>
-          {page === "events" && !editing && (
+          {page === "events" && starting && (
+            <>
+              <GoHandoff expanded />
+              <section className="panel">
+                <h2>After Go saves your event</h2>
+                <p className="muted">
+                  Come back to Your events and refresh. Open the saved event and
+                  compare its name, location, times, and guest list with your
+                  request.
+                </p>
+                {gateway.mode === "preview" && (
+                  <p className="notice">
+                    You are viewing local sample data. Go cannot write to this
+                    tab. Connect the hosted backend in Settings before testing a
+                    real transfer.
+                  </p>
+                )}
+                <div className="action-row">
+                  <button
+                    className="primary"
+                    disabled={busy || gateway.mode === "preview"}
+                    onClick={() => {
+                      setStarting(false);
+                      refresh();
+                    }}
+                  >
+                    Check Your events
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() => navigate("settings")}
+                  >
+                    Connection settings
+                  </button>
+                </div>
+              </section>
+              <button
+                className="text-button"
+                disabled={busy || gateway.readOnly}
+                onClick={() => {
+                  setStarting(false);
+                  setEditing(true);
+                  setEditorKey((k) => k + 1);
+                }}
+              >
+                Enter event details manually instead
+              </button>
+            </>
+          )}
+          {page === "events" && !editing && !starting && (
             <>
               <div className="events-toolbar">
                 <h2>
@@ -1332,7 +1541,11 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     key={item.id}
                     className={step === item.id ? "active" : ""}
                     aria-current={step === item.id ? "step" : undefined}
-                    disabled={busy || (!record && item.id !== "details")}
+                    disabled={
+                      busy ||
+                      (gateway.readOnly && item.id !== "details") ||
+                      (!record && item.id !== "details")
+                    }
                     onClick={() => changeStep(item.id)}
                   >
                     <span>{i + 1}</span>
@@ -1345,6 +1558,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   key={editorKey}
                   record={record}
                   busy={busy}
+                  readOnly={gateway.readOnly}
                   onDirty={() => setDirty(true)}
                   onSave={(input) =>
                     void run(
@@ -1461,6 +1675,49 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           {page === "settings" && (
             <>
               <GoHandoff expanded />
+              {gateway.mode === "preview" ? (
+                <TransferConnection
+                  onConnected={(next, activeSession) => {
+                    if (!canLeave()) return;
+                    epoch.current++;
+                    setEvents([]);
+                    setBusy(false);
+                    setGateway(next);
+                    setSession(activeSession);
+                    setRecord(null);
+                    setEditing(false);
+                    setStarting(false);
+                    setDirty(false);
+                    setMessage(
+                      "Connected to real organizer events. Open Your events to compare Go’s saved ID.",
+                    );
+                  }}
+                />
+              ) : (
+                <section className="panel">
+                  <h2>Workspace connected</h2>
+                  <p className="muted">
+                    {session?.email ?? "Authenticated organizer gateway"} ·
+                    event-details test
+                  </p>
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      if (canLeave()) {
+                        epoch.current++;
+                        setEvents([]);
+                        setBusy(false);
+                        setSession(undefined);
+                        setGateway(createPreviewGateway());
+                        setRecord(null);
+                        setDirty(false);
+                      }
+                    }}
+                  >
+                    Disconnect workspace
+                  </button>
+                </section>
+              )}
               <section className="panel settings-connections">
                 <h2>Your connected tools</h2>
                 <p className="muted">
