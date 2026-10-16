@@ -3,5 +3,9 @@
   "python.envFile": "${workspaceFolder}/backend/.env",
   "eslint.workingDirectories": ["frontend"],
   "files.exclude": { "**/__pycache__": true },
-  "search.exclude": { "**/node_modules": true, "**/.venv": true }
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.venv": true
+  },
+  "cmake.sourceDirectory": "/Users/jroe/Documents/GitHub/SuperhumanGo_HackProj/inference"
 }
