@@ -1,6 +1,6 @@
 # Contributing
 
-The project scaffold is authorized. Implement product features once their issue defines the intended behavior; the project idea and primary track are still open. Use the three [development agent roles](AGENTS.md) to avoid overlapping edits.
+The approved product is the event organizer website in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md). Before work read [AGENTS.md](AGENTS.md), the global context, and all four member contexts linked in [the task plan](docs/TEAM_TASKS.md). Implement your assigned scope during the authorized build period. Update only your own personal context; Member 2 coordinates agreed global contracts. Use the four member roles to avoid overlapping edits.
 
 ## Pick up a task
 

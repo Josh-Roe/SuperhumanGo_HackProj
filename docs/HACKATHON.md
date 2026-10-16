@@ -31,7 +31,7 @@ Choose one primary track:
 | Inclusion & Accessibility | Explore how technology can open more possibilities for more people. Consider the different ways people communicate, navigate information, and experience the world. | Reduce barriers to communication, learning, work, or access to information |
 | Wildcard | Follow an idea that doesn't fit neatly into a category, or that brings several together: useful, playful, experimental, or unexpected. | Explore a creative or unexpected use of agents |
 
-The team has not selected an idea or track yet. The approved scaffold uses React/TypeScript, Python APIs/ML, and a Superhuman Go connector. Those tools support the prototype. The agent's contribution must still be demonstrated in the chosen user workflow.
+The team has selected an event organizer website with Superhuman Go writing/coordination, Gmail/Google Calendar/Canva synchronization, Supabase data, and inclusion review. Website name and final primary track remain open. See [the product context](../PROJECT_CONTEXT.md) and [four-member plan](TEAM_TASKS.md). The agent's real contribution must be demonstrated in the implemented workflow.
 
 ## Schedule
 

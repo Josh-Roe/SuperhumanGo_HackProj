@@ -20,7 +20,7 @@ python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
 npm run dev:backend
 ```
 
-The MCP server rejects requests without the configured bearer token. `workspace_status` returns service readiness; `count_text` is a deterministic utility for checking a tool round trip. Neither is a trained model or an AI completion. Add useful product tools after choosing the project.
+The MCP server rejects requests without the configured bearer token. `workspace_status` returns service readiness; `count_text` is a deterministic utility for checking a tool round trip. Neither is AI writing or the chosen event workflow. Member 3 adds event/content/operation tools and organizer-scoped authorization per [the contract](INTEGRATION_CONTRACT.md); a single global development token cannot authorize access to every organizer's data.
 
 The [official tutorial](https://coda.io/packs/build/latest/tutorials/build/mcp/) requires a hosted endpoint. A localhost server and SDK validation alone cannot verify live Go behavior.
 
@@ -54,7 +54,7 @@ Until step 5 succeeds, record the state as **locally tested; live Go connection 
 
 ## Configure a Go agent
 
-After installing the connector, use Go’s [agent builder](https://support.grammarly.com/hc/en-us/articles/47453002811021-Create-and-configure-agents-with-the-agent-builder) to define the project’s behavior and grant its connector tools. Choose instructions and triggers after the team agrees the use case. The three development agents in this repository are coding roles, separate from the product agent configured in Go.
+After installing the connector, use Go’s [agent builder](https://support.grammarly.com/hc/en-us/articles/47453002811021-Create-and-configure-agents-with-the-agent-builder) to configure the event-writing/coordination agent and its authorized tools. Verify actual triggers and account grants before claiming fully automatic website-to-Go execution. A manual Go invocation processing queued event work is the labeled MVP fallback. The four development roles in [the task plan](TEAM_TASKS.md) are separate from this product agent.
 
 Add product tools through the backend’s MCP service and test their inputs and outputs. Give read-only tools the `readOnlyHint` annotation; tools with side effects should retain Go’s confirmation behavior. Keep API credentials in backend environment settings and never in `VITE_*` variables or browser code.
 

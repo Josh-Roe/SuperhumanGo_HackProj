@@ -1,86 +1,80 @@
-# Shared project context
+# Shared product context: event organizer website
 
-Last reviewed: 2026-10-16 (America/Los_Angeles).
+Updated 2026-10-16, America/Los_Angeles. **Website name: undecided.** This file owns the agreed brief; personal progress and handoffs live in four separate files. During implementation, Member 2 is its sole editor.
 
-This file carries agreed project knowledge between teammates, devices, and agents. It is a curated handoff, not a chat transcript. Read it before starting a task and before handing work to another owner. Follow [AGENTS.md](AGENTS.md) for the update rules.
+## Read every context before work
 
-## Goal and current phase
+Every agent must read [AGENTS.md](AGENTS.md), this file, and **all four** contexts before starting, taking a handoff, changing a contract, or finishing:
 
-Build a working prototype for [MTC x Grammarly: Agents in Action](https://mtc-x-grammarly.devpost.com/) with Superhuman Go or Grammarly agents central to the user experience. See [the event brief](docs/HACKATHON.md) for the rubric and submission requirements.
+- [01 Frontend](docs/contexts/01_FRONTEND.md)
+- [02 Backend/Supabase](docs/contexts/02_BACKEND_SUPABASE.md)
+- [03 Superhuman Go/Google](docs/contexts/03_GO_GOOGLE.md)
+- [04 Canva/inclusion/presentation](docs/contexts/04_CANVA_INCLUSION.md)
 
-The reusable scaffold is implemented and published. The product idea, primary track, and product-specific agent behavior are **not selected**. Brainstorming and recommendations are proposals until the team explicitly accepts them. Do not begin product implementation by assuming an idea was chosen.
+Write only your own personal context. Propose cross-team changes there for the relevant owner. Fetch/read new versions across devices; Git does not inject updates into existing agent chats automatically. [Tasks and prompts](docs/TEAM_TASKS.md) define ownership; [the integration contract](docs/INTEGRATION_CONTRACT.md) defines the initial handoff interfaces.
 
-## Accepted decisions
+## Accepted product decision
 
-| ID | Decision | Reason / source |
-| --- | --- | --- |
-| D001 | Use React with TypeScript/TSX for the frontend and Python FastAPI for the backend. | Team lead's scaffold instructions, 2026-10-16; implemented in `frontend/` and `backend/`. |
-| D002 | Expose Python tools to Superhuman Go through an authenticated Streamable HTTP MCP connector using the official Packs SDK. | Supported integration documented in [Superhuman setup](docs/SUPERHUMAN.md); do not assume a general Go inference API. |
-| D003 | Divide development into backend, frontend, and documentation/Canva/presentation roles. Coordinate root configuration and shared interfaces through the task lead. | Team lead's three-agent workflow; ownership is in [AGENTS.md](AGENTS.md). |
-| D004 | Keep CPU VPS deployment and Python/C++ ONNX inference optional. Choose training and model integration after the use case; measure before claiming an optimization. | Team lead's conditional deployment/model instructions; [architecture](docs/ARCHITECTURE.md) and [deployment](docs/DEPLOYMENT.md). |
-| D005 | Use GitHub for shared source/tasks and VS Code Live Share for pairing on frontend/backend integration. | Team lead's collaboration instructions; [workflow](docs/TEAM_WORKFLOW.md). |
-| D006 | Keep shared decisions and material handoffs in this tracked file. Every agent reads it before work and updates it when project knowledge changes. | Team lead's shared-context request, 2026-10-16. |
+The team lead has selected an event organizer website. Organizers create an event once, use **Superhuman Go and Grammarly writing assistance** to prepare clear material, review design/inclusion, distribute invitations, and propagate approved changes across Gmail, Google Calendar, Canva, and stored event material. Productivity is the working primary-track recommendation; inclusion is a core capability. Confirm the final Devpost track with the team lead.
 
-## Current implementation and contracts
+The distinctive demo is a real change of time/location causing a visible, versioned update across Calendar, Gmail, and Canva. Keep the latest event accessible through one stable link while clearly identifying older snapshots.
 
-- React development server: port `5173`; it proxies `/api` to Python on `8000`. Use `npm run dev:frontend` and `npm run dev:backend` after [README setup](README.md).
-- `GET /api/health` returns `{"status":"ok","service":"backend"}`.
-- `GET /api/status` returns `superhuman: {transport, configured, verified, endpoint}` and `model: {configured, runtime}`. Exact semantics and examples belong in [the architecture](docs/ARCHITECTURE.md) and [backend README](backend/README.md).
-- `/mcp` requires a server-side bearer token and exposes `workspace_status` and `count_text`. These are readiness/protocol utilities, not the final AI product.
-- Connector configuration uses a public example endpoint until a real HTTPS host is supplied. No external Superhuman installation has been verified; `verified` remains false.
-- Optional CPU ONNX inference exists in Python and as an independent C++ smoke runner. No trained model or product inference endpoint is included.
-- Docker Compose routes the frontend, `/api`, and `/mcp` through Caddy. No public VPS has been provisioned or deployed by this project setup.
+## Organizer flow
 
-## Verification evidence
+1. **Log in:** Supabase Auth; connect the organizer's Gmail/Calendar/Canva accounts as supported by their real integrations.
+2. **Event details:** title, description, location/online link, start/end with timezone, relevant links, invitee email addresses, organizer contact, and venue/diet/accessibility facts.
+3. **Design and inclusion:** manually create/edit a Canva flyer or request AI assistance; prepare an event document; review plain-language writing and inclusion findings before distribution.
+4. **Distribution:** preview the Go-written invitation and event material. Publish the reviewed version to Calendar attendees and Gmail. Email includes the Calendar event/invitation link, current details/document links, and the flyer as appropriate. Store document/flyer artifacts in Supabase Storage.
+5. **Changes:** save a new canonical event revision; regenerate prose through Go; update the same Calendar event and Canva design or its new version/export. Replace an unsent Gmail draft. If its invitation was sent, create a new change-notification email, retaining the sent history. Send via the organizer's authorized update flow.
 
-These are recorded results from the scaffold handoff, not a claim that every future revision passes:
+## Recipient flow
 
-- Scaffold revision `78d5477`: [GitHub Actions](https://github.com/Josh-Roe/SuperhumanGo_HackProj/actions/runs/38876793067) passed frontend/backend checks, connector validation in the Linux Pack sandbox, Compose validation, both Docker builds, and a container-stack HTTP smoke test.
-- Local scaffold validation reported 37 backend tests and 3 frontend tests passing. The backend suite included an optional ONNX Identity test fixture; the base CI environment skipped that optional ML test.
-- A C++ ONNX CPU Identity smoke test succeeded during scaffold setup. This establishes a working runtime boundary, not model quality or a speed improvement.
-- Frontend browser checks covered desktop/mobile layout and real API failure/recovery during scaffold setup.
+- Receive the published email and Calendar invitation; use Calendar/email/flyer/current event page to learn the details and contact the organizer.
+- Calendar updates target the original event ID. A changed event produces a new notification email when the earlier email was already sent. Original delivered attachments cannot change; new exports and a stable current link handle freshness.
+- RSVP through Calendar and/or an email reply classified by Go as attending/maybe/not attending. Match the invited sender and event; ambiguous replies require review. Optional Forms collect extra RSVP/diet/accessibility information after the core flow works.
 
-When changing behavior, record the checks run for that revision in the handoff or linked PR. Do not copy these historical results as evidence for a later change.
+## Inclusion scope
 
-## Open questions and external setup
+- Plain-language summary and actionable event instructions.
+- Organizer-confirmed step-free entrance/ramp and elevator facts.
+- Dietary accommodations and private collection of restrictions where required.
+- Potential conflicts with significant religious observances, using dates, location/timezone, and cited sources; ask the organizer which observances to consider, never infer religion from ethnicity/name.
+- Captioning availability and clear loud-sound/strobe notices.
+- Parking, restrooms, and Google Forms are stretch features from the team brief. Unknown accommodations remain unknown; do not invent guarantees.
 
-- Which problem, primary track, intended user, and single demo workflow should the team choose?
-- What product tools and external APIs are needed, and what is the agreed request/response contract?
-- Teammates' GitHub usernames and collaborator invitations are pending; see [the roster](TEAM.md).
-- A public domain/VPS and account-side Superhuman connector activation are pending. Configure real secrets locally; never record their values here.
-- No training framework, model, dataset, or model-performance target has been selected.
-- The published event date is October 16, 2026, with submissions at 8 PM Pacific. Confirm organizer communications because the initial description said “tomorrow.”
+## Superhuman Go is central
 
-## Latest handoffs by role
+Go is responsible for event descriptions, plain-language summaries, invitations, change summaries, event-document prose, optional Notion-note prose, and RSVP interpretation. Grammarly assistance is demonstrated through an actually available supported writing surface. The website requests and displays generation work; Python supplies durable state and reliable tool execution.
 
-Each owner maintains their own entry to reduce edit conflicts. Link to canonical docs and issues instead of copying them.
+Supported starting architecture: **Go → authenticated hosted MCP tools → Python → Supabase/provider operations**. The website may enqueue work for Go. Member 3 must verify a supported account-side trigger before promising automatic website-to-Go execution; a manual Go command or verified schedule is the explicit MVP fallback, displayed as awaiting Go rather than fake completion. No general Go inference endpoint has been established. See [official MCP guidance](https://coda.io/packs/build/latest/guides/blocks/mcp/) and [agent builder](https://support.grammarly.com/hc/en-us/articles/47453002811021-Create-and-configure-agents-with-the-agent-builder).
 
-### Backend
+Gmail/Calendar writes may use Go's verified native connectors or backend OAuth tools called by Go. Member 3 chooses **one writer per provider operation**, records its IDs/results, and prevents duplicated native-connector plus API execution. No secrets are passed as model prose. Each organizer's access must be enforced at the tool boundary.
 
-- State: FastAPI, authenticated MCP tools, provider-neutral outbound JSON client, optional Python ONNX boundary, and C++ runner are implemented.
-- Next: After idea selection, agree one product tool/API contract with frontend and implement it with meaningful tests.
-- Evidence / limitations: [Backend guide](backend/README.md), [C++ guide](inference/README.md), and scaffold verification above; live Go and a trained model remain unverified/unconfigured.
+Gemini is available for explicitly approved supporting subtasks or separately labeled fallback experimentation. It does not fulfill the requirement for Go-powered writing on its own. A live Go operation and returned provider receipt must appear in the final demo.
 
-### Frontend
+## Stack and synchronization plan
 
-- State: React/TSX starter reads real service status, handles errors/retry, and has responsive layout and a production image.
-- Next: Build the agreed product's input → tool result → user action flow after the backend contract is accepted.
-- Evidence / limitations: [Frontend guide](frontend/README.md) and scaffold verification above; starter status cards are not a product demo.
+- React/TypeScript TSX website; Python FastAPI on the prepared VPS/container path.
+- Supabase Auth, Postgres as canonical event state, and Storage for event documents/flyer exports. Enforce owner-scoped authorization/RLS and private RSVP/credential storage.
+- Canonical event revisions, an operation/outbox queue, stable provider IDs, and read-back receipts keep changes traceable. Use idempotency by event/revision/operation/recipient where relevant, optimistic concurrency, retries, and per-provider stale/error states.
+- OAuth/API credentials and service-role secrets remain server-side. Supabase publishable keys may be in the browser only with appropriate RLS.
+- Custom training, C++ model serving, and extra integrations are deferred until the required event/Go loop works. The existing ONNX scaffold remains optional.
 
-### Documentation, Canva, and presentation
+## Decision continuity
 
-- State: Architecture, team workflow, deployment/integration guides, submission checklist, and a two-minute pitch/Canva handoff template exist.
-- Next: After idea selection, capture the problem, intended user, agent contribution, demo script, and evidence needed for the pitch.
-- Evidence / limitations: [Presentation guide](docs/PRESENTATION.md); no product-specific deck or external submission has been created.
+- Earlier React/Python, GitHub/Live Share, and supported Go MCP choices remain in effect.
+- The previous three-agent split is **superseded** by the team lead's four-member request, 2026-10-16. Single-file progress editing is superseded by the four owner-specific contexts; only global agreed requirements remain here.
+- Earlier brainstorming ideas are not the product specification. This event-management brief is the approved direction.
+- Notion note generation is requested; a live Notion connector is a follow-on integration unless the core Gmail/Calendar/Canva flow is already working. Forms/parking/restrooms are explicit stretch scope. Final sequencing can change by team decision.
 
-### Shared coordination
+## Current evidence and blockers
 
-- State: This context file and the required agent read/update procedure are established at the team lead's request.
-- Next owner / action: Team lead selects an idea after reviewing proposals. Keep proposals separate from accepted decisions.
-- Checks for this documentation change: Local links and Git whitespace validation; application behavior is unchanged. The commit containing this entry is the evidence for the context setup.
+The repository currently contains a tested React/Python/MCP scaffold, optional ONNX boundaries, and Docker/Caddy deployment files. These planning documents **do not implement** Supabase auth/data, event CRUD, provider OAuth, invitations, Canva edits, inclusion checks, or RSVP workflows.
 
-## Entry formats
+Historical evidence: scaffold revision `78d5477` passed [Linux CI and Docker smoke testing](https://github.com/Josh-Roe/SuperhumanGo_HackProj/actions/runs/38876793067). Local scaffold validation reported 37 backend and 3 frontend tests; optional ML behavior differs from base CI. This is not evidence that planned event features work.
 
-For a new accepted decision: `ID | decision | rationale | date | source (user instruction / issue / PR / commit)`. If replacing a decision, mark the old entry superseded and link its replacement.
+Unresolved external setup: Supabase project/credentials, organizer account connections, Canva eligible account/template fields, hosted HTTPS domain, Go installation and activation mode, four human names/usernames, and final Devpost track. Record each resolved item in its owner's context with evidence, never with secret values.
 
-For a material handoff: `date | owner / role | branch / commit / issue | completed outcome | contract or config changes | checks and evidence | blocker | next owner and action`. Omit fields that do not apply; never invent an assignee or successful check.
+## Immediate handoff
+
+Send each member their [copy-ready prompt](docs/TEAM_TASKS.md). First coordinate the v0 contracts, then demonstrate Go reading an authorized test event and saving generated output before expanding provider automation. Preserve [hackathon preparation/disclosure rules](docs/HACKATHON.md). No event feature work or external sends were performed by this documentation preparation.

@@ -1,6 +1,6 @@
 # Architecture
 
-This is a reusable hackathon scaffold. The product workflow, selected track, business data, and model remain open decisions.
+The approved product is an event organizer website. React collects details, design/inclusion review and distribution choices; Superhuman Go generates prose and coordinates event tools; Python executes reliable provider operations; Supabase supplies Auth, Postgres and artifact Storage. Read [the global brief](../PROJECT_CONTEXT.md), [four member contexts](TEAM_TASKS.md), and [event contract](INTEGRATION_CONTRACT.md). The code is still the reusable scaffold; event features below are the implementation plan.
 
 ## Components
 
@@ -8,6 +8,8 @@ This is a reusable hackathon scaffold. The product workflow, selected track, bus
 | --- | --- | --- |
 | Web interface | React, TypeScript/TSX, Vite | User interface and REST client |
 | Application backend | Python, FastAPI | `/api/health`, `/api/status`, future product APIs and server-side integrations |
+| Planned event data | Supabase Auth, Postgres, Storage | Organizer identity/ownership, versioned event state, private RSVP, stored documents/flyer exports |
+| Planned event providers | Gmail, Google Calendar, Canva | Go-coordinated invitations, Calendar IDs/RSVP, current flyer versions and change propagation |
 | Agent tool server | Python FastMCP, streamable HTTP at `/mcp` | Expose backend tools to an authenticated connector |
 | Superhuman Go connector | Superhuman Go Packs SDK | Connect Go to the project's MCP tools; see [setup](SUPERHUMAN.md) |
 | Optional inference | ONNX Runtime CPU in Python, separate C++ runner | Load an externally supplied ONNX model after its input/output contract is agreed |
@@ -51,4 +53,4 @@ Export to ONNX only when the chosen model supports it. Validate output parity be
 
 ## Open decisions
 
-The team still needs to select the problem, primary track, tool behavior, external APIs, data storage needs, model (if any), and VPS provider/domain. Keep scope focused on a working agent-centered demo before adding infrastructure or model training.
+Website name, final primary track, provider accounts/credentials, Go activation/automatic trigger availability, eligible Canva template, exact schemas, and VPS/domain remain open. The chosen event workflow and Supabase data direction supersede earlier idea exploration. Follow the four member contexts for progress. Custom model training/ONNX optimization is deferred until the core event/Go loop works.
