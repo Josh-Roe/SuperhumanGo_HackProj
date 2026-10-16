@@ -35,6 +35,8 @@ coverage/
 *.egg-info/
 .coverage
 htmlcov/
+supabase/.temp/
+supabase/.branches/
 *.tsbuildinfo
 
 # Keep model artifacts outside source control
