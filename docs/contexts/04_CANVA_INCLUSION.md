@@ -3,6 +3,7 @@
 Owner: Member 4 (human name/GitHub pending). Updated 2026-10-16.
 Status: **implemented and locally tested; live provider round trip pending**.
 Branch: `codex/member-4-canva-inclusion`, based on shared `3bd33b3`.
+Implementation commit: `cdf08bc`. Draft [PR #1](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/1) awaits cross-member integration and live proof.
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/04_CANVA_INCLUSION.md) before work. Write only this personal context. Preserve other members' files.
 
