@@ -54,6 +54,7 @@ Live activation needs a public HTTPS endpoint and an eligible Superhuman account
 
 ## Team and deployment
 
+- [Shared project context and latest handoffs](PROJECT_CONTEXT.md) — read before starting work; update material decisions with your changes.
 - [Three-agent workflow and VS Code Live Share](docs/TEAM_WORKFLOW.md)
 - [Team roster](TEAM.md) and [contribution guide](CONTRIBUTING.md)
 - [Architecture and API handoff](docs/ARCHITECTURE.md)

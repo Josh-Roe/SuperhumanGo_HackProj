@@ -2,6 +2,24 @@
 
 The team uses three development agent roles. Select the relevant role for a task; use parallel agents when separate frontend, backend, and documentation work is useful. Small edits do not require starting all three agents.
 
+## Required shared-context workflow
+
+Before starting any task:
+
+1. Read [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), then the docs and issue relevant to your task. Do not assume another agent's chat history is available or that a local memory is shared with teammates.
+2. Inspect the current branch and working-tree state. Check whether the shared context and code have changed upstream; incorporate relevant updates without overwriting uncommitted work or another owner's edits. For an existing long-running session, reread the context before starting a new task or taking over a handoff.
+3. Identify your scope, accepted decisions, open questions, and the current interface contract. Distinguish a proposal from a team-approved decision. Explicit current user instructions take precedence; record any resulting material decision.
+
+During work and before the final handoff:
+
+- Update `PROJECT_CONTEXT.md` when an important decision, interface/configuration change, blocker, corrected assumption, or ownership handoff would affect another agent's work. A task that introduces no material shared knowledge does not need a filler entry.
+- Record the decision and rationale with its date and source (user instruction, issue, PR, or commit). Mark replaced decisions as superseded; do not silently remove their rationale or turn a suggestion into an accepted decision.
+- Update your own role's latest handoff with the outcome, relevant branch/commit/issue, checks actually run, limitations/blockers, and next owner/action. Do not invent an assignee. Reconcile stale handoffs when a blocker is resolved.
+- Link to canonical contracts, docs, and evidence instead of duplicating them. Keep the file concise; exclude raw transcripts, routine logs, credentials, private user history, and unsupported success claims.
+- Reread the current context and diff before committing. Preserve other owners' entries and resolve context conflicts by keeping all compatible material decisions. Commit relevant context updates with the work they describe, and mention the context change in the handoff.
+
+This file-based workflow applies across devices and agent tools. Agents that do not discover `AGENTS.md` automatically must be explicitly instructed by their operator to read it and `PROJECT_CONTEXT.md`. Shared Git files synchronize when fetched/pulled; they do not merge private conversation histories or push updates into a running agent's context automatically.
+
 ## Ownership
 
 | Role | Primary files | Responsibility |
