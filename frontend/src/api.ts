@@ -1,4 +1,5 @@
 import { normalizeContentKind } from "./content";
+import { emptyFacts } from "./types";
 export interface ProjectStatus {
   superhuman: {
     transport: "mcp";
@@ -396,12 +397,15 @@ export const authConfigured = Boolean(
 export async function signIn(
   email: string,
   password: string,
+  config?: PublicAuthConfig,
 ): Promise<Session> {
-  if (!authConfigured)
+  if (!config && !authConfigured)
     throw new Error(
       "Live sign-in is awaiting a connected organizer account. Use the local preview.",
     );
-  const url = new URL(import.meta.env.VITE_SUPABASE_URL);
+  const url = new URL(
+    config?.supabase_url ?? import.meta.env.VITE_SUPABASE_URL,
+  );
   if (
     url.protocol !== "https:" &&
     !["localhost", "127.0.0.1"].includes(url.hostname)
@@ -413,7 +417,9 @@ export async function signIn(
       method: "POST",
       signal: AbortSignal.timeout(12000),
       headers: {
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey:
+          config?.supabase_publishable_key ??
+          import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password }),
@@ -436,5 +442,82 @@ export async function signIn(
     access_token: data.access_token,
     email: data.user.email,
     expires_at: Date.now() + data.expires_in * 1000,
+  };
+}
+
+// Member 2's published canonical event REST contract. Narrow, read-only transfer test.
+export function createEventTransferGateway(token: string): EventGateway {
+  const blocked = async (): Promise<WorkspaceEvent> => {
+    throw new Error(
+      "This connection tests event details only. Editing and distribution are not enabled.",
+    );
+  };
+  return {
+    mode: "live",
+    readOnly: true,
+    async list() {
+      const events: EventRecord[] = [];
+      for (let offset = 0; ; offset += 100) {
+        const rows = await requestJson(
+          `/api/events?limit=100&offset=${offset}`,
+          token,
+        );
+        if (!Array.isArray(rows))
+          throw new Error("Event list must be an array.");
+        events.push(...rows.map(parseEvent));
+        if (rows.length < 100) return events;
+      }
+    },
+    async get(id) {
+      const event = parseEvent(
+        await requestJson(`/api/events/${encodeURIComponent(id)}`, token),
+      );
+      if (event.id !== id)
+        throw new Error("The server returned a different event.");
+      return {
+        event,
+        content: [],
+        assets: [],
+        work: [],
+        facts: emptyFacts(),
+        findings: [],
+        operations: [],
+        rsvps: [],
+        gmail: null,
+        review_revision: null,
+      };
+    },
+    save: blocked,
+    prepare: blocked,
+    review: blocked,
+    publish: blocked,
+  };
+}
+export interface PublicAuthConfig {
+  supabase_url: string;
+  supabase_publishable_key: string;
+}
+export async function loadPublicAuthConfig(): Promise<PublicAuthConfig> {
+  const response = await fetch("/api/config", {
+    signal: AbortSignal.timeout(8000),
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok)
+    throw new Error(
+      "The event API is not registered on this backend yet. The connection test cannot run.",
+    );
+  const value: unknown = await response.json();
+  if (
+    !isRecord(value) ||
+    value.configured !== true ||
+    typeof value.supabase_url !== "string" ||
+    typeof value.supabase_publishable_key !== "string"
+  )
+    throw new Error(
+      "The backend needs public Supabase authentication configuration.",
+    );
+  return {
+    supabase_url: value.supabase_url,
+    supabase_publishable_key: value.supabase_publishable_key,
   };
 }

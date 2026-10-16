@@ -1,6 +1,6 @@
 # Event workspace · Member 1
 
-The site opens directly to **Your events**. The sidebar has Your events, Settings, and Profile. Click an event or the plus button to use the three steps: event details → design/inclusion → distribution. Signup/login is skipped at the user's request.
+The site opens directly to **Your events**. The sidebar has Your events, Settings, and Profile. The plus button first prompts the user to open standalone Superhuman Go. It creates no placeholder event. After Go saves the event, return and check Your events. Manual entry is a secondary option; existing events retain details → design/inclusion → distribution. Signup/login is skipped at the user's request.
 
 ```sh
 npm ci
@@ -48,3 +48,17 @@ The intended pipeline is **user describes the event in Go → Go calls typed MCP
 `App` accepts an `eventGateway` composition prop for an already-authenticated backend adapter; it defaults to the public local preview. Refresh loads list/detail snapshots from that gateway. This composition seam and mocked typed-output tests are not a live Go transfer or natural-language understanding test. Automatic push/subscription refresh remains pending the shared backend contract.
 
 Missing server work: owner-scoped create/update event MCP tools, durable canonical storage, artifact recording, accepted organizer read/review/approval APIs, scoped browser identity without a signup gate, and a real standalone Go round trip. Member 3's current branch exposes read/queue/save-content tools, but not event create/update tools. See Member 1 context for the exact handoff.
+
+## Current objective: verify a real Go-created event
+
+Settings → **Test Go → website** → **Check event API** probes `/api/config` before requesting any account credentials. The current LAN baseline returns 404 because Member 2's router has not been registered in Member 3's composition. This is a visible setup blocker, not a successful Go connection.
+
+The new `createEventTransferGateway` accepts Member 2's published canonical read contract: paginated `GET /api/events?limit=100&offset=N` returns `EventRecord[]`; `GET /api/events/{id}` returns `EventRecord`. It carries the organizer's Supabase Bearer token. Once API readiness is confirmed, an existing account can connect through Settings; its access token remains in memory, expires, and is cleared on disconnect. There is no initial signup gate. This narrow connection is read-only and loads event details only; design/distribution stages and writes are disabled so empty material arrays are not mistaken for real provider state. The earlier full `createLiveGateway` is still a proposed adapter and is not activated here.
+
+After deployment/registration, test with this synthetic Go request:
+
+> Create a draft event named Go transfer test 01 on November 14, 2026, from 10 AM to noon in America/Los_Angeles, at Test Garden. Description: connection test. No guests yet. Save it through the Event Workspace connector and return its saved event ID and revision. Do not send invitations or create provider assets.
+
+Connect the same organizer in Settings, choose New event → **Check Your events** (or refresh the list), and open that event. Compare the displayed saved ID, title, location, times/timezone, description and guests with Go's tool receipt. A matching name alone does not prove transfer. Changing a location should retain the ID and increment the revision. Reloading should read persisted state. Keep this first test limited to canonical details.
+
+**Current blocker:** user confirmed the project is LAN-only and no Go connector/public backend is deployed. Go requires a reachable hosted endpoint. Member 3 still needs to register Member 2's router and add create/update event MCP tools. No live end-to-end proof can run until those are available. Mocked transfer tests do not prove standalone Go execution.

@@ -61,6 +61,11 @@ describe("simplified event workspace", () => {
   it("adds an event and advances through design to distribution without making up Go output", async () => {
     const user = await workspace();
     await user.click(screen.getByRole("button", { name: "Add event" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Enter event details manually instead",
+      }),
+    );
     expect(
       screen.getByRole("button", { name: /2Design & inclusion/ }),
     ).toBeDisabled();
@@ -268,5 +273,98 @@ describe("Go-backed event read model", () => {
     );
     await user.click(screen.getByRole("button", { name: "↻ Refresh" }));
     expect(gateway.get).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("Go-first event transfer test", () => {
+  it("starts new events in Go without first creating a placeholder event", async () => {
+    const user = await workspace();
+    await user.click(screen.getByRole("button", { name: "Add event" }));
+    expect(
+      screen.getByRole("heading", { name: "Start your event with Go" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: /Continue in Superhuman Go/ }),
+    ).toHaveAttribute("href", "https://go.superhuman.com/");
+    expect(screen.queryByLabelText("Event title")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Check Your events" }),
+    ).toBeDisabled();
+    expect(screen.getByText(/Go cannot write to this tab/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "← Your events" }));
+    expect(
+      screen.getAllByRole("button", { name: /A neighborhood, together/ }),
+    ).toHaveLength(1);
+  });
+  it("reads Go-created canonical records from a connected gateway and exposes their exact ID", async () => {
+    const { createPreviewGateway } = await import("./preview");
+    const { createEventTransferGateway } = await import("./api");
+    const snapshot = await createPreviewGateway().get("preview-gathering");
+    const event = {
+      ...snapshot.event,
+      id: "go-saved-event",
+      title: "Go transfer test 01",
+      location: "Synthetic garden",
+    };
+    let saved = false;
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockImplementation((path: string) =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify(
+                path.startsWith("/api/events?")
+                  ? saved
+                    ? [event]
+                    : []
+                  : event,
+              ),
+            ),
+          ),
+        ),
+    );
+    const user = userEvent.setup();
+    render(
+      <App eventGateway={createEventTransferGateway("synthetic-user-jwt")} />,
+    );
+    await user.click(screen.getByRole("button", { name: "Add event" }));
+    saved = true;
+    await user.click(screen.getByRole("button", { name: "Check Your events" }));
+    await user.click(
+      await screen.findByRole("button", { name: /Go transfer test 01/ }),
+    );
+    expect(screen.getByText("go-saved-event")).toBeVisible();
+    expect(screen.getByLabelText("Event title")).toHaveValue(
+      "Go transfer test 01",
+    );
+    expect(
+      screen.getByLabelText("Location or online meeting link"),
+    ).toHaveValue("Synthetic garden");
+    expect(
+      screen.getByRole("button", { name: "Read-only event" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /2Design & inclusion/ }),
+    ).toBeDisabled();
+    expect(screen.getByText(/Connected event-details test/)).toBeVisible();
+  });
+});
+
+describe("event API readiness", () => {
+  it("checks registration before requesting account credentials", async () => {
+    const user = await workspace();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.queryByLabelText("Account password")).not.toBeInTheDocument();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("{}", { status: 404 })),
+    );
+    await user.click(screen.getByRole("button", { name: "Check event API" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "not registered",
+    );
+    expect(screen.queryByLabelText("Account password")).not.toBeInTheDocument();
   });
 });
