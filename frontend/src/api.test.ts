@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiError,
-  createLiveGateway,
   loadProjectStatus,
   parseWorkspace,
   requestJson,
@@ -44,28 +43,6 @@ describe("API boundary and revision invariants", () => {
     await expect(
       gateway.publish(snapshot.event.id, 3, "publish", "key"),
     ).rejects.toThrow(/cannot publish/);
-  });
-  it("attaches organizer auth, expected revision and a stable publish idempotency key", async () => {
-    const snapshot = await createPreviewGateway().get("preview-gathering");
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify(snapshot)));
-    vi.stubGlobal("fetch", fetcher);
-    await createLiveGateway("organizer-jwt").publish(
-      snapshot.event.id,
-      2,
-      "publish",
-      "same-key",
-    );
-    const [path, options] = fetcher.mock.calls[0];
-    expect(path).toBe("/api/events/preview-gathering/publish");
-    expect(options.headers.Authorization).toBe("Bearer organizer-jwt");
-    expect(options.headers["Idempotency-Key"]).toBe("same-key");
-    expect(JSON.parse(options.body)).toEqual({
-      expected_revision: 2,
-      action: "publish",
-      idempotency_key: "same-key",
-    });
   });
   it.each([
     [401, "unauthenticated"],

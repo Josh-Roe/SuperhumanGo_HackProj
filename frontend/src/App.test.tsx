@@ -368,3 +368,65 @@ describe("event API readiness", () => {
     expect(screen.queryByLabelText("Account password")).not.toBeInTheDocument();
   });
 });
+
+describe("connected event arrival", () => {
+  it("loads an event saved in Go when the user returns to the window and reports read failures", async () => {
+    const { createPreviewGateway } = await import("./preview");
+    const { waitFor, fireEvent } = await import("@testing-library/react");
+    const base = createPreviewGateway();
+    const snapshot = await base.get("preview-gathering");
+    const event = {
+      ...snapshot.event,
+      id: "new-go-id",
+      title: "Arrived from Go",
+    };
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([event])
+      .mockRejectedValueOnce(new Error("Connection interrupted"));
+    render(
+      <App eventGateway={{ ...base, mode: "live", readOnly: true, list }} />,
+    );
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+    fireEvent.focus(window);
+    expect(
+      await screen.findByRole("button", { name: /Arrived from Go/ }),
+    ).toBeVisible();
+    fireEvent.focus(window);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Connection interrupted",
+    );
+  });
+});
+
+it("checks the connected list every ten seconds and stops after unmount", async () => {
+  const { act } = await import("@testing-library/react");
+  const { createPreviewGateway } = await import("./preview");
+  const base = createPreviewGateway();
+  const snapshot = await base.get("preview-gathering");
+  const list = vi
+    .fn()
+    .mockResolvedValueOnce([])
+    .mockResolvedValue([snapshot.event]);
+  vi.useFakeTimers();
+  try {
+    const view = render(
+      <App eventGateway={{ ...base, mode: "live", readOnly: true, list }} />,
+    );
+    await act(async () => {});
+    expect(list).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    expect(
+      screen.getByRole("button", { name: /A neighborhood, together/ }),
+    ).toBeVisible();
+    expect(list).toHaveBeenCalledTimes(2);
+    view.unmount();
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(list).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
