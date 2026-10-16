@@ -43,7 +43,12 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
   - Pack 72744 was uploaded and release 1 published from Pack Studio. The CLI `packs release` refuses to run while the tunnel URL sits uncommitted in `config.ts`.
   - The pack installed in Go (Connectors → search "Hackathon"; it is not listed until searched) and shows Connected.
   - Go's first chat said the tools were unavailable. Its session log shows `Mcp call init` → `POST https://<x>.trycloudflare.com/mcp <no HTTP response>` after **7 ms**, request ID `3e8ed224-…`. Neither the tunnel log nor the server log received it.
-  - The same URL answers other external fetchers. Likely cause: Superhuman's fetcher refuses `trycloudflare.com` quick-tunnel hosts. **Unconfirmed**; needs an answer from Superhuman or testing on a real HTTPS host.
+  - The same URL answers other external fetchers.
+  - Follow-up tests on 2026-10-16:
+    - A Go "Add custom MCP" connector (a pack with no auth) **did** reach the same trycloudflare URL from AWS IPs and got a 401 from us.
+    - Pack v2 pointed at a localhost.run tunnel got a real HTTP 502 there. The free tunnel rotated its hostname mid-test, so it is unusable.
+    - Pack v3, back on trycloudflare, again failed with `<no HTTP response>`.
+  - So the failure is specific to authenticated pack requests to `trycloudflare.com`, not to all of Superhuman's traffic. Re-signing in after the domain change is still untested on v3. Next: test a stable host (ngrok static domain, named Cloudflare tunnel, or a real deploy).
 
 ## Handoffs (proposed, awaiting recipient agreement)
 
