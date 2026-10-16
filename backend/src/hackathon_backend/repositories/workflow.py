@@ -57,6 +57,18 @@ class SupabaseWorkflowStore:
         return WorkItem.model_validate(rows[0]["data"]) if rows else None
 
     async def put_work(self, item: WorkItem) -> None:
+        # Reply-classification jobs are per message, not just per event/revision/batch.
+        # Without this key, a second guest's reply would dedupe to the first guest's job.
+        if item.kind.value == "classify_reply" and "idempotency_key" not in item.payload:
+            reply_id = item.payload.get("reply_id")
+            if not isinstance(reply_id, str) or not reply_id:
+                raise WorkflowError("invalid_request", "Reply work requires a source message ID")
+            item.payload = {
+                **item.payload,
+                "idempotency_key": (
+                    f"{item.event_id}:{item.event_revision}:classify_reply:{reply_id}"
+                ),
+            }
         try:
             row = await self.db.rpc(
                 "organizer_put_work",

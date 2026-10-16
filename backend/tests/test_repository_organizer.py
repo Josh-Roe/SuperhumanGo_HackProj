@@ -147,6 +147,30 @@ def test_work_deduplication_propagates_canonical_id_to_protocol_caller():
     assert item.id == canonical_id
 
 
+def test_two_guests_reply_jobs_have_distinct_stable_idempotency_keys():
+    keys = []
+
+    def handler(request):
+        item = json.loads(request.content)["p_data"]
+        keys.append(item["payload"]["idempotency_key"])
+        return httpx.Response(200, json=item)
+
+    store = SupabaseWorkflowStore(
+        Database(SETTINGS, token="user", transport=httpx.MockTransport(handler))
+    )
+    for reply_id in ("guest-a-message", "guest-b-message", "guest-a-message"):
+        item = WorkItem(
+            owner_id=OWNER,
+            event_id=EVENT,
+            event_revision=1,
+            kind=WorkKind.CLASSIFY_REPLY,
+            payload={"reply_id": reply_id},
+        )
+        run(store.put_work(item))
+    assert keys[0] != keys[1]
+    assert keys[0] == keys[2]
+
+
 def test_private_asset_upload_is_immutable_and_verifies_existing_bytes():
     content = b"<html>Go supplied prose</html>"
     digest = hashlib.sha256(content).hexdigest()
