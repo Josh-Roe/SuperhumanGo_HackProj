@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
+  ApiError,
   createEventTransferGateway,
   loadPublicAuthConfig,
   loadProjectStatus,
@@ -1163,20 +1164,56 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   const heading = useRef<HTMLHeadingElement>(null);
   const publishKeys = useRef(new Map<string, string>());
   const epoch = useRef(0);
+  const watchedId = gateway.readOnly && editing ? record?.event.id : undefined;
+  const watchPaused = Boolean(gateway.readOnly && (busy || dirty));
   useEffect(() => {
     let active = true;
-    gateway
-      .list()
-      .then((value) => {
-        if (active) setEvents(value);
-      })
-      .catch(() => {
-        if (active) setError("Could not load events. Try refreshing.");
-      });
+    let inFlight = false;
+    async function load() {
+      if (inFlight || watchPaused) return;
+      inFlight = true;
+      try {
+        const list = await gateway.list();
+        const item = watchedId ? await gateway.get(watchedId) : undefined;
+        if (!active) return;
+        setEvents(list);
+        if (item) {
+          setRecord(item);
+          setEditorKey((key) => key + 1);
+        }
+        setError("");
+      } catch (err) {
+        if (!active) return;
+        if (err instanceof ApiError && err.code === "unauthenticated") {
+          setEvents([]);
+          setRecord(null);
+          setEditing(false);
+        }
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not load events. Try refreshing.",
+        );
+      } finally {
+        inFlight = false;
+      }
+    }
+    void load();
+    if (!gateway.readOnly)
+      return () => {
+        active = false;
+      };
+    const refreshVisible = () => {
+      if (document.visibilityState !== "hidden") void load();
+    };
+    const timer = window.setInterval(refreshVisible, 10000);
+    window.addEventListener("focus", refreshVisible);
     return () => {
       active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshVisible);
     };
-  }, [gateway]);
+  }, [gateway, watchedId, watchPaused]);
   useEffect(() => {
     heading.current?.focus();
   }, [page, step, editing, starting]);
@@ -1355,7 +1392,11 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           </span>
           <span>
             {profile.name}
-            <small>Local workspace</small>
+            <small>
+              {gateway.mode === "live"
+                ? "Connected workspace"
+                : "Local workspace"}
+            </small>
           </span>
         </div>
       </aside>
@@ -1397,7 +1438,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
             {gateway.mode === "preview"
               ? "Local preview · sample data · changes stay in this tab · no invitations send"
               : gateway.readOnly
-                ? "Connected event-details test · read-only · materials and distribution are not loaded"
+                ? "Connected event-details test · checks every 10 seconds · read-only · materials and distribution are not loaded"
                 : "Connected organizer workspace · review changes before sending"}
           </p>
           {error && (

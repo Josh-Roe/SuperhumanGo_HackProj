@@ -22,9 +22,7 @@ The Go handoff is implemented; the actual custom MCP and backend/provider round 
 
 ## Integration boundary
 
-`src/types.ts` and `src/api.ts` preserve the proposed normalized REST gateway, runtime validation, authenticated writes, expected revisions, and stable publish idempotency keys. The current simplified shell intentionally uses only the in-memory preview gateway while sign-in is skipped. Auth utilities remain available for the future accepted account flow; environment flags alone do not activate live mode in this shell.
-
-Member 2 must accept/normalize `GET /api/events` → `EventRecord[]`, event read/mutation responses → `WorkspaceEvent`, and authenticated create/PATCH/prepare/review/publish/sync endpoints. Member 3's `/api/dev` shape differs and must not be treated as production Supabase data. Private records, trusted Go provenance, exact asset/approval revisions, ownership/RLS, and idempotency must be validated server-side. Public browser config must never include connector tokens, OAuth secrets, or service-role keys.
+`src/types.ts` defines the UI review model and `src/api.ts` validates incoming records. The connected test uses Member 2's published canonical read API. The obsolete proposed write adapter has been removed: production editing/review/publishing remain disabled until the actual backend endpoints are mapped. The local preview retains the manual flow. Member 3's `/api/dev` shape is not production Supabase data. Ownership, revisions, review and idempotency must be enforced server-side.
 
 Canva previews render actual HTTPS metadata when supplied. Unknown inclusion facts remain unknown; sourced yes/no facts require confirmation dates. Access/sensory details and prose previews are collapsed to keep the main flow small. Provider status and private guest responses are expandable sections inside distribution. Sent email/attachments remain immutable; sent invitations require a new change notice, while unsent drafts are replaced. Exact Canva transaction digest approval and public event links remain pending backend handoffs.
 
@@ -45,15 +43,15 @@ The intended pipeline is **user describes the event in Go → Go calls typed MCP
 | `document` / `event_document`, `notion_note`                      | Documents             |
 | `invitation`, `change_notice`, subject, Gmail/Calendar receipts   | Distribution          |
 
-`App` accepts an `eventGateway` composition prop for an already-authenticated backend adapter; it defaults to the public local preview. Refresh loads list/detail snapshots from that gateway. This composition seam and mocked typed-output tests are not a live Go transfer or natural-language understanding test. Automatic push/subscription refresh remains pending the shared backend contract.
+`App` accepts an `eventGateway` composition prop for an already-authenticated backend adapter; it defaults to the public local preview. Refresh loads list/detail snapshots from that gateway. This composition seam and mocked typed-output tests are not a live Go transfer or natural-language understanding test. The connected read-only test polls every ten seconds while visible and refreshes on window focus.
 
-Missing server work: owner-scoped create/update event MCP tools, durable canonical storage, artifact recording, accepted organizer read/review/approval APIs, scoped browser identity without a signup gate, and a real standalone Go round trip. Member 3's current branch exposes read/queue/save-content tools, but not event create/update tools. See Member 1 context for the exact handoff.
+Canonical Supabase storage and organizer API factories now exist in main. Remaining work includes application registration, owner-scoped create/update event MCP tools, full review-material mapping and a standalone Go round trip. Member 3's current branch exposes read/queue/save-content tools, but not event create/update tools. See Member 1 context for the exact handoff.
 
 ## Current objective: verify a real Go-created event
 
 Settings → **Test Go → website** → **Check event API** probes `/api/config` before requesting any account credentials. The current LAN baseline returns 404 because Member 2's router has not been registered in Member 3's composition. This is a visible setup blocker, not a successful Go connection.
 
-The new `createEventTransferGateway` accepts Member 2's published canonical read contract: paginated `GET /api/events?limit=100&offset=N` returns `EventRecord[]`; `GET /api/events/{id}` returns `EventRecord`. It carries the organizer's Supabase Bearer token. Once API readiness is confirmed, an existing account can connect through Settings; its access token remains in memory, expires, and is cleared on disconnect. There is no initial signup gate. This narrow connection is read-only and loads event details only; design/distribution stages and writes are disabled so empty material arrays are not mistaken for real provider state. The earlier full `createLiveGateway` is still a proposed adapter and is not activated here.
+The new `createEventTransferGateway` accepts Member 2's published canonical read contract: paginated `GET /api/events?limit=100&offset=N` returns `EventRecord[]`; `GET /api/events/{id}` returns `EventRecord`. It carries the organizer's Supabase Bearer token. Once API readiness is confirmed, an existing account can connect through Settings; its access token remains in memory, expires, and is cleared on disconnect. There is no initial signup gate. This narrow connection is read-only and loads event details only; design/distribution stages and writes are disabled so empty material arrays are not mistaken for real provider state. No speculative write adapter remains.
 
 After deployment/registration, test with this synthetic Go request:
 
@@ -61,4 +59,16 @@ After deployment/registration, test with this synthetic Go request:
 
 Connect the same organizer in Settings, choose New event → **Check Your events** (or refresh the list), and open that event. Compare the displayed saved ID, title, location, times/timezone, description and guests with Go's tool receipt. A matching name alone does not prove transfer. Changing a location should retain the ID and increment the revision. Reloading should read persisted state. Keep this first test limited to canonical details.
 
-**Current blocker:** user confirmed the project is LAN-only and no Go connector/public backend is deployed. Go requires a reachable hosted endpoint. Member 3 still needs to register Member 2's router and add create/update event MCP tools. No live end-to-end proof can run until those are available. Mocked transfer tests do not prove standalone Go execution.
+**Current blocker:** a Vercel project exists, but no reachable backend/Go connector has been verified. Member 3 still needs to register Member 2's router and add create/update event MCP tools. No live end-to-end proof can run until those are available. Mocked transfer tests do not prove standalone Go execution.
+
+
+## Vercel setup and remaining owner actions
+
+The main backend merge is incorporated into `codex/member-1-frontend`. Merge [PR #2](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/2) to include this frontend in main.
+
+1. **Member 3:** wire production Supabase/auth/event dependencies in `main.py`, include Member 2's API router before the MCP catch-all, and register authenticated event create/update MCP tools. Use the canonical service, ownership, expected revisions and idempotency; return saved ID/revision. Current read/content tools cannot create events.
+2. **Backend deployment owner:** deploy Python to public HTTPS. Configure backend variables from root `.env.example`, an organizer test account and MCP authorization scoped to that owner. Set `APP_DOMAIN` to the public backend hostname. Keep service-role, encryption and OAuth secrets server-side. Verify `/api/health`, `/api/config`, authenticated event reads and `/mcp` initialization.
+3. **Vercel owner:** set **Root Directory: `frontend`**, deploy main after merging PR #2, and set server-only `BACKEND_ORIGIN=https://your-backend-host` (origin only, no `/api`). Set public build variable `VITE_PUBLIC_MCP_URL=https://your-backend-host/mcp`, then redeploy. The frontend includes `vercel.json` and a server function forwarding `/api/*`. This configuration does not deploy Python or host MCP. The proxy forwards the caller's auth and injects no credentials.
+4. **Go account owner:** install/authorize the backend MCP connector in standalone Go. In website Settings, check the event API and connect the same organizer. Run the synthetic prompt above and compare saved ID/revision and exact fields. Returning to the window refreshes events; visible pages also check every ten seconds. Change the location and confirm the same ID plus a newer revision.
+
+Actual Vercel routing, standalone Go authorization and the full transfer remain unverified. Proxy checks use mocked upstream responses. See [Vercel function API](https://vercel.com/docs/functions/functions-api-reference) and [quickstart](https://vercel.com/docs/functions/quickstart).

@@ -349,46 +349,6 @@ export async function requestJson(
   }
   return response.json();
 }
-export function createLiveGateway(token: string): EventGateway {
-  const path = (id: string) => `/api/events/${encodeURIComponent(id)}`;
-  const workspace = async (
-    url: string,
-    method?: string,
-    body?: unknown,
-    key?: string,
-  ) => parseWorkspace(await requestJson(url, token, method, body, key));
-  return {
-    mode: "live",
-    async list() {
-      const response = await requestJson("/api/events", token);
-      if (!Array.isArray(response))
-        throw new Error("Event list must be an array.");
-      return response.map(parseEvent);
-    },
-    get: (id) => workspace(path(id)),
-    save: (id, input, revision) =>
-      workspace(id ? path(id) : "/api/events", id ? "PATCH" : "POST", {
-        ...input,
-        ...(id ? { expected_revision: revision } : {}),
-      }),
-    prepare: (id, revision) =>
-      workspace(`${path(id)}/prepare`, "POST", { expected_revision: revision }),
-    review: (id, revision, content, facts) =>
-      workspace(`${path(id)}/review`, "POST", {
-        expected_revision: revision,
-        content,
-        facts,
-        acknowledge_unknowns: true,
-      }),
-    publish: (id, revision, action, key) =>
-      workspace(
-        `${path(id)}/${action === "update" ? "sync" : "publish"}`,
-        "POST",
-        { expected_revision: revision, action, idempotency_key: key },
-        key,
-      ),
-  };
-}
 export const authConfigured = Boolean(
   import.meta.env.VITE_SUPABASE_URL &&
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY &&
