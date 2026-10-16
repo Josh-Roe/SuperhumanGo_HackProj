@@ -13,5 +13,5 @@ if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password ||
   throw new Error("Use your deployed public HTTPS /mcp URL with no credentials, query, or fragment.");
 }
 await writeFile(new URL("./config.ts", import.meta.url),
-  `// Public endpoint only. Credentials are entered when installing the connector in Go.\nexport const mcpEndpoint = ${JSON.stringify(endpoint.href)};\n`);
+  `// Public endpoint only. Credentials are entered when installing the connector in Go.\nexport const mcpEndpoint = ${JSON.stringify(endpoint.href)};\nexport const networkDomain = ${JSON.stringify(endpoint.hostname)};\n`);
 console.log("Connector endpoint updated. Run npm run check before uploading.");

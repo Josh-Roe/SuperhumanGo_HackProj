@@ -33,3 +33,20 @@ jobs:
         run: docker build -t hackathon-frontend ./frontend
       - name: Build backend image
         run: docker build -t hackathon-backend ./backend
+      - name: Smoke test container stack
+        env:
+          MCP_AUTH_TOKEN: ci-placeholder-not-a-secret
+        run: |
+          docker compose up -d --build
+          curl --retry 12 --retry-all-errors --retry-delay 2 --fail http://localhost/api/health
+          curl --fail --output /dev/null http://localhost/
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+        env:
+          MCP_AUTH_TOKEN: ci-placeholder-not-a-secret
+      - name: Stop containers
+        if: always()
+        run: docker compose down
+        env:
+          MCP_AUTH_TOKEN: ci-placeholder-not-a-secret
