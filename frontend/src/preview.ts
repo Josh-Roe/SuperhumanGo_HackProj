@@ -46,6 +46,10 @@ export function createPreviewGateway(): EventGateway {
         "Hello neighbors,\n\nYou’re invited to our community gathering. Please review the current event details before you travel. Reply to let us know if you can join.\n\nWe hope to see you there!",
       ),
       content(
+        "flyer_brief",
+        "A welcoming community-garden flyer. Use a soft green palette, clear high-contrast type, and a simple botanical layout. Keep the date and location prominent.",
+      ),
+      content(
         "event_document",
         "Community gathering\n\nMeet your neighbors and share ideas for the neighborhood.\n\nVenue and access details are awaiting organizer confirmation.",
       ),
