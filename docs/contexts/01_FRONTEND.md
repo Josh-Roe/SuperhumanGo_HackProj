@@ -69,4 +69,4 @@ Read upstream context/integration guide at `3768f4e` / implementation `cdf08bc`.
 
 ## Branch handoff
 
-Only `frontend/**` and this personal context changed. Other member contexts and canonical docs remain untouched. A frontend PR will carry the local-preview implementation and mark live integrations as pending. Preserve the original pre-existing scaffold disclosure from the shared project docs.
+Only `frontend/**` and this personal context changed. Other member contexts and canonical docs remain untouched. Implementation commit: `8b8b897`. Draft [PR #2](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/2) carries the local-preview implementation and marks live integrations as pending. Branch pushed to origin; local lint/tests/build and real scaffold API proxy checks passed as described above. Preserve the original pre-existing scaffold disclosure from the shared project docs.
