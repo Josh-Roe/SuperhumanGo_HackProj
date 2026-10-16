@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiError,
-  createLiveGateway,
   loadProjectStatus,
   parseWorkspace,
   requestJson,
@@ -44,28 +43,6 @@ describe("API boundary and revision invariants", () => {
     await expect(
       gateway.publish(snapshot.event.id, 3, "publish", "key"),
     ).rejects.toThrow(/cannot publish/);
-  });
-  it("attaches organizer auth, expected revision and a stable publish idempotency key", async () => {
-    const snapshot = await createPreviewGateway().get("preview-gathering");
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify(snapshot)));
-    vi.stubGlobal("fetch", fetcher);
-    await createLiveGateway("organizer-jwt").publish(
-      snapshot.event.id,
-      2,
-      "publish",
-      "same-key",
-    );
-    const [path, options] = fetcher.mock.calls[0];
-    expect(path).toBe("/api/events/preview-gathering/publish");
-    expect(options.headers.Authorization).toBe("Bearer organizer-jwt");
-    expect(options.headers["Idempotency-Key"]).toBe("same-key");
-    expect(JSON.parse(options.body)).toEqual({
-      expected_revision: 2,
-      action: "publish",
-      idempotency_key: "same-key",
-    });
   });
   it.each([
     [401, "unauthenticated"],
@@ -116,5 +93,50 @@ describe("API boundary and revision invariants", () => {
     expect(toInstant("2026-11-07T10:00", "Asia/Kathmandu")).toBe(
       "2026-11-07T04:15:00.000Z",
     );
+  });
+});
+
+describe("published event transfer contract", () => {
+  it("uses canonical event responses with pagination and never enables writes", async () => {
+    const { createEventTransferGateway } = await import("./api");
+    const snapshot = await createPreviewGateway().get("preview-gathering");
+    const fetcher = vi
+      .fn()
+      .mockImplementation((path: string) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(
+              path.includes("?") ? [snapshot.event] : snapshot.event,
+            ),
+          ),
+        ),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    const gateway = createEventTransferGateway("synthetic-session");
+    expect((await gateway.list())[0].title).toBe(snapshot.event.title);
+    expect((await gateway.get(snapshot.event.id)).event).toEqual(
+      snapshot.event,
+    );
+    expect(fetcher.mock.calls[0][0]).toBe("/api/events?limit=100&offset=0");
+    expect(fetcher.mock.calls[0][1].headers.Authorization).toBe(
+      "Bearer synthetic-session",
+    );
+    expect(gateway.readOnly).toBe(true);
+    await expect(gateway.save(null, snapshot.event)).rejects.toThrow(
+      /event details only/,
+    );
+    await expect(
+      gateway.publish(snapshot.event.id, 2, "publish", "key"),
+    ).rejects.toThrow(/event details only/);
+  });
+  it("reports missing API registration before any account sign-in request", async () => {
+    const { loadPublicAuthConfig } = await import("./api");
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(new Response("{}", { status: 404 }));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(loadPublicAuthConfig()).rejects.toThrow(/not registered/);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][0]).toBe("/api/config");
   });
 });

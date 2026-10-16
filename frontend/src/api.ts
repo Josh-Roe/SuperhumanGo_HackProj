@@ -1,3 +1,5 @@
+import { normalizeContentKind } from "./content";
+import { emptyFacts } from "./types";
 export interface ProjectStatus {
   superhuman: {
     transport: "mcp";
@@ -117,12 +119,48 @@ export function parseEvent(value: unknown): EventRecord {
     throw new Error("Event timestamps are invalid.");
   return value as unknown as EventRecord;
 }
-export function parseWorkspace(value: unknown): WorkspaceEvent {
+function normalizeAsset(
+  value: unknown,
+  eventId: string,
+): Record<string, unknown> {
+  if (
+    !isRecord(value) ||
+    (value.event_id !== undefined && value.event_id !== eventId)
+  )
+    throw new Error("Artifact response did not match this event.");
+  const kind =
+    value.kind === "flyer_png"
+      ? "flyer"
+      : value.kind === "event_document"
+        ? "document"
+        : value.kind;
+  const state =
+    value.state ??
+    (value.review_state === "reviewed"
+      ? "ready"
+      : value.review_state === "needs_review"
+        ? "needs_review"
+        : undefined);
+  // Member 4 preview metadata uses a content hash, not a provider/database ID. This is a UI key only.
+  const id =
+    value.id ??
+    (typeof value.sha256 === "string" && /^[a-f0-9]{64}$/.test(value.sha256)
+      ? `${kind}:${value.event_revision}:${value.sha256}`
+      : undefined);
+  return { ...value, kind, state, id };
+}
+export function parseWorkspace(raw: unknown): WorkspaceEvent {
   const fail = () => {
     throw new Error("Review response did not match the proposed API contract.");
   };
-  if (!isRecord(value)) return fail();
-  parseEvent(value.event);
+  if (!isRecord(raw)) return fail();
+  const event = parseEvent(raw.event);
+  const value: Record<string, unknown> = {
+    ...raw,
+    assets: Array.isArray(raw.assets)
+      ? raw.assets.map((asset) => normalizeAsset(asset, event.id))
+      : raw.assets,
+  };
   const collections = [
     "content",
     "work",
@@ -138,6 +176,8 @@ export function parseWorkspace(value: unknown): WorkspaceEvent {
         !isRecord(item) ||
         typeof item.id !== "string" ||
         !Number.isInteger(item.event_revision) ||
+        Number(item.event_revision) < 1 ||
+        (item.event_id !== undefined && item.event_id !== event.id) ||
         !states.includes(String(item.state))
       )
         return fail();
@@ -149,13 +189,9 @@ export function parseWorkspace(value: unknown): WorkspaceEvent {
         isRecord(c) &&
         typeof c.body === "string" &&
         ["superhuman_go", "organizer", "gemini"].includes(String(c.producer)) &&
-        [
-          "description",
-          "plain_language_summary",
-          "invitation",
-          "change_notice",
-          "event_document",
-        ].includes(String(c.kind)),
+        (c.subject === undefined ||
+          c.subject === null ||
+          typeof c.subject === "string"),
     )
   )
     return fail();
@@ -253,7 +289,16 @@ export function parseWorkspace(value: unknown): WorkspaceEvent {
       !Number.isInteger(value.gmail.event_revision))
   )
     return fail();
-  return value as unknown as WorkspaceEvent;
+  const content = (value.content as Record<string, unknown>[]).map((item) => ({
+    ...item,
+    kind: normalizeContentKind(item.kind),
+  }));
+  if (
+    new Set((value.content as Record<string, unknown>[]).map((item) => item.id))
+      .size !== content.length
+  )
+    return fail();
+  return { ...value, content } as unknown as WorkspaceEvent;
 }
 export class ApiError extends Error {
   code: string;
@@ -304,46 +349,6 @@ export async function requestJson(
   }
   return response.json();
 }
-export function createLiveGateway(token: string): EventGateway {
-  const path = (id: string) => `/api/events/${encodeURIComponent(id)}`;
-  const workspace = async (
-    url: string,
-    method?: string,
-    body?: unknown,
-    key?: string,
-  ) => parseWorkspace(await requestJson(url, token, method, body, key));
-  return {
-    mode: "live",
-    async list() {
-      const response = await requestJson("/api/events", token);
-      if (!Array.isArray(response))
-        throw new Error("Event list must be an array.");
-      return response.map(parseEvent);
-    },
-    get: (id) => workspace(path(id)),
-    save: (id, input, revision) =>
-      workspace(id ? path(id) : "/api/events", id ? "PATCH" : "POST", {
-        ...input,
-        ...(id ? { expected_revision: revision } : {}),
-      }),
-    prepare: (id, revision) =>
-      workspace(`${path(id)}/prepare`, "POST", { expected_revision: revision }),
-    review: (id, revision, content, facts) =>
-      workspace(`${path(id)}/review`, "POST", {
-        expected_revision: revision,
-        content,
-        facts,
-        acknowledge_unknowns: true,
-      }),
-    publish: (id, revision, action, key) =>
-      workspace(
-        `${path(id)}/${action === "update" ? "sync" : "publish"}`,
-        "POST",
-        { expected_revision: revision, action, idempotency_key: key },
-        key,
-      ),
-  };
-}
 export const authConfigured = Boolean(
   import.meta.env.VITE_SUPABASE_URL &&
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY &&
@@ -352,12 +357,15 @@ export const authConfigured = Boolean(
 export async function signIn(
   email: string,
   password: string,
+  config?: PublicAuthConfig,
 ): Promise<Session> {
-  if (!authConfigured)
+  if (!config && !authConfigured)
     throw new Error(
       "Live sign-in is awaiting a connected organizer account. Use the local preview.",
     );
-  const url = new URL(import.meta.env.VITE_SUPABASE_URL);
+  const url = new URL(
+    config?.supabase_url ?? import.meta.env.VITE_SUPABASE_URL,
+  );
   if (
     url.protocol !== "https:" &&
     !["localhost", "127.0.0.1"].includes(url.hostname)
@@ -369,7 +377,9 @@ export async function signIn(
       method: "POST",
       signal: AbortSignal.timeout(12000),
       headers: {
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey:
+          config?.supabase_publishable_key ??
+          import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password }),
@@ -392,5 +402,82 @@ export async function signIn(
     access_token: data.access_token,
     email: data.user.email,
     expires_at: Date.now() + data.expires_in * 1000,
+  };
+}
+
+// Member 2's published canonical event REST contract. Narrow, read-only transfer test.
+export function createEventTransferGateway(token: string): EventGateway {
+  const blocked = async (): Promise<WorkspaceEvent> => {
+    throw new Error(
+      "This connection tests event details only. Editing and distribution are not enabled.",
+    );
+  };
+  return {
+    mode: "live",
+    readOnly: true,
+    async list() {
+      const events: EventRecord[] = [];
+      for (let offset = 0; ; offset += 100) {
+        const rows = await requestJson(
+          `/api/events?limit=100&offset=${offset}`,
+          token,
+        );
+        if (!Array.isArray(rows))
+          throw new Error("Event list must be an array.");
+        events.push(...rows.map(parseEvent));
+        if (rows.length < 100) return events;
+      }
+    },
+    async get(id) {
+      const event = parseEvent(
+        await requestJson(`/api/events/${encodeURIComponent(id)}`, token),
+      );
+      if (event.id !== id)
+        throw new Error("The server returned a different event.");
+      return {
+        event,
+        content: [],
+        assets: [],
+        work: [],
+        facts: emptyFacts(),
+        findings: [],
+        operations: [],
+        rsvps: [],
+        gmail: null,
+        review_revision: null,
+      };
+    },
+    save: blocked,
+    prepare: blocked,
+    review: blocked,
+    publish: blocked,
+  };
+}
+export interface PublicAuthConfig {
+  supabase_url: string;
+  supabase_publishable_key: string;
+}
+export async function loadPublicAuthConfig(): Promise<PublicAuthConfig> {
+  const response = await fetch("/api/config", {
+    signal: AbortSignal.timeout(8000),
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok)
+    throw new Error(
+      "The event API is not registered on this backend yet. The connection test cannot run.",
+    );
+  const value: unknown = await response.json();
+  if (
+    !isRecord(value) ||
+    value.configured !== true ||
+    typeof value.supabase_url !== "string" ||
+    typeof value.supabase_publishable_key !== "string"
+  )
+    throw new Error(
+      "The backend needs public Supabase authentication configuration.",
+    );
+  return {
+    supabase_url: value.supabase_url,
+    supabase_publishable_key: value.supabase_publishable_key,
   };
 }

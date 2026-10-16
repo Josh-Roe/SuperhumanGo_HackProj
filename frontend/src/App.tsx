@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { loadProjectStatus } from "./api";
+import {
+  ApiError,
+  createEventTransferGateway,
+  loadPublicAuthConfig,
+  loadProjectStatus,
+  signIn,
+} from "./api";
 import { createPreviewGateway } from "./preview";
+import { contentDefinitions, destinations, routeContent } from "./content";
 import { emptyFacts, factLabels, friendlyState, safeUrl } from "./types";
 import type {
   Content,
+  EventGateway,
   EventInput,
   EventRecord,
   FactKey,
   WorkspaceEvent,
+  Session,
 } from "./types";
 import { eventDate, localTime, toInstant } from "./dates";
 import "./App.css";
@@ -22,13 +31,6 @@ const steps: { id: Step; name: string }[] = [
 ];
 const GO_URL = "https://go.superhuman.com/";
 const MCP_URL = safeUrl(import.meta.env.VITE_PUBLIC_MCP_URL);
-const contentLabels: Record<Content["kind"], string> = {
-  description: "Event description",
-  plain_language_summary: "Plain-language summary",
-  invitation: "Invitation",
-  change_notice: "Change notice",
-  event_document: "Event document",
-};
 function Badge({
   children,
   tone = "",
@@ -81,8 +83,8 @@ function GoHandoff({
             {event ? "Let Go take it from here." : "Plan in Go. See it here."}
           </h2>
           <p>
-            Connect this workspace to Go, then ask it to update your flyer,
-            writing, email, and Calendar plan.
+            Describe the whole event in your own words in Go—details, design,
+            guests, and invitations. Go saves each part into its place here.
           </p>
         </div>
         <a className="primary" href={GO_URL} target="_blank" rel="noreferrer">
@@ -125,9 +127,10 @@ function GoHandoff({
             )}
           </li>
           <li>
-            <strong>Prompt Go, then come back.</strong> Ask Go to save changes
-            through the connector. Return here and refresh to review the
-            results.
+            <strong>Describe what you want.</strong> Use any order or wording in
+            Go. Ask it to save event details, design instructions, and writing
+            through the connector. If something is unclear, Go should ask you
+            rather than guess. Return here to review the results.
             <label>
               Prompt for Go
               <textarea
@@ -164,16 +167,127 @@ function GoHandoff({
     </section>
   );
 }
+function TransferConnection({
+  onConnected,
+}: {
+  onConnected: (gateway: EventGateway, session: Session) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [config, setConfig] =
+    useState<Awaited<ReturnType<typeof loadPublicAuthConfig>>>();
+  async function check() {
+    setBusy(true);
+    setError("");
+    try {
+      setConfig(await loadPublicAuthConfig());
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to check the event API.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function connect(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!config) return;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setBusy(true);
+    setError("");
+    try {
+      const session = await signIn(
+        String(data.get("email")),
+        String(data.get("password")),
+        config,
+      );
+      const gateway = createEventTransferGateway(session.access_token);
+      await gateway.list();
+      form.reset();
+      onConnected(gateway, session);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to connect.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel">
+      <h2>Test Go → website.</h2>
+      <p className="muted">
+        Once the backend and Go connector are hosted, connect an existing
+        organizer account here to read its real events. This test loads event
+        details only.
+      </p>
+      <ol className="setup-steps">
+        <li>Connect Go to the public HTTPS MCP endpoint.</li>
+        <li>
+          Ask Go to create a uniquely named test event and return its saved
+          event ID.
+        </li>
+        <li>
+          Connect the same organizer account below, then refresh Your events and
+          compare the saved details.
+        </li>
+      </ol>
+      {!config && (
+        <button className="secondary" disabled={busy} onClick={check}>
+          {busy ? "Checking…" : "Check event API"}
+        </button>
+      )}
+      {error && (
+        <p role="alert" className="error-box">
+          {error}
+        </p>
+      )}
+      {config && (
+        <form onSubmit={connect} className="profile-form">
+          <fieldset disabled={busy}>
+            <label>
+              Organizer account email
+              <input
+                name="email"
+                type="email"
+                autoComplete="username"
+                required
+              />
+            </label>
+            <label>
+              Account password
+              <input
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+            </label>
+          </fieldset>
+          <button className="secondary" disabled={busy}>
+            {busy ? "Connecting…" : "Connect existing workspace"}
+          </button>
+        </form>
+      )}
+      <p className="small muted">
+        No signup is required here. Session access stays in this tab and expires
+        automatically. A connected event list alone does not prove a Go write;
+        compare it with Go’s saved ID.
+      </p>
+    </section>
+  );
+}
 function Details({
   record,
   onSave,
   busy,
   onDirty,
+  readOnly = false,
 }: {
   record: WorkspaceEvent | null;
   onSave: (input: EventInput) => void;
   busy: boolean;
   onDirty: () => void;
+  readOnly?: boolean;
 }) {
   const event = record?.event;
   const [formError, setFormError] = useState("");
@@ -239,7 +353,12 @@ function Details({
       <p className="muted">
         Name your event, set the place and time, and add your guests.
       </p>
-      <fieldset disabled={busy}>
+      {event && (
+        <p className="small muted">
+          Saved event ID: <code>{event.id}</code>
+        </p>
+      )}
+      <fieldset disabled={busy || readOnly}>
         <label>
           Event title
           <input
@@ -349,8 +468,8 @@ function Details({
         <p className="small muted">
           Save your details, then prepare the design and inclusion review.
         </p>
-        <button className="primary" disabled={busy}>
-          {busy ? "Saving…" : "Save & continue"}
+        <button className="primary" disabled={busy || readOnly}>
+          {readOnly ? "Read-only event" : busy ? "Saving…" : "Save & continue"}
         </button>
       </div>
     </form>
@@ -375,6 +494,7 @@ function Review({
   const [facts, setFacts] = useState(record.facts ?? emptyFacts());
   const [ack, setAck] = useState(false);
   const [error, setError] = useState("");
+  const groupedContent = routeContent(content);
   const current = content.filter(
     (c) => c.event_revision === record.event.revision,
   );
@@ -499,7 +619,15 @@ function Review({
           </p>
           <div className="asset-grid">
             {(["flyer", "document"] as const).map((kind) => {
-              const asset = record.assets.find((a) => a.kind === kind);
+              const asset =
+                record.assets.find(
+                  (a) =>
+                    a.kind === kind &&
+                    a.event_revision === record.event.revision,
+                ) ??
+                record.assets
+                  .filter((a) => a.kind === kind)
+                  .sort((a, b) => b.event_revision - a.event_revision)[0];
               return (
                 <article className="asset" key={kind}>
                   <div className="asset-preview">
@@ -603,52 +731,95 @@ function Review({
               above.
             </p>
           )}
-          {content.map((c, i) => (
-            <details className="writing-preview" key={c.id}>
-              <summary>
-                {contentLabels[c.kind]}{" "}
-                <Badge
-                  tone={
-                    c.event_revision !== record.event.revision ? "warning" : ""
-                  }
+          {destinations.map(
+            (destination) =>
+              groupedContent[destination.id].length > 0 && (
+                <div
+                  key={destination.id}
+                  className="content-group"
+                  role="group"
+                  aria-label={`Go output: ${destination.label}`}
                 >
-                  {c.event_revision === record.event.revision
-                    ? friendlyState(c.state)
-                    : `Stale · r${c.event_revision}`}
-                </Badge>
-              </summary>
-              <label>
-                {contentLabels[c.kind]}
-                <span className="small muted">
-                  {c.producer === "superhuman_go"
-                    ? "Superhuman Go"
-                    : c.producer === "gemini"
-                      ? "Gemini-assisted portion"
-                      : "Edited by organizer"}{" "}
-                  · revision {c.event_revision}
-                </span>
-                <textarea
-                  rows={5}
-                  value={c.body}
-                  disabled={busy || c.event_revision !== record.event.revision}
-                  onChange={(e) =>
-                    setContent((all) =>
-                      all.map((item, index) =>
-                        index === i
-                          ? {
-                              ...item,
-                              body: e.target.value,
-                              producer: "organizer",
-                              state: "needs_review",
+                  <h3>{destination.label}</h3>
+                  {groupedContent[destination.id].map((c) => (
+                    <details className="writing-preview" key={c.id}>
+                      <summary>
+                        {contentDefinitions[c.kind].label}{" "}
+                        <Badge
+                          tone={
+                            c.event_revision !== record.event.revision
+                              ? "warning"
+                              : ""
+                          }
+                        >
+                          {c.event_revision === record.event.revision
+                            ? friendlyState(c.state)
+                            : `Stale · r${c.event_revision}`}
+                        </Badge>
+                      </summary>
+                      {(c.kind === "invitation" ||
+                        c.kind === "change_notice") && (
+                        <label>
+                          Email subject
+                          <input
+                            value={c.subject ?? ""}
+                            disabled={
+                              busy || c.event_revision !== record.event.revision
                             }
-                          : item,
-                      ),
-                    )
-                  }
-                />
-              </label>
-            </details>
-          ))}
+                            onChange={(e) =>
+                              setContent((all) =>
+                                all.map((item) =>
+                                  item.id === c.id
+                                    ? {
+                                        ...item,
+                                        subject: e.target.value,
+                                        producer: "organizer",
+                                        state: "needs_review",
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                      )}
+                      <label>
+                        {contentDefinitions[c.kind].label}
+                        <span className="small muted">
+                          {c.producer === "superhuman_go"
+                            ? "Superhuman Go"
+                            : c.producer === "gemini"
+                              ? "Gemini-assisted portion"
+                              : "Edited by organizer"}{" "}
+                          · revision {c.event_revision}
+                        </span>
+                        <textarea
+                          rows={5}
+                          value={c.body}
+                          disabled={
+                            busy || c.event_revision !== record.event.revision
+                          }
+                          onChange={(e) =>
+                            setContent((all) =>
+                              all.map((item) =>
+                                item.id === c.id
+                                  ? {
+                                      ...item,
+                                      body: e.target.value,
+                                      producer: "organizer",
+                                      state: "needs_review",
+                                    }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                    </details>
+                  ))}
+                </div>
+              ),
+          )}
           <label className="checkbox">
             <input
               type="checkbox"
@@ -803,7 +974,7 @@ function Distribution({
                 {record.event.invitees.length === 1 ? "person" : "people"} ·
                 private recipients
               </p>
-              <strong>{record.event.title}</strong>
+              <strong>{mail?.subject || record.event.title}</strong>
             </div>
             <div className="mail-body">
               {mail?.body ??
@@ -971,8 +1142,13 @@ function Rsvps({ record }: { record: WorkspaceEvent }) {
     </section>
   );
 }
-function App() {
-  const [gateway] = useState(createPreviewGateway);
+function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
+  // A live gateway must already carry organizer auth; default remains the public local preview.
+  const [gateway, setGateway] = useState(
+    () => eventGateway ?? createPreviewGateway(),
+  );
+  const [session, setSession] = useState<Session>();
+  const [starting, setStarting] = useState(false);
   const [page, setPage] = useState<Page>("events");
   const [step, setStep] = useState<Step>("details");
   const [editing, setEditing] = useState(false);
@@ -986,41 +1162,103 @@ function App() {
   const [backend, setBackend] = useState("Not checked");
   const [profile, setProfile] = useState({ name: "Organizer", email: "" });
   const heading = useRef<HTMLHeadingElement>(null);
+  const publishKeys = useRef(new Map<string, string>());
+  const epoch = useRef(0);
+  const watchedId = gateway.readOnly && editing ? record?.event.id : undefined;
+  const watchPaused = Boolean(gateway.readOnly && (busy || dirty));
   useEffect(() => {
     let active = true;
-    gateway
-      .list()
-      .then((value) => {
-        if (active) setEvents(value);
-      })
-      .catch(() => {
-        if (active) setError("Could not load events. Try refreshing.");
-      });
+    let inFlight = false;
+    async function load() {
+      if (inFlight || watchPaused) return;
+      inFlight = true;
+      try {
+        const list = await gateway.list();
+        const item = watchedId ? await gateway.get(watchedId) : undefined;
+        if (!active) return;
+        setEvents(list);
+        if (item) {
+          setRecord(item);
+          setEditorKey((key) => key + 1);
+        }
+        setError("");
+      } catch (err) {
+        if (!active) return;
+        if (err instanceof ApiError && err.code === "unauthenticated") {
+          setEvents([]);
+          setRecord(null);
+          setEditing(false);
+        }
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not load events. Try refreshing.",
+        );
+      } finally {
+        inFlight = false;
+      }
+    }
+    void load();
+    if (!gateway.readOnly)
+      return () => {
+        active = false;
+      };
+    const refreshVisible = () => {
+      if (document.visibilityState !== "hidden") void load();
+    };
+    const timer = window.setInterval(refreshVisible, 10000);
+    window.addEventListener("focus", refreshVisible);
     return () => {
       active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshVisible);
     };
-  }, [gateway]);
+  }, [gateway, watchedId, watchPaused]);
   useEffect(() => {
     heading.current?.focus();
-  }, [page, step, editing]);
+  }, [page, step, editing, starting]);
   useEffect(() => {
     if (!dirty) return;
     const guard = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
   }, [dirty]);
+  useEffect(() => {
+    if (!session) return;
+    const timer = window.setTimeout(
+      () => {
+        epoch.current++;
+        setBusy(false);
+        setEvents([]);
+        setGateway(createPreviewGateway());
+        setSession(undefined);
+        setRecord(null);
+        setEditing(false);
+        setStarting(false);
+        setDirty(false);
+        setMessage("The workspace session expired. Reconnect in Settings.");
+      },
+      Math.max(0, session.expires_at - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [session]);
   async function run<T>(action: () => Promise<T>, done: (value: T) => void) {
+    const requestEpoch = epoch.current;
     setBusy(true);
     setError("");
     setMessage("");
     try {
-      done(await action());
+      const result = await action();
+      if (requestEpoch === epoch.current) done(result);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong. Try again.",
-      );
+      if (requestEpoch === epoch.current)
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong. Try again.",
+        );
     } finally {
-      setBusy(false);
+      if (requestEpoch === epoch.current) setBusy(false);
     }
   }
   function canLeave() {
@@ -1029,6 +1267,7 @@ function App() {
   function navigate(next: Page) {
     if (!canLeave()) return;
     setPage(next);
+    setStarting(false);
     setEditing(false);
     setDirty(false);
     setError("");
@@ -1068,7 +1307,8 @@ function App() {
   function addEvent() {
     if (canLeave()) {
       setRecord(null);
-      setEditing(true);
+      setStarting(true);
+      setEditing(false);
       setStep("details");
       setDirty(false);
       setEditorKey((k) => k + 1);
@@ -1102,9 +1342,11 @@ function App() {
       ? "Settings"
       : page === "profile"
         ? "Profile"
-        : editing
-          ? (record?.event.title ?? "New event")
-          : "Your events";
+        : starting
+          ? "Start your event with Go"
+          : editing
+            ? (record?.event.title ?? "New event")
+            : "Your events";
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main">
@@ -1150,7 +1392,11 @@ function App() {
           </span>
           <span>
             {profile.name}
-            <small>Local workspace</small>
+            <small>
+              {gateway.mode === "live"
+                ? "Connected workspace"
+                : "Local workspace"}
+            </small>
           </span>
         </div>
       </aside>
@@ -1158,7 +1404,7 @@ function App() {
         <main id="main">
           <header className="page-heading">
             <div>
-              {editing && page === "events" && (
+              {(editing || starting) && page === "events" && (
                 <button
                   className="text-button back-button"
                   disabled={busy}
@@ -1175,9 +1421,11 @@ function App() {
                   ? "Connect Go to your workspace."
                   : page === "profile"
                     ? "A few details about you."
-                    : editing
-                      ? "Details, design, then distribution."
-                      : "All your gatherings, in one place."}
+                    : starting
+                      ? "Describe the plan in Go, then review it here."
+                      : editing
+                        ? "Details, design, then distribution."
+                        : "All your gatherings, in one place."}
               </p>
             </div>
             {page === "events" && (
@@ -1187,8 +1435,11 @@ function App() {
             )}
           </header>
           <p className="preview-note">
-            Local preview · sample data · changes stay in this tab · no
-            invitations send
+            {gateway.mode === "preview"
+              ? "Local preview · sample data · changes stay in this tab · no invitations send"
+              : gateway.readOnly
+                ? "Connected event-details test · checks every 10 seconds · read-only · materials and distribution are not loaded"
+                : "Connected organizer workspace · review changes before sending"}
           </p>
           {error && (
             <p role="alert" className="error-box">
@@ -1198,7 +1449,57 @@ function App() {
           <p className="status-message" role="status">
             {busy ? "Saving your request…" : message}
           </p>
-          {page === "events" && !editing && (
+          {page === "events" && starting && (
+            <>
+              <GoHandoff expanded />
+              <section className="panel">
+                <h2>After Go saves your event</h2>
+                <p className="muted">
+                  Come back to Your events and refresh. Open the saved event and
+                  compare its name, location, times, and guest list with your
+                  request.
+                </p>
+                {gateway.mode === "preview" && (
+                  <p className="notice">
+                    You are viewing local sample data. Go cannot write to this
+                    tab. Connect the hosted backend in Settings before testing a
+                    real transfer.
+                  </p>
+                )}
+                <div className="action-row">
+                  <button
+                    className="primary"
+                    disabled={busy || gateway.mode === "preview"}
+                    onClick={() => {
+                      setStarting(false);
+                      refresh();
+                    }}
+                  >
+                    Check Your events
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() => navigate("settings")}
+                  >
+                    Connection settings
+                  </button>
+                </div>
+              </section>
+              <button
+                className="text-button"
+                disabled={busy || gateway.readOnly}
+                onClick={() => {
+                  setStarting(false);
+                  setEditing(true);
+                  setEditorKey((k) => k + 1);
+                }}
+              >
+                Enter event details manually instead
+              </button>
+            </>
+          )}
+          {page === "events" && !editing && !starting && (
             <>
               <div className="events-toolbar">
                 <h2>
@@ -1281,7 +1582,11 @@ function App() {
                     key={item.id}
                     className={step === item.id ? "active" : ""}
                     aria-current={step === item.id ? "step" : undefined}
-                    disabled={busy || (!record && item.id !== "details")}
+                    disabled={
+                      busy ||
+                      (gateway.readOnly && item.id !== "details") ||
+                      (!record && item.id !== "details")
+                    }
                     onClick={() => changeStep(item.id)}
                   >
                     <span>{i + 1}</span>
@@ -1294,6 +1599,7 @@ function App() {
                   key={editorKey}
                   record={record}
                   busy={busy}
+                  readOnly={gateway.readOnly}
                   onDirty={() => setDirty(true)}
                   onSave={(input) =>
                     void run(
@@ -1374,11 +1680,30 @@ function App() {
                   <Distribution
                     key={editorKey}
                     record={record}
-                    preview
+                    preview={gateway.mode === "preview"}
                     busy={busy}
-                    onPublish={() =>
-                      setError("Sending is unavailable in the local preview.")
-                    }
+                    onPublish={() => {
+                      const action = record.gmail?.sent ? "update" : "publish";
+                      const keyId = `${record.event.id}:${record.event.revision}:${action}`;
+                      const key =
+                        publishKeys.current.get(keyId) ?? crypto.randomUUID();
+                      publishKeys.current.set(keyId, key);
+                      void run(
+                        () =>
+                          gateway.publish(
+                            record.event.id,
+                            record.event.revision,
+                            action,
+                            key,
+                          ),
+                        (value) => {
+                          update(value);
+                          setMessage(
+                            "Request recorded. Check provider receipts for completion.",
+                          );
+                        },
+                      );
+                    }}
                   />
                   <details className="panel">
                     <summary>Guest responses</summary>
@@ -1391,6 +1716,49 @@ function App() {
           {page === "settings" && (
             <>
               <GoHandoff expanded />
+              {gateway.mode === "preview" ? (
+                <TransferConnection
+                  onConnected={(next, activeSession) => {
+                    if (!canLeave()) return;
+                    epoch.current++;
+                    setEvents([]);
+                    setBusy(false);
+                    setGateway(next);
+                    setSession(activeSession);
+                    setRecord(null);
+                    setEditing(false);
+                    setStarting(false);
+                    setDirty(false);
+                    setMessage(
+                      "Connected to real organizer events. Open Your events to compare Go’s saved ID.",
+                    );
+                  }}
+                />
+              ) : (
+                <section className="panel">
+                  <h2>Workspace connected</h2>
+                  <p className="muted">
+                    {session?.email ?? "Authenticated organizer gateway"} ·
+                    event-details test
+                  </p>
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      if (canLeave()) {
+                        epoch.current++;
+                        setEvents([]);
+                        setBusy(false);
+                        setSession(undefined);
+                        setGateway(createPreviewGateway());
+                        setRecord(null);
+                        setDirty(false);
+                      }
+                    }}
+                  >
+                    Disconnect workspace
+                  </button>
+                </section>
+              )}
               <section className="panel settings-connections">
                 <h2>Your connected tools</h2>
                 <p className="muted">

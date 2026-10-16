@@ -61,6 +61,11 @@ describe("simplified event workspace", () => {
   it("adds an event and advances through design to distribution without making up Go output", async () => {
     const user = await workspace();
     await user.click(screen.getByRole("button", { name: "Add event" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Enter event details manually instead",
+      }),
+    );
     expect(
       screen.getByRole("button", { name: /2Design & inclusion/ }),
     ).toBeDisabled();
@@ -194,4 +199,234 @@ describe("simplified event workspace", () => {
       await screen.findByText("Backend unavailable. Try again."),
     ).toBeVisible();
   });
+});
+
+describe("Go-backed event read model", () => {
+  it("fills event fields and routes design and email content to their named groups on refresh", async () => {
+    const { createPreviewGateway } = await import("./preview");
+    const { parseWorkspace } = await import("./api");
+    const base = createPreviewGateway();
+    const snapshot = await base.get("preview-gathering");
+    const incoming = parseWorkspace({
+      ...snapshot,
+      event: {
+        ...snapshot.event,
+        title: "Community picnic",
+        location: "Lakeside garden",
+      },
+      content: [
+        {
+          id: "design-output",
+          kind: "flyer_brief",
+          body: "Blue and yellow. Hand-drawn lemons. Date prominently at the top.",
+          producer: "superhuman_go",
+          event_revision: 2,
+          state: "needs_review",
+        },
+        {
+          id: "email-output",
+          kind: "invitation",
+          body: "Bring a picnic blanket.",
+          subject: "Join our community picnic",
+          producer: "superhuman_go",
+          event_revision: 2,
+          state: "needs_review",
+        },
+      ],
+    });
+    const gateway = {
+      ...base,
+      list: vi.fn().mockResolvedValue([incoming.event]),
+      get: vi.fn().mockResolvedValue(incoming),
+    };
+    const user = userEvent.setup();
+    render(<App eventGateway={gateway} />);
+    await user.click(
+      await screen.findByRole("button", { name: /Community picnic/ }),
+    );
+    expect(screen.getByLabelText("Event title")).toHaveValue(
+      "Community picnic",
+    );
+    expect(
+      screen.getByLabelText("Location or online meeting link"),
+    ).toHaveValue("Lakeside garden");
+    await user.click(
+      screen.getByRole("button", { name: /2Design & inclusion/ }),
+    );
+    const design = screen.getByRole("group", {
+      name: "Go output: Canva design",
+    });
+    await user.click(
+      within(design).getByText("Canva design instructions", {
+        selector: "summary",
+      }),
+    );
+    expect(within(design).getByRole("textbox")).toHaveValue(
+      "Blue and yellow. Hand-drawn lemons. Date prominently at the top.",
+    );
+    const mail = screen.getByRole("group", { name: "Go output: Distribution" });
+    await user.click(
+      within(mail).getByText("Invitation", { selector: "summary" }),
+    );
+    expect(within(mail).getByLabelText("Email subject")).toHaveValue(
+      "Join our community picnic",
+    );
+    await user.click(screen.getByRole("button", { name: "↻ Refresh" }));
+    expect(gateway.get).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("Go-first event transfer test", () => {
+  it("starts new events in Go without first creating a placeholder event", async () => {
+    const user = await workspace();
+    await user.click(screen.getByRole("button", { name: "Add event" }));
+    expect(
+      screen.getByRole("heading", { name: "Start your event with Go" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: /Continue in Superhuman Go/ }),
+    ).toHaveAttribute("href", "https://go.superhuman.com/");
+    expect(screen.queryByLabelText("Event title")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Check Your events" }),
+    ).toBeDisabled();
+    expect(screen.getByText(/Go cannot write to this tab/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "← Your events" }));
+    expect(
+      screen.getAllByRole("button", { name: /A neighborhood, together/ }),
+    ).toHaveLength(1);
+  });
+  it("reads Go-created canonical records from a connected gateway and exposes their exact ID", async () => {
+    const { createPreviewGateway } = await import("./preview");
+    const { createEventTransferGateway } = await import("./api");
+    const snapshot = await createPreviewGateway().get("preview-gathering");
+    const event = {
+      ...snapshot.event,
+      id: "go-saved-event",
+      title: "Go transfer test 01",
+      location: "Synthetic garden",
+    };
+    let saved = false;
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockImplementation((path: string) =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify(
+                path.startsWith("/api/events?")
+                  ? saved
+                    ? [event]
+                    : []
+                  : event,
+              ),
+            ),
+          ),
+        ),
+    );
+    const user = userEvent.setup();
+    render(
+      <App eventGateway={createEventTransferGateway("synthetic-user-jwt")} />,
+    );
+    await user.click(screen.getByRole("button", { name: "Add event" }));
+    saved = true;
+    await user.click(screen.getByRole("button", { name: "Check Your events" }));
+    await user.click(
+      await screen.findByRole("button", { name: /Go transfer test 01/ }),
+    );
+    expect(screen.getByText("go-saved-event")).toBeVisible();
+    expect(screen.getByLabelText("Event title")).toHaveValue(
+      "Go transfer test 01",
+    );
+    expect(
+      screen.getByLabelText("Location or online meeting link"),
+    ).toHaveValue("Synthetic garden");
+    expect(
+      screen.getByRole("button", { name: "Read-only event" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /2Design & inclusion/ }),
+    ).toBeDisabled();
+    expect(screen.getByText(/Connected event-details test/)).toBeVisible();
+  });
+});
+
+describe("event API readiness", () => {
+  it("checks registration before requesting account credentials", async () => {
+    const user = await workspace();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.queryByLabelText("Account password")).not.toBeInTheDocument();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("{}", { status: 404 })),
+    );
+    await user.click(screen.getByRole("button", { name: "Check event API" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "not registered",
+    );
+    expect(screen.queryByLabelText("Account password")).not.toBeInTheDocument();
+  });
+});
+
+describe("connected event arrival", () => {
+  it("loads an event saved in Go when the user returns to the window and reports read failures", async () => {
+    const { createPreviewGateway } = await import("./preview");
+    const { waitFor, fireEvent } = await import("@testing-library/react");
+    const base = createPreviewGateway();
+    const snapshot = await base.get("preview-gathering");
+    const event = {
+      ...snapshot.event,
+      id: "new-go-id",
+      title: "Arrived from Go",
+    };
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([event])
+      .mockRejectedValueOnce(new Error("Connection interrupted"));
+    render(
+      <App eventGateway={{ ...base, mode: "live", readOnly: true, list }} />,
+    );
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+    fireEvent.focus(window);
+    expect(
+      await screen.findByRole("button", { name: /Arrived from Go/ }),
+    ).toBeVisible();
+    fireEvent.focus(window);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Connection interrupted",
+    );
+  });
+});
+
+it("checks the connected list every ten seconds and stops after unmount", async () => {
+  const { act } = await import("@testing-library/react");
+  const { createPreviewGateway } = await import("./preview");
+  const base = createPreviewGateway();
+  const snapshot = await base.get("preview-gathering");
+  const list = vi
+    .fn()
+    .mockResolvedValueOnce([])
+    .mockResolvedValue([snapshot.event]);
+  vi.useFakeTimers();
+  try {
+    const view = render(
+      <App eventGateway={{ ...base, mode: "live", readOnly: true, list }} />,
+    );
+    await act(async () => {});
+    expect(list).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    expect(
+      screen.getByRole("button", { name: /A neighborhood, together/ }),
+    ).toBeVisible();
+    expect(list).toHaveBeenCalledTimes(2);
+    view.unmount();
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(list).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
 });
