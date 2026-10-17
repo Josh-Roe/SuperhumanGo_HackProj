@@ -7,7 +7,8 @@ into the Distributor, then registers:
 
 - Go MCP tools (connector-token principal): read asset status, queue asset prose, render the
   event document, start/poll/preview/export the custom Canva flyer. Go never approves.
-- Organizer REST routes (Supabase session): the same actions plus private inclusion review,
+- Organizer REST routes (Supabase session): the same actions plus private inclusion review
+  (with Google public holiday calendars checked for religious-observance conflicts),
   organizer approval of the exact flyer preview, and abandoning a flyer.
 
 Fail closed: no Canva token → `integration_not_connected`; nothing reports success it lacks.
@@ -47,7 +48,7 @@ from hackathon_backend.services.assets.models import DesignRef, StaleRevisionErr
 from hackathon_backend.services.assets.models import EventSnapshot as AssetEvent
 from hackathon_backend.services.assets.preparation import EventAssetPreparationService
 from hackathon_backend.services.assets.storage import AssetStorage, ExportDownloader
-from hackathon_backend.services.inclusion import InclusionInput
+from hackathon_backend.services.inclusion import HolidayCalendar, InclusionInput
 from hackathon_backend.workflows.go_work import WorkflowError, require_event
 from hackathon_backend.workflows.models import EventSnapshot
 from hackathon_backend.workflows.ports import WorkflowStore
@@ -320,8 +321,10 @@ class AssetCoordinator:
         flyers: FlyerStateStore,
         client_factory: Callable[[], httpx.AsyncClient] | None = None,
         clock: Callable[[], datetime] = _now,
+        holidays: HolidayCalendar | None = None,
     ) -> None:
         self.store = store
+        self.holidays = holidays
         self.storage_for = storage_for
         self.canva = canva
         self.flyers = flyers
@@ -330,7 +333,7 @@ class AssetCoordinator:
         self._locks: dict[tuple[str, str], asyncio.Lock] = {}
 
     def _prep(self, owner_id: str) -> EventAssetPreparationService:
-        return EventAssetPreparationService(self.store, self.storage_for(owner_id))
+        return EventAssetPreparationService(self.store, self.storage_for(owner_id), self.holidays)
 
     async def _guard(self, action: Awaitable[Any]) -> Any:
         try:
@@ -848,6 +851,7 @@ def register_asset_services(
         storage_for=storage_for,
         canva=VaultCanvaSessions(vault) if vault else None,
         flyers=flyers,
+        holidays=HolidayCalendar(),
     )
 
     async def resolve_owner(authorization: str | None) -> str:

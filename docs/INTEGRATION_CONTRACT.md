@@ -11,7 +11,7 @@ Owner: Member 2. Status: **planning baseline, not implemented API**. Members 1/3
 | Event | `id`, authenticated `owner_id`, integer `revision`, `title`, `description`, `location`, `starts_at`, `ends_at`, IANA `timezone`, `links[]`, `organizer_contact`, `status`, timestamps; end is after start |
 | Invitee | `id`, `event_id`, normalized `email`, `display_name?`; RSVP and sensitive needs are private |
 | Inclusion facts | `event_id`, `revision`, step-free entrance, elevator, captions, diet options, loud sound/strobe information; facts use `yes/no/unknown`, source/confirmed-by and date where appropriate |
-| Generated content | `event_id`, `event_revision`, `kind`, `body`, `producer`, `state`, timestamp; kinds include description, summary, invitation, change notice, document, optional Notion note; Go provenance is explicit |
+| Generated content | `event_id`, `event_revision`, `kind`, `body`, `producer`, `state`, timestamp; kinds include description, summary, invitation, change notice, document; producer is `superhuman_go` or `organizer` (organizer edit of Go output) |
 | Artifact | `event_id`, `event_revision`, `kind`, Storage path, provider design/document ID, exported-version ID/hash, current URL/access policy; no mixed-revision distribution |
 | Provider binding | event + provider + account/target + remote ID; store Calendar event ID, Gmail draft/message/thread IDs and sent state, Canva design ID and export revision |
 | Operation | `id`, event/revision, kind, idempotency key, authorization/approval reference, state, attempts, error code, provider receipt; durable queue/outbox |

@@ -14,7 +14,6 @@ describe("structured Go output placement", () => {
       "document",
       "flyer_alt_text",
       "change_notice",
-      "notion_note",
       "flyer_brief",
     ];
     // Synthetic tool-output fixtures. These do not test natural-language understanding in Go.
@@ -38,10 +37,7 @@ describe("structured Go output placement", () => {
     expect(groups.inclusion.map((c) => c.kind)).toEqual([
       "plain_language_summary",
     ]);
-    expect(groups.documents.map((c) => c.kind)).toEqual([
-      "event_document",
-      "notion_note",
-    ]);
+    expect(groups.documents.map((c) => c.kind)).toEqual(["event_document"]);
     expect(groups.distribution.map((c) => c.kind)).toEqual([
       "invitation",
       "change_notice",
@@ -91,7 +87,7 @@ describe("structured Go output placement", () => {
         content: [{ ...snapshot.content[0], subject: { text: "wrong type" } }],
       }),
     ).toThrow(/contract/);
-    expect(Object.keys(contentDefinitions)).toHaveLength(9);
+    expect(Object.keys(contentDefinitions)).toHaveLength(8);
   });
 });
 
