@@ -2,7 +2,17 @@
 
 ## Free native hosting: no VPS or Docker required
 
-**Prepared 2026-10-16; not deployed.** Keep Vercel for the frontend and the existing
+**Service created 2026-10-16; application activation pending.** Stable backend URL:
+[superhuman-go-event-backend.onrender.com](https://superhuman-go-event-backend.onrender.com).
+[Render dashboard](https://dashboard.render.com/web/srv-db9ccb7btjjs73b6pv50), workspace
+`Grammarly Hackathon`, service `srv-db9ccb7btjjs73b6pv50`, Free/Oregon, auto-deploy off.
+The first build used Render's default Python 3.14 because the service API has no
+rootDir parameter; it failed before startup because the project requests Python 3.12
+and managed downloads are disabled. Root `.python-version` now selects native 3.12
+for both API-created/root builds and the Blueprint's backend-root build. This URL is
+reserved; do not mark the event API live until startup and authenticated checks pass.
+
+Keep Vercel for the frontend and the existing
 Supabase project for Auth, data and files. Deploy the existing Python/FastAPI/MCP
 process as a native web service. No database move or application rewrite is needed.
 
@@ -39,8 +49,8 @@ uv run --project backend --frozen --env-file backend/.env python -m hackathon_ba
 
 ### Render → Vercel → Go
 
-1. After composition passes, connect the GitHub repo in Render and create a Blueprint
-   from `render.yaml`; verify **Free** before creating it. Set existing `SUPABASE_URL`,
+1. Use the existing Render service above. To reproduce in another account, create a
+   Blueprint from `render.yaml` and verify **Free**. Set existing `SUPABASE_URL`,
    `SUPABASE_PUBLISHABLE_KEY`, server-only `SUPABASE_SERVICE_ROLE_KEY` and
    `CREDENTIAL_ENCRYPTION_KEY` in Render. This chat's connector is management access,
    not a backend service key. Preserve the encryption key across deployments; rotation
@@ -51,7 +61,7 @@ uv run --project backend --frozen --env-file backend/.env python -m hackathon_ba
    server-side and organizer-scoped. Do not log credentials or private replies.
 3. Deploy and verify HTTPS `/api/health`, `/api/config` and `/openapi.json`. Check
    event/task routes and authenticated two-account isolation; scaffold health alone
-   is insufficient. No server/account has been provisioned by this configuration.
+   is insufficient. Use the existing service above rather than creating a duplicate.
 4. Vercel root directory: `frontend`. Set server-only
    `BACKEND_ORIGIN=https://BACKEND-HOST` and public build variable
    `VITE_PUBLIC_MCP_URL=https://BACKEND-HOST/mcp`; redeploy. Verify frontend `/api/config`
@@ -126,3 +136,4 @@ The [C++ runner](../inference/README.md) uses ONNX Runtime. Before promoting a P
 ## Verification boundaries
 
 Local source checks verify UI behavior, REST endpoints, authenticated MCP protocol, and connector schema. Docker images, DNS, TLS, live Go installation, and model performance need their own runtime checks. Record the results actually observed; a passing SDK validation does not prove a reachable server.
+during cutover. Migration does not reset data or resend invitations.
