@@ -2,6 +2,8 @@
 
 Owner: Member 2. Status: **planning baseline, not implemented API**. Members 1/3/4 read this and propose adjustments in their own contexts; agree changes before relying on them. Existing `/api/health`, `/api/status`, and MCP scaffold behavior must stay functional during integration.
 
+**Agreed product/interface additions, 2026-10-16:** the team lead's Go-first workflow retains manual editing and requires authorized create/update task/event MCP tools over the same canonical repository. Member 3 owns their registration. Go creation is separate from organizer publish approval. Members 3/4 proposed matching asset-prose kinds below; Member 2 accepts and implements those names and their supplied repository/Storage ports. The exact standalone-task and REST wire schemas are exported from `hackathon_backend.api.schema` and recorded in [Member 2's context](contexts/02_BACKEND_SUPABASE.md); the frontend's different proposed `WorkspaceEvent` wire model is **not yet agreed or enabled**. This document does not imply those factories are registered in the running scaffold.
+
 ## Canonical records
 
 | Record | Initial fields and invariants |
@@ -16,6 +18,8 @@ Owner: Member 2. Status: **planning baseline, not implemented API**. Members 1/3
 | RSVP | invitee/event, `attending/maybe/not_attending/no_response/needs_review`, source, source message/Calendar ID, observed time, event revision; preserve provenance rather than silently overwriting conflicts |
 
 `owner_id` is taken from validated identity, never trusted from request JSON. OAuth tokens must be encrypted/server-held and scoped to the correct account. Schema/migrations/RLS are Member 2's responsibility; 3/4 use repository interfaces and request additions.
+
+The agreed Go asset-prose kinds are `flyer_brief`, `flyer_copy`, `event_document`, `plain_language_summary`, and `flyer_alt_text`, in addition to the original kinds. `producer=superhuman_go` is asserted only through the authenticated server workflow; browser edits retain `producer=organizer`. A producer label does not establish a real Go run without execution evidence. See Members 3/4's concrete adapters and [the Storage/registration handoff](../supabase/README.md).
 
 ## REST surface to agree first
 
