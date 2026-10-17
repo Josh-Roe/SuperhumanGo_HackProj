@@ -42,18 +42,23 @@ export function ProviderCallbackNotice() {
   );
 }
 
+const providerServices: Record<Provider, string> = {
+  google: "Gmail · Google Calendar",
+  canva: "Flyers",
+};
 const providerScope: Record<Provider, string> = {
-  google: "Calendar invitations and Gmail drafts are sent from this account.",
-  canva: "Go creates and exports your flyer in this Canva account.",
+  google: "Invitations and Calendar events are sent from this account.",
+  canva: "Go creates and exports your flyers in this Canva account.",
 };
 
+/** One service row; without an organizer session it explains why it can't connect yet. */
 export function ProviderConnection({
   provider,
   accessToken,
   navigate = (url) => window.location.assign(url),
 }: {
   provider: Provider;
-  accessToken: string;
+  accessToken?: string;
   navigate?: (url: string) => void;
 }) {
   const name = providerNames[provider];
@@ -61,9 +66,9 @@ export function ProviderConnection({
     "loading",
   );
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
+    if (!accessToken) return;
     let active = true;
     loadConnection(provider, accessToken).then(
       (value) => active && setStatus(value),
@@ -78,30 +83,48 @@ export function ProviderConnection({
     };
   }, [provider, accessToken, name]);
   const connected = typeof status === "object" && status.connected;
+  const [label, tone] = !accessToken
+    ? ["Sign in to connect", "neutral"]
+    : busy
+      ? [`Opening ${name}…`, "neutral"]
+      : status === "loading"
+        ? ["Checking…", "neutral"]
+        : status === "error"
+          ? ["Status unknown", "warning"]
+          : status.connected
+            ? ["Connected", "success"]
+            : ["Not connected", "warning"];
   return (
-    <section className="panel" aria-labelledby={`${provider}-connection`}>
-      <h2 id={`${provider}-connection`}>{name} account</h2>
-      <p className="muted">{providerScope[provider]}</p>
-      <p role="status">
-        {status === "loading"
-          ? `Checking ${name} connection…`
-          : status === "error"
-            ? `${name} connection status unknown.`
-            : status.connected
-              ? `Connected${status.email ? ` as ${status.email}` : ""}.`
-              : "Not connected."}
-        {message && ` ${message}`}
-      </p>
+    <div
+      className="connection-row"
+      role="group"
+      aria-labelledby={`${provider}-connection`}
+    >
+      <span className={`connection-logo ${provider}`} aria-hidden="true">
+        {name[0]}
+      </span>
+      <div className="connection-copy">
+        <strong id={`${provider}-connection`}>{name}</strong>
+        <span className="connection-services">
+          {providerServices[provider]}
+        </span>
+        <span className="small muted">
+          {connected && status.email ? `Connected as ${status.email}. ` : ""}
+          {providerScope[provider]}
+        </span>
+      </div>
+      <span className={`badge ${tone}`} role="status">
+        {label}
+      </span>
       <button
-        className="secondary"
-        disabled={busy}
+        className={connected ? "secondary" : "primary"}
+        disabled={busy || !accessToken}
         onClick={async () => {
+          if (!accessToken) return;
           setBusy(true);
           setError("");
           try {
-            const url = await startConnection(provider, accessToken);
-            setMessage(`Opening ${name}…`);
-            navigate(url);
+            navigate(await startConnection(provider, accessToken));
           } catch (err) {
             setError(failure(err, `Could not start the ${name} connection.`));
             setBusy(false);
@@ -110,7 +133,46 @@ export function ProviderConnection({
       >
         {connected ? `Reconnect ${name}` : `Connect ${name}`}
       </button>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p className="connection-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Always-present home for the organizer's own provider accounts (Settings). */
+export function ConnectedServices({
+  accessToken,
+  navigate,
+}: {
+  accessToken?: string;
+  navigate?: (url: string) => void;
+}) {
+  return (
+    <section
+      className="panel settings-connections"
+      aria-labelledby="connected-services"
+    >
+      <h2 id="connected-services">Connected services</h2>
+      <p className="muted">
+        Connect your own accounts once. Go needs them when it sends invitations
+        or makes a flyer, and it can’t open a sign-in page mid-task.
+      </p>
+      {!accessToken && (
+        <p className="notice small">
+          Connect your organizer workspace above to link these accounts.
+        </p>
+      )}
+      {(["google", "canva"] as const).map((provider) => (
+        <ProviderConnection
+          key={provider}
+          provider={provider}
+          accessToken={accessToken}
+          navigate={navigate}
+        />
+      ))}
     </section>
   );
 }

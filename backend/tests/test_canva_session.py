@@ -142,6 +142,8 @@ def test_real_mcp_sdk_http_handshake_discovery_call_and_close_with_fake_server()
             transport=httpx.MockTransport(server),
         ) as scoped:
             assert scoped.tool_names == {"get-design": "get-design"}
+            # MCP credentials must not be reused at the REST export endpoint.
+            assert scoped.adapter(owner_id="fixture-owner").export_jobs is None
             result = await scoped.call_tool("get-design", {"design_id": "D-synthetic"})
             assert result.content[0].text == "Synthetic test result"
 

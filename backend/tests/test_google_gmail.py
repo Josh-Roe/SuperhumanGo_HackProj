@@ -103,3 +103,27 @@ def test_server_error_is_safe():
         asyncio.run(api(handler).send_draft("owner-1", "d1"))
     assert caught.value.status == 500
     assert "secret" not in str(caught.value)
+
+
+def test_find_by_message_id_returns_exact_header_matches_with_draft_ids():
+    wanted = "evt-1-r2-c3@example.com"
+    metadata = {
+        "m1": {"id": "m1", "threadId": "t1", "labelIds": ["DRAFT"], "header": f"<{wanted}>"},
+        "m2": {"id": "m2", "threadId": "t1", "labelIds": ["TRASH"], "header": f"<{wanted}>"},
+        "m3": {"id": "m3", "threadId": "t2", "labelIds": ["SENT"], "header": "<other@x>"},
+    }
+
+    def handler(request: httpx.Request):
+        if request.url.path in (f"{PREFIX}/messages", f"{PREFIX}/drafts"):
+            assert request.url.params["q"] == f"rfc822msgid:{wanted}"
+        if request.url.path == f"{PREFIX}/messages":
+            return httpx.Response(200, json={"messages": [{"id": m} for m in metadata]})
+        if request.url.path == f"{PREFIX}/drafts":
+            return httpx.Response(200, json={"drafts": [{"id": "d1", "message": {"id": "m1"}}]})
+        found = metadata[request.url.path.rsplit("/", 1)[1]]
+        headers = [{"name": "Message-ID", "value": found["header"]}]
+        return httpx.Response(200, json={**found, "payload": {"headers": headers}})
+
+    result = asyncio.run(api(handler).find_by_message_id("owner-1", f"<{wanted}>"))
+
+    assert result == [{"id": "m1", "threadId": "t1", "labelIds": ["DRAFT"], "draft_id": "d1"}]
