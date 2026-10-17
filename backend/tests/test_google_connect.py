@@ -2,6 +2,7 @@
 
 import base64
 import json
+from dataclasses import replace
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -54,7 +55,12 @@ class Clock:
 
 
 @pytest.fixture
-def env():
+def settings():
+    return SETTINGS
+
+
+@pytest.fixture
+def env(settings):
     vault, clock, exchanged = FakeVault(), Clock(), []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -68,22 +74,22 @@ def env():
             exchanged.append(form)
             if form["code"] == ["bad"]:
                 return httpx.Response(400, json={"error": "invalid_grant"})
-            return httpx.Response(
-                200,
-                json={
-                    "access_token": "access",
-                    "expires_in": 3600,
-                    "refresh_token": "refresh-" + form["code"][0],
-                    "scope": "openid email",
-                    "id_token": id_token("organizer@example.com"),
-                },
-            )
+            grant = {
+                "access_token": "access",
+                "expires_in": 3600,
+                "refresh_token": "refresh-" + form["code"][0],
+                "scope": "openid email",
+                "id_token": id_token("organizer@example.com"),
+            }
+            if form["code"] == ["no-refresh"]:
+                del grant["refresh_token"]
+            return httpx.Response(200, json=grant)
         raise AssertionError(f"unexpected request {request.url}")
 
     app = FastAPI()
     app.include_router(
         google_connect_router(
-            SETTINGS,
+            settings,
             vault,
             states=OAuthStates(ttl=600, now=clock),
             transport=httpx.MockTransport(handler),
@@ -168,4 +174,39 @@ def test_denied_or_failed_exchange_consumes_state_and_stores_nothing(env):
     assert (
         client.get("/api/google/callback", params={"state": failed, "code": "x"}).status_code == 400
     )
+    assert not vault.saved
+
+
+APP = "https://app.example"
+
+
+@pytest.mark.parametrize("settings", [replace(SETTINGS, app_url=APP)])
+def test_callback_redirects_to_app_url_on_success_without_secrets(env):
+    client, vault, *_ = env
+    state = connect(client)
+    response = client.get(
+        "/api/google/callback", params={"state": state, "code": "abc"}, follow_redirects=False
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{APP}/?google=connected"
+    assert response.headers["cache-control"] == "no-store"
+    assert vault.saved[OWNER_A][1] == "refresh-abc"
+
+
+@pytest.mark.parametrize("settings", [replace(SETTINGS, app_url=APP)])
+@pytest.mark.parametrize(
+    ("params", "reason"),
+    [
+        ({"state": "forged", "code": "abc"}, "invalid_state"),
+        ({"error": "access_denied"}, "denied"),
+        ({"code": "bad"}, "exchange_failed"),
+        ({"code": "no-refresh"}, "no_refresh_token"),
+    ],
+)
+def test_callback_redirects_failures_with_reason_code(env, params, reason):
+    client, vault, *_ = env
+    params = {"state": connect(client), **params}
+    response = client.get("/api/google/callback", params=params, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{APP}/?google=error&reason={reason}"
     assert not vault.saved
