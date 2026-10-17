@@ -142,11 +142,11 @@ User decision, 2026-10-16: finish every coding task before writing any documenta
 
 | User | Coding | Manual | Docs (after all coding) |
 | --- | --- | --- | --- |
-| **1** | A14, A1, A10, A18, A11, A19, A9, A16, A17 (the lanes below) | M3 Google OAuth client, M4 Go connector release | — |
+| **1** | A14, A1, A10, A18, A11, A19, A9, A16, A17 (the lanes below) | M3 Google OAuth client, M4 Go connector release, M5 organizer accounts and test inboxes | — |
 | **2** | A2 live Supabase check; review and apply the migrations from A10 and A11 | M1 Render env, M2 Vercel env, M11 Gemini/Notion migration | A3 contract docs, README |
-| **3** | A15 `?event=` deep link; review the UI from A16 and A17 | M5 organizer accounts and test inboxes, M7 Grammarly proof, M9 screen-reader audit | — |
+| **3** | A15 `?event=` deep link | M7 Grammarly proof, M9 screen-reader audit (on a local build; no deploy needed) | — |
 | **4** | A7 live Canva export, A8 Canva revision on change | M6 Canva OAuth client, M10 Devpost | A12 pitch |
-| **All** | | M8 live rehearsal (User 3 drives it, everyone joins) | |
+| **All** | | M8 live rehearsal (User 2 drives it, everyone joins) | |
 
 **User 1's parallel lanes.** Each lane touches its own files, so the lanes can run as separate agent sessions at the same time. Within a lane, go top to bottom. Every item can be built and tested locally against mocks now. The manual task listed under "Live check waits on" only gates the live check, so leave the item `[~]` until it lands (rule 4). Each lane writes its own timestamped migration file, and User 2 applies them.
 
@@ -169,4 +169,4 @@ All lanes share one checkout on `main` (no worktrees, per the user's CLAUDE.md).
 - M1 and M2 (User 2) and M3 (User 1): together they gate live Google and the website.
 - M11 (User 2): it gates live L2 work and A2.
 
-After those come M4 (User 1) and M5 (User 3). M7 and M9 can happen whenever someone is free. M10 depends on the M8 recording.
+After those come M4 and M5 (User 1). User 3's tasks have no dependencies on anyone, so User 3 can start all of them now. M7 and M9 can happen whenever someone is free. M10 depends on the M8 recording.
