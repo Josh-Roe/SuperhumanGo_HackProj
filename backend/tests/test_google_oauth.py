@@ -172,6 +172,25 @@ def test_vault_token_source_not_connected_and_revoked():
         asyncio.run(source.access_token("o"))
 
 
+def test_vault_token_source_does_not_cache_a_grant_forgotten_mid_refresh():
+    vault = FakeVault("rt-old", "o@x.com")
+    source: VaultTokenSource
+
+    def handler(request):
+        refresh_token = parse_qs(request.content.decode())["refresh_token"][0]
+        if refresh_token == "rt-old":  # organizer reconnects while this refresh is in flight
+            vault.refresh_token = "rt-new"
+            source.forget("o")
+        return httpx.Response(
+            200, json={"access_token": f"for-{refresh_token}", "expires_in": 3600}
+        )
+
+    source = VaultTokenSource(CONFIG, vault, httpx.MockTransport(handler))
+    assert asyncio.run(source.access_token("o")) == "for-rt-old"  # that caller already had it
+
+    assert asyncio.run(source.access_token("o")) == "for-rt-new"
+
+
 def test_static_token_source():
     source = StaticTokenSource({"o": "static-secret"}, {"o": "o@x.com"})
     assert asyncio.run(source.access_token("o")) == "static-secret"
