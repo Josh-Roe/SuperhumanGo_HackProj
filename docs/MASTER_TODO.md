@@ -73,7 +73,7 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
 ### Live proof and submission
 
 - [ ] **M8 — Full live rehearsal on Supabase.** Everyone. Use authorized test inboxes only. Steps: ask Go to create an event (open its `dashboard_url`) → prepare assets → website inclusion review → website approval → Go `execute_distribution` → change the time and location through Go or the website → re-prepare, approve and execute → a second test account replies "yes" and accepts in Calendar → `sync_rsvps`/`list_rsvps`. Capture receipt IDs (Calendar event ID, Gmail message/thread IDs, Canva design/export IDs, revisions) in the 03 context. Requires M1–M6 and A2, A3 and A5.
-- [ ] **M9 — Accessibility audit.** Owner 1. ~~Real phone check and~~ a screen-reader pass on the deployed site.
+- [~] **M9 — Accessibility audit.** **Claimed:** User 3, 2026-10-16 18:25 PT, `main`. Owner 1. ~~Real phone check and~~ a screen-reader pass on the deployed site.
   - Note (user decision, 2026-10-16): phones are not a target; desktop only. Phone check dropped.
 - [ ] **M10 — Devpost by 8 PM PT.** Team lead. Fill in: name (still undecided), primary track (working pick: Productivity), description, agent-integration write-up, demo video recorded from M8, repo plus working demo link and setup steps, all four member names, tools and credits including the **pre-existing scaffold disclosure** (HACKATHON.md). Before submitting, check that no link exposes keys or private data. Prepare the 2-minute live pitch ([PRESENTATION.md](PRESENTATION.md)).
 
