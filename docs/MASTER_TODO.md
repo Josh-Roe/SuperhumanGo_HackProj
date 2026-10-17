@@ -11,7 +11,7 @@ The user has authorized every member's agent to edit this file. This is an excep
 3. **Status markers.** `- [ ]` open, `- [~]` claimed or in progress, `- [x]` done, `- [!]` blocked. A blocked item gets `**Blocked:** <exact missing input, e.g. "Render env SUPABASE_SERVICE_ROLE_KEY unset"> → needs <M-item or Member N>`.
 4. **Done means evidence.** Mark `[x]` only after the item's verify step passes. Append `**Done:** <commit SHA or PR> — <local | mocked | live>: <one-line proof>`. Examples: `pytest 320 passed`, `curl /api/health → 200`, `Calendar event id abc123 same after rev 2`. Mocked or local evidence never completes an item whose wording says live. Leave it `[~]` and say what remains.
 5. **Edit only your item's lines.** Don't rewrite, reorder or reword other items. If you think another item is wrong, add an indented `- Note (Member N, date): …` under it.
-6. **Adding tasks.** New tasks take the next free ID: **next manual = M17, next agent = A26**. Bump these numbers in the same edit. IDs are permanent: never renumber or reuse one. Put the task under the right owner heading with files, change and verify step. Cite where the need came from (spec line, context handoff, failing check). Add it to §4 if it is on the critical path.
+6. **Adding tasks.** New tasks take the next free ID: **next manual = M17, next agent = A27**. Bump these numbers in the same edit. IDs are permanent: never renumber or reuse one. Put the task under the right owner heading with files, change and verify step. Cite where the need came from (spec line, context handoff, failing check). Add it to §4 if it is on the critical path.
 7. **Never delete tasks.** If a task is obsolete, mark it `[x]` and strike it through: `~~text~~ **Dropped:** <reason, who decided>`. Cutting scope listed in §4 needs the user's or team lead's decision. Record who made it.
 8. **Keep §1 true.** When your evidence changes a row in the Current state table, update that row and the snapshot line (date + main SHA).
 9. **Joining with prior work (one-time reconcile).** If you already did work for your member before reading this file, do this before anything else, in a single commit (`todo: reconcile Member N`):
@@ -72,6 +72,8 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
   - Note (User 1, 2026-10-16 18:55 PT): cannot be verified with the publishable key (no CLI or service key on User 1's machine). Needs User 2 to confirm it is applied.
 
 ### Superhuman Go
+
+- [~] **A26 — Go write confirmation compatibility.** **Claimed:** Member 1 / Tanay, 2026-10-16, main, explicit user authorization. Actual Go list_events succeeds but create_event confirmation cannot display. Remove schema references/nullable array unions from organizer tools while preserving validation, ownership, idempotency and write confirmation; test and verify actual Go draft creation after backend deploy.
 
 - [x] **A25 — Copy personal Go key.** **Claimed:** Member 1 (Tanay), 2026-10-16, main. User cannot copy the masked website key. Add explicit clipboard copy and reveal/select fallback, verify with synthetic token tests, deploy clean main and verify copy controls without reading credentials. **Done:** `1351c1c` — mocked clipboard success/denial regression, 78 tests/lint/build; live Production dpl_8La954hGBBUwFJ4zDiHAmHuBLWXT READY, served JS contains Copy/Show key and assets/health/config 200. Organizer performs actual secret copy.
 
