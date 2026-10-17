@@ -1,0 +1,33 @@
+# Render Blueprint for the backend. Secrets are set in the Render dashboard
+# (sync: false); see docs/MASTER_TODO.md M1 for the values to use.
+services:
+  - type: web
+    name: superhuman-go-event-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    envVars:
+      # Defaults to RENDER_EXTERNAL_HOSTNAME when unset.
+      - key: APP_DOMAIN
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: MCP_AUTH_TOKEN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # https://<host>/api/google/callback
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
