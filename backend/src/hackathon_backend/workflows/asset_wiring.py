@@ -195,24 +195,40 @@ class CanvaSessions(Protocol):
 class VaultCanvaSessions:
     """Opens Canva's remote MCP with the organizer's server-held access token.
 
-    No token → integration_not_connected. Obtaining/refreshing that token (Canva MCP OAuth
-    client registration) is not implemented anywhere yet; see the handoff in the report.
+    No token → integration_not_connected. With `tokens` (Canva Connect OAuth, see
+    `workflows/canva_connect.py`) an expiring access token is refreshed first; a rejected
+    refresh also reports integration_not_connected so the organizer reconnects.
     """
 
-    def __init__(self, vault: SecretVault, connect: Callable[..., Any] | None = None) -> None:
+    def __init__(
+        self,
+        vault: SecretVault,
+        connect: Callable[..., Any] | None = None,
+        tokens: Any | None = None,
+    ) -> None:
         if connect is None:
             from hackathon_backend.providers.canva.session import connect_canva
 
             connect = connect_canva
         self.vault = vault
         self._connect = connect
+        self._tokens = tokens
 
     async def _token(self, owner_id: str) -> str | None:
+        if self._tokens is not None:
+            try:
+                return await self._tokens.access_token(owner_id)
+            except CanvaError:
+                raise WorkflowError(
+                    "integration_not_connected", "Canva authorization expired; reconnect Canva"
+                ) from None
         record = await self.vault.get_secret(owner_id, CANVA_SECRET)
         token = (record or {}).get("access_token")
         return token if isinstance(token, str) and token else None
 
     async def connected(self, owner_id: str) -> bool:
+        if self._tokens is not None:
+            return await self._tokens.connected(owner_id)
         return await self._token(owner_id) is not None
 
     @asynccontextmanager
@@ -845,8 +861,10 @@ def register_asset_services(
 ) -> None:
     """Supabase-mode composition, called from main.py. Never fakes a provider connection."""
     from hackathon_backend.auth.identity import authenticate
+    from hackathon_backend.providers.canva.oauth import CanvaTokens
     from hackathon_backend.repositories.assets import SupabaseAssetStorage
     from hackathon_backend.repositories.transport import Database
+    from hackathon_backend.workflows.canva_connect import canva_oauth_config
 
     database = Database(settings, admin=True)
     vault = None
@@ -862,7 +880,9 @@ def register_asset_services(
     coordinator = AssetCoordinator(
         events.store,
         storage_for=storage_for,
-        canva=VaultCanvaSessions(vault) if vault else None,
+        canva=VaultCanvaSessions(vault, tokens=CanvaTokens(vault, canva_oauth_config(settings)))
+        if vault
+        else None,
         flyers=flyers,
         holidays=HolidayCalendar(),
     )
