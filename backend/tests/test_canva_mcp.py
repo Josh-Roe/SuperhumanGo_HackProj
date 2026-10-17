@@ -78,6 +78,85 @@ def test_poll_policy_new_token_and_completion():
         asyncio.run(adapter.poll_creation(event(2), second, now=NOW + timedelta(seconds=50)))
 
 
+def test_creation_shortlink_is_normalized_by_design_id_without_following_redirects():
+    session = Session(
+        {
+            "create-design": [pending()],
+            "get-create-design-async-job": [
+                {
+                    "status": "completed",
+                    "job_id": "test-job",
+                    "design": {
+                        "id": "D-synthetic",
+                        "url": "https://canva.link/synthetic",
+                        "edit_url": "https://canva.link/synthetic",
+                    },
+                }
+            ],
+            "get-design": [
+                {
+                    "design": {
+                        "id": "D-synthetic",
+                        "urls": {"edit_url": design().edit_url, "view_url": design().view_url},
+                    }
+                }
+            ],
+        }
+    )
+    adapter = CanvaMCPAdapter(session, owner_id="fixture-owner")
+    job = asyncio.run(adapter.create_flyer(event(), go(event()), now=NOW))
+    done = asyncio.run(adapter.poll_creation(event(), job, now=NOW + timedelta(seconds=15)))
+    assert done.design.edit_url == design().edit_url and done.design.view_url == design().view_url
+    assert session.calls[-1][0] == "get-design"
+    assert session.calls[-1][1]["design_id"] == "D-synthetic"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://evil.example/design",
+        "https://canva.link.evil.example/a",
+        "https://user:secret@canva.link/a",
+        "http://canva.link/a",
+        "https://www.canva.com:8443/a",
+    ],
+)
+def test_untrusted_completion_link_does_not_trigger_lookup_or_http_redirect(url):
+    session = Session(
+        {"create-design": [{"status": "completed", "design": {"id": "D-synthetic", "url": url}}]}
+    )
+    with pytest.raises(CanvaError, match="design_url"):
+        asyncio.run(
+            CanvaMCPAdapter(session, owner_id="fixture-owner").create_flyer(event(), go(event()))
+        )
+    assert len(session.calls) == 1
+
+
+def test_shortlink_metadata_must_belong_to_created_design():
+    session = Session(
+        {
+            "create-design": [
+                {
+                    "status": "completed",
+                    "design": {"id": "D-synthetic", "url": "https://canva.link/synthetic"},
+                }
+            ],
+            "get-design": [
+                {
+                    "design": {
+                        "id": "another-design",
+                        "urls": {"edit_url": design().edit_url, "view_url": design().view_url},
+                    }
+                }
+            ],
+        }
+    )
+    with pytest.raises(CanvaError, match="identity_mismatch"):
+        asyncio.run(
+            CanvaMCPAdapter(session, owner_id="fixture-owner").create_flyer(event(), go(event()))
+        )
+
+
 def test_quota_failure_is_returned_without_retry():
     session = Session(
         {
@@ -143,7 +222,21 @@ def editing_fixture(extra_text=""):
         {
             "start-editing-transaction": [opened],
             "perform-editing-operations": [
-                {"thumbnails": [{"url": "https://example.org/preview"}]}
+                {
+                    "thumbnails": [
+                        {"url": "https://design-manipulation-download.canva.com/preview"}
+                    ],
+                    "edit_operation_results": [
+                        {
+                            "status": "success",
+                            "operation_info": {
+                                "type": "replace_text",
+                                "element_id": mapping.element_id,
+                            },
+                        }
+                        for mapping in mappings
+                    ],
+                }
             ],
             "commit-editing-transaction": [{"status": "committed"}],
             "get-design-content": [
@@ -203,6 +296,16 @@ def test_preview_tampering_and_newer_event_rejected_before_commit():
     altered = preview.model_copy(update={"expected": {**preview.expected, "location": "Wrong"}})
     with pytest.raises(PermissionError):
         asyncio.run(adapter.commit_update(new, altered, approval))
+    with pytest.raises(PermissionError):
+        asyncio.run(
+            adapter.commit_update(
+                new,
+                preview.model_copy(
+                    update={"thumbnail_urls": ("https://media.canva.com/another-preview",)}
+                ),
+                approval,
+            )
+        )
     with pytest.raises(StaleRevisionError):
         asyncio.run(adapter.commit_update(event(3), preview, approval))
     assert not any(name == "commit-editing-transaction" for name, _ in session.calls)
@@ -253,3 +356,129 @@ def test_verification_rejects_partial_checks_and_safe_tool_errors():
     with pytest.raises(CanvaError, match="canva_tool_failed") as error:
         asyncio.run(adapter.verify_text(event(), design(), event().flyer_fields()))
     assert "secret" not in str(error.value)
+
+
+def test_partial_edit_operation_failure_is_cancelled_without_preview_or_commit():
+    session = Session(
+        {
+            "start-editing-transaction": [
+                {
+                    "transaction": {"transaction_id": "txn"},
+                    "richtexts": [
+                        {"element_id": role, "page_index": 1, "regions": [{"text": text}]}
+                        for role, text in event().flyer_fields().items()
+                    ],
+                }
+            ],
+            "perform-editing-operations": [{"edit_operation_results": [{"status": "failed"}]}],
+            "cancel-editing-transaction": [{}],
+        }
+    )
+    mappings = tuple(
+        ElementMapping(role=role, element_id=role, previous_text=text)
+        for role, text in event().flyer_fields().items()
+    )
+    with pytest.raises(CanvaError, match="operation_failed"):
+        asyncio.run(
+            CanvaMCPAdapter(session, owner_id="fixture-owner").stage_update(
+                event(2), design(), go(event(2), "flyer_copy"), mappings
+            )
+        )
+    assert session.calls[-1][0] == "cancel-editing-transaction"
+
+
+def test_update_preview_public_metadata_excludes_transaction_handle():
+    adapter, session, new, preview, _ = editing_fixture()
+    public = preview.preview_metadata()
+    assert "transaction_id" not in public and public["event_revision"] == 2
+    asyncio.run(adapter.cancel_update(event(3), preview))
+    assert session.calls[-1][0] == "cancel-editing-transaction"
+
+
+def review_fixture(*, changed_version=False):
+    metadata = {
+        "design": {
+            "id": "D-synthetic",
+            "updated_at": 100,
+            "page_count": 1,
+            "thumbnail": {"url": "https://media.canva.com/synthetic-preview"},
+        }
+    }
+    newer = {"design": {**metadata["design"], "updated_at": 101}} if changed_version else metadata
+    session = Session(
+        {
+            "get-design": [metadata, newer],
+            "get-design-content": [{"text": "\n".join(event().flyer_fields().values())}] * 2,
+        }
+    )
+    adapter = CanvaMCPAdapter(session, owner_id="fixture-owner")
+    preview = asyncio.run(adapter.preview_flyer(event(), design(), now=NOW))
+    approval = Approval(
+        owner_id="fixture-owner",
+        event_id=event().id,
+        event_revision=1,
+        preview_digest=preview.digest,
+        approved_at=NOW,
+        approval_id="synthetic-approval",
+    )
+    return adapter, session, preview, approval
+
+
+def test_initial_flyer_requires_exact_organizer_review_and_readback():
+    adapter, session, preview, approval = review_fixture()
+    assert preview.preview_metadata()["thumbnail_urls"] == preview.thumbnail_urls
+    assert asyncio.run(adapter.approve_flyer(event(), preview, approval)).organizer_reviewed
+    assert all(
+        name not in {"commit-editing-transaction", "create-design"} for name, _ in session.calls
+    )
+
+
+def test_manual_edit_after_preview_requires_new_review():
+    adapter, _, preview, approval = review_fixture(changed_version=True)
+    with pytest.raises(CanvaError, match="changed_since_preview"):
+        asyncio.run(adapter.approve_flyer(event(), preview, approval))
+
+
+def test_changed_review_preview_or_event_revision_cannot_be_approved():
+    adapter, session, preview, approval = review_fixture()
+    with pytest.raises(PermissionError):
+        asyncio.run(
+            adapter.approve_flyer(
+                event(),
+                preview.model_copy(update={"thumbnail_urls": ("https://example.com/unrelated",)}),
+                approval,
+            )
+        )
+    with pytest.raises(StaleRevisionError):
+        asyncio.run(adapter.approve_flyer(event(2), preview, approval))
+    assert len(session.calls) == 2
+
+
+@pytest.mark.parametrize(
+    "status,state", [("in_progress", "pending"), ("failed", "failed"), ("success", "completed")]
+)
+def test_export_receipts_preserve_job_id_without_serializing_signed_download_url(status, state):
+    from hackathon_backend.providers.canva import VerifiedDesign
+
+    session = Session(
+        {
+            "export-design": [
+                {
+                    "job": {
+                        "id": "export-synthetic",
+                        "status": status,
+                        "urls": [
+                            "https://export-download.canva.com/synthetic.png?signature=private"
+                        ],
+                    }
+                }
+            ]
+        }
+    )
+    receipt = asyncio.run(
+        CanvaMCPAdapter(session, owner_id="fixture-owner").request_png_export(
+            event(), VerifiedDesign(design=design(), state="verified", missing_roles=())
+        )
+    )
+    assert receipt.state == state and receipt.export_id == "export-synthetic"
+    assert "signature" not in receipt.model_dump_json() + repr(receipt)
