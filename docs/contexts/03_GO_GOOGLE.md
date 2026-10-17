@@ -48,7 +48,12 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
     - A Go "Add custom MCP" connector (a pack with no auth) **did** reach the same trycloudflare URL from AWS IPs and got a 401 from us.
     - Pack v2 pointed at a localhost.run tunnel got a real HTTP 502 there. The free tunnel rotated its hostname mid-test, so it is unusable.
     - Pack v3, back on trycloudflare, again failed with `<no HTTP response>`.
-  - So the failure is specific to authenticated pack requests to `trycloudflare.com`, not to all of Superhuman's traffic. Re-signing in after the domain change is still untested on v3. Next: test a stable host (ngrok static domain, named Cloudflare tunnel, or a real deploy).
+  - So the failure is specific to authenticated pack requests to `trycloudflare.com`, not to all of Superhuman's traffic.
+- **2026-10-16 | live, resolved | Go → MCP:**
+  - After re-signing in to pack v3 with the token copied with no trailing newline (`tr -d '\n' | pbcopy`), Go called `list_go_work` over the trycloudflare tunnel and returned the queued `dev-event-1` `prepare_content` item (server: `POST /mcp 200`).
+  - Likely root cause: a stray newline in the first pasted token makes the gateway fail before sending (`<no HTTP response>`, 7 ms). The domain was not blocked.
+  - Each domain change in a pack release requires the user to sign in again.
+  - Go asks for in-chat approval before each write tool (`claim_go_work`, `save_generated_content`).
 
 ## Handoffs (proposed, awaiting recipient agreement)
 
