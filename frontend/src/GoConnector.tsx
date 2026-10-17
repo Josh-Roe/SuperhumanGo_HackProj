@@ -12,6 +12,8 @@ export function GoConnector({
     useState<Awaited<ReturnType<typeof issueGoConnector>>>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [revealed, setRevealed] = useState(false);
+  const [copyMessage, setCopyMessage] = useState("");
   const tokenField = useRef<HTMLInputElement>(null);
   const createButton = useRef<HTMLButtonElement>(null);
   const hadCredential = useRef(false);
@@ -28,7 +30,7 @@ export function GoConnector({
             Your Go key
             <input
               ref={tokenField}
-              type="password"
+              type={revealed ? "text" : "password"}
               readOnly
               value={credential.token}
               onFocus={(event) => event.currentTarget.select()}
@@ -39,9 +41,39 @@ export function GoConnector({
             Copy it now: it’s hidden when you leave this page. It works until{" "}
             {new Date(credential.expires_at).toLocaleDateString()}.
           </p>
+          <div className="action-row">
+            <button
+              className="secondary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(credential.token);
+                  setCopyMessage("Key copied. Paste it only into Onrender’s API token field.");
+                } catch {
+                  setRevealed(true);
+                  tokenField.current?.focus();
+                  tokenField.current?.select();
+                  setCopyMessage("Copy is blocked. Select the revealed key and press Command+C (Mac) or Ctrl+C.");
+                }
+              }}
+            >
+              Copy key
+            </button>
+            <button
+              className="secondary"
+              onClick={() => setRevealed(!revealed)}
+              aria-pressed={revealed}
+            >
+              {revealed ? "Mask key" : "Show key"}
+            </button>
+          </div>
+          {copyMessage && <p role="status">{copyMessage}</p>}
           <button
             className="secondary"
-            onClick={() => setCredential(undefined)}
+            onClick={() => {
+              setCredential(undefined);
+              setRevealed(false);
+              setCopyMessage("");
+            }}
           >
             Hide key
           </button>

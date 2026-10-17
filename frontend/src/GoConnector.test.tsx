@@ -31,3 +31,28 @@ it("issues a personal token with the organizer session and keeps it masked and e
   expect(screen.getByRole("button", { name: "Create Go key" })).toHaveFocus();
   view.unmount();
 });
+
+it("copies the key while masked and offers manual copying when clipboard access fails", async () => {
+  const token = "go_" + "b".repeat(43);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    id: "synthetic-copy", token, expires_at: "2026-11-16T00:00:00Z",
+  }))));
+  const user = userEvent.setup();
+  const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+  render(<GoConnector accessToken="synthetic-session" />);
+  await user.click(screen.getByRole("button", { name: "Create Go key" }));
+  const field = await screen.findByLabelText("Your Go key");
+  await user.click(screen.getByRole("button", { name: "Copy key" }));
+  expect(writeText).toHaveBeenCalledWith(token);
+  expect(field).toHaveAttribute("type", "password");
+  expect(screen.getByRole("status")).toHaveTextContent("Key copied");
+  writeText.mockRejectedValueOnce(new Error("Clipboard blocked"));
+  await user.click(screen.getByRole("button", { name: "Copy key" }));
+  expect(field).toHaveAttribute("type", "text");
+  expect(field).toHaveFocus();
+  expect(screen.getByRole("status")).toHaveTextContent("Copy is blocked");
+  await user.click(screen.getByRole("button", { name: "Mask key" }));
+  expect(field).toHaveAttribute("type", "password");
+  await user.click(screen.getByRole("button", { name: "Hide key" }));
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});
