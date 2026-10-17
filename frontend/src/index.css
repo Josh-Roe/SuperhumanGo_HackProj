@@ -1,18 +1,18 @@
 :root {
   font-family:
     -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
-  color: #19354f;
-  background: #edf5fc;
+  color: #363432;
+  background: #f6f5f3;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   font-weight: 400;
   font-size: 14px;
   line-height: 1.6;
-  --ink: #19354f;
-  --muted: #536c83;
-  --blue: #1465cf;
-  --blue-dark: #0d4fa9;
+  --ink: #363432;
+  --muted: #6f6c67;
+  --blue: #75726e;
+  --blue-dark: #5e5b58;
   --line: rgba(100, 146, 188, 0.22);
   --glass: rgba(255, 255, 255, 0.72);
   --glass-edge: rgba(255, 255, 255, 0.96);
@@ -53,7 +53,7 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 3px solid #1465cf;
+  outline: 3px solid #75726e;
   outline-offset: 4px;
 }
 h1,
@@ -94,21 +94,21 @@ select {
   width: 100%;
   min-width: 0;
   background: rgba(255, 255, 255, 0.78);
-  border: 1px solid #b7ccdf;
-  border-radius: 12px;
+  border: 1px solid #cdcbc9;
+  border-radius: 5px;
   padding: 12px 14px;
   color: var(--ink);
-  box-shadow: inset 0 2px 4px rgba(48, 87, 125, 0.025);
+  box-shadow: none;
 }
 input::placeholder,
 textarea::placeholder {
-  color: #657d92;
+  color: #807c77;
   opacity: 1;
 }
 input:hover,
 textarea:hover,
 select:hover {
-  border-color: #86add2;
+  border-color: #afaca9;
 }
 textarea {
   resize: vertical;
@@ -136,8 +136,8 @@ a {
     transform 0.18s;
 }
 ::selection {
-  background: #c4e2ff;
-  color: #143854;
+  background: #e5e2de;
+  color: #363432;
 }
 img {
   max-width: 100%;
@@ -145,4 +145,56 @@ img {
 }
 strong {
   font-weight: 600;
+}
+
+/* Editorial foundation: warm paper, dark ink, restrained terracotta. */
+:root {
+  color: #15171b;
+  background: #faf9f6;
+  --ink: #15171b;
+  --muted: #62615f;
+  --blue: #b94129;
+  --blue-dark: #97341f;
+  --line: #dedbd5;
+  --glass: #faf9f6;
+  --glass-edge: #dedbd5;
+  --glass-shadow: none;
+}
+h1,
+h2,
+h3 {
+  font-family:
+    "Iowan Old Style", "Baskerville", "Palatino Linotype", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+input,
+textarea,
+select {
+  background: #fbfaf7;
+  border-color: var(--line);
+  border-radius: 5px;
+  box-shadow: none;
+  padding: 12px 14px;
+}
+input::placeholder,
+textarea::placeholder {
+  color: #7c7974;
+}
+input:hover,
+textarea:hover,
+select:hover {
+  border-color: #aaa59b;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline-color: #a73822;
+}
+::selection {
+  background: #eed3c8;
+  color: #15171b;
 }
