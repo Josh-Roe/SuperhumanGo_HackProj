@@ -54,6 +54,16 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
   - Likely root cause: a stray newline in the first pasted token makes the gateway fail before sending (`<no HTTP response>`, 7 ms). The domain was not blocked.
   - Each domain change in a pack release requires the user to sign in again.
   - Go asks for in-chat approval before each write tool (`claim_go_work`, `save_generated_content`).
+- **2026-10-16 | live, tested | Go writing loop:**
+  - After the organizer approved the tool calls in Go chat, Go ran `claim_go_work` → `get_event` → `save_generated_content` ×3 on `dev-event-1` revision 1.
+  - Server state: the work item is `succeeded`; `invitation` (with subject), `description` and `summary` are saved as `producer: superhuman_go`, `needs_review`.
+  - The drafts keep unknowns ("not yet confirmed" for entry, step-free access, captions, diet). They contain no invitee emails, only the organizer contact.
+  - This is in-memory dev mode, not Supabase. Nothing was sent.
+- **2026-10-16 | live, tested | publish:** the organizer approved the invitation via the dev approve route, with the user's explicit send confirmation in chat. `execute_distribution` over MCP, revision 1:
+  - Operations: `calendar_upsert` created a real Google Calendar event (deterministic ID), then `gmail_draft`, then `gmail_send`, all `succeeded` with attempts=1.
+  - It was sent to the single authorized test inbox only.
+  - Retrying with the same approval reused all three receipts. Attempts stayed at 1, and the server log shows exactly one Gmail send call. Retry idempotency is verified live.
+  - Next: revise time/location → change notice → RSVP.
 
 ## Handoffs (proposed, awaiting recipient agreement)
 

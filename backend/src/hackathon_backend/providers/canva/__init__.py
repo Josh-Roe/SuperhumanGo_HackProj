@@ -266,15 +266,25 @@ class CanvaMCPAdapter:
         event: EventSnapshot,
         brief: GoContent,
         *,
+        copy: GoContent | None = None,
         now: datetime | None = None,
     ) -> CreationJob:
-        self._scope(event, brief)
+        self._scope(event, brief, *((copy,) if copy else ()))
         if brief.kind != "flyer_brief":
             raise ValueError("Expected a Go-written custom flyer brief")
+        if copy is not None and copy.kind != "flyer_copy":
+            raise ValueError("Expected Go-written displayed flyer copy")
         canonical = json.dumps(event.flyer_fields(), ensure_ascii=False)
+        displayed_copy = (
+            f"\n\nGo-written flyer text (use exactly):\n{copy.body}"
+            "\nDo not invent additional event wording."
+            if copy is not None
+            else ""
+        )
         result = await self._call(
             "create-design",
-            brief=f"{brief.body}\n\nCanonical event fields (use exactly):\n{canonical}",
+            brief=f"{brief.body}{displayed_copy}\n\n"
+            f"Canonical event fields (use exactly):\n{canonical}",
             format="Flyer (Portrait A4)",
             user_intent="Create a custom event flyer from the organizer's Go-prepared brief.",
         )

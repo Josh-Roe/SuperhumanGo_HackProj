@@ -17,10 +17,51 @@ The primary route is Superhuman Go's event-specific brief → Canva MCP `create-
 | Custom creation | User-authorized fictional sample created through this chat's Canva MCP; full metadata links and text read back. Adapter normalizes observed `canva.link` completions through `get-design` by ID. No live Go generation or native Python OAuth session is claimed. |
 | Editing / same-design update | Live sample exposed 15 editable text elements in a transaction, then inspection was cancelled without edits. Replacement/approval/commit/read-back/stale-copy behavior is locally tested with synthetic responses; no live edit commit. |
 | Export | Adapter and bounded download tests pass locally. `export-design` is documented in remote Canva MCP but is absent from this chat's exposed connector tools. A host must verify it is granted; do not claim current chat export works. |
-| Go prose | Strict producer/kind/revision contracts and queue handoff implemented. No live Go output in these tests. |
+| Go prose | Trusted-store preparation bridge and current-revision source loading tested. Member 3 reports live read, three core draft saves and authorized Calendar/Gmail publish/retry in main `341b09e`; the five asset kinds and actual asset delivery remain unverified here. |
 | Storage | Immutable paths, hash receipts and revision-CAS contract tested against a double. Supabase implementation/RLS belongs to Member 2. |
 
 Official references: [custom creation](https://www.canva.dev/docs/apps/mcp/tools/create-design/), [editing transactions](https://www.canva.dev/docs/apps/mcp/tools/start-editing-transaction/), [read-back](https://www.canva.dev/docs/apps/mcp/tools/get-design-content/), [export](https://www.canva.dev/docs/apps/mcp/tools/export-design/), [MCP tools](https://www.canva.dev/docs/apps/mcp/tools/). Tool availability in a connected chat does not install credentials or authorize a backend session.
+
+## Callable preparation service after the main merge
+
+`services/assets/preparation.py` now provides `EventAssetPreparationService(store, storage=None)` over Member 3's actual `WorkflowStore` and Member 2's `AssetStorage`. The Member 4 branch includes merged main through `341b09e`, preserving all other owners' code. These are callable services, not automatically registered MCP/HTTP routes.
+
+```python
+preparation = EventAssetPreparationService(workflow_store, asset_storage)
+# owner_id is taken from the authenticated server principal, never a tool JSON field.
+state = await preparation.read(owner_id, event_id, expected_revision)
+status_for_ui = state.preview_metadata()  # no prose, owner ID or Storage object path
+# Only an explicit preparation request queues work; read() never generates/queues prose.
+receipt = await preparation.request_prose(owner_id, event_id, expected_revision)
+document = await preparation.prepare_document(owner_id, event_id, expected_revision)
+report = await preparation.inclusion(owner_id, event_id, expected_revision, confirmed_facts)
+```
+
+`read` loads exactly the five Go asset kinds from the trusted server store, validates kind/scope/current revision, and rechecks the event after loading. No previous revision or alternate producer is substituted. `prose_state` is `awaiting_go`, `needs_review`, or `reviewed`; this describes prose only, not provider synchronization or publish permission. `preview_metadata()` returns event ID/revision, missing/unreviewed kinds and source generation IDs. Both the event document and plain-language summary are mandatory for `prepare_document`; when either is missing it returns `awaiting_go` without generating, storing or silently omitting the summary. `stored` means private document bytes/metadata were saved; inspect its separate review state before distribution. Unreviewed prose can produce a private review draft, never a reviewed outgoing attachment.
+
+**Durable queue detail:** the facade's `StoredGoAssetQueue` writes the complete asset batch/idempotency key in its first `WorkflowStore.put_work` call. This avoids a mismatch found by reading the current Member 3 `GoAssetQueue` and Member 2's RPC: Member 3 adds the custom key in a second awaiting-job write, while the RPC returns the already stored job without replacing that payload. A later retry can then supersede same-revision work. The Member 4 adapter queues the same five kinds into the same canonical store, reuses an existing matching running/awaiting batch, and never supersedes same-revision work. Deterministic IDs plus the store's atomic key check protect concurrent insert retries. Adopt **one** queue path in composition; this facade does not modify Member 3's reserved queue module or repair other callers of it. Actual `SupabaseWorkflowStore` HTTP-double tests verify one first write with the full key and a stable repeated receipt; no hosted SQL execution is claimed by this check.
+
+After the coordinator claims a durable create operation, call:
+
+```python
+created = await preparation.start_flyer(owner_id, event_id, expected_revision, canva)
+# Persist created.job plus created.generation_ids before polling/reconciling.
+# Continuation token remains server-only and needs explicit encrypted persistence.
+```
+
+This requires separate trusted `flyer_brief` and `flyer_copy` records, forwards the exact displayed copy alongside canonical event facts, and records both generation IDs. No missing copy is invented. The adapter's optional `copy=` argument preserves existing direct callers. If the event advances during an actual provider call, the returned job is retained at its original revision so the host can reconcile it rather than lose the external job or blindly create a duplicate.
+
+After real text/visual review, a completed export and a trusted design binding:
+
+```python
+asset = await preparation.store_flyer_export(
+    owner_id, event_id, expected_revision, verified_design, export_receipt, downloader,
+)
+```
+
+The export's complete design binding must match the verified binding. Current Go alt text, exact owner/event/revision, verification state and completed export URL are required before download. A revision change during download prevents upload; Storage still applies its final CAS. `needs_review`/pending exports never masquerade as completed files. Organizer visual approval remains a separate explicit action; this service cannot create it. The coordinator still owns persistent operation locks, approval routes, recovery and registration in `main.py`.
+
+[Go asset rehearsal prompt](GO_ASSET_REHEARSAL.md) requests the five actual outputs through currently available Member 3 tools. New internal service-state models are included in the schema bundle; frontend transport uses the described `preview_metadata()` shapes, not raw internal model fields.
 
 ## Member 3: Go request and Canva execution
 
