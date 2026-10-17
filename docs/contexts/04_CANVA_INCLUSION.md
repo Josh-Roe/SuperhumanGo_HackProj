@@ -7,6 +7,10 @@ Implementation commit: `cdf08bc`. Draft [PR #1](https://github.com/Josh-Roe/Supe
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/04_CANVA_INCLUSION.md) before work. Write only this personal context. Preserve other members' files.
 
+## Merge validation follow-up — 2026-10-16
+
+**User requested merging PR #1.** CI run `38985909852` failed Ruff `I001` in `test_assets_member3_compat.py`: imports of the now-merged repository modules belonged in the first-party group. Local cached lint had not surfaced the changed classification; `ruff check --no-cache` reproduced it. Moved those two imports without changing test behavior. Uncached full-backend Ruff and all **264 tests** pass (one optional ML skip, existing Starlette warning). Remote checks must pass on this correction before merging; use the PR's current checks for final CI evidence. No lint rule was disabled or CI gate bypassed.
+
 ## Continued Member 4 work after Go connection check — 2026-10-16
 
 **Source: user switched back to Member 4 and requested a Member 3 connection check plus continued implementation.** Read current main/all member contexts and merged `origin/main` through `341b09e` into this branch cleanly. The merge preserves Member 1's glass UI and all peer-owned backend code; new implementation edits remain within Member 4 paths and this context.
