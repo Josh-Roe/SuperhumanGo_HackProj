@@ -34,6 +34,26 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
 - **2026-10-16 | implemented | dev mode** (`workflows/dev.py`, `WORKFLOW_DEV_MODE=1`): an in-memory store with one seeded test event, plus `/api/dev/*` routes (prepare, revise, approve, connect Google) guarded by `DEV_CONNECTOR_TOKEN`. This proves the live Go loop before Supabase lands. It is **not** Supabase evidence. Smoke-tested with a real uvicorn server and MCP over HTTP locally.
 - **Website-to-Go trigger:** unverified. The fallback is the visible `awaiting_go` queue, which Go drains when the organizer says "Process my event work".
 - Grammarly path (proposed): the organizer edits Go drafts in the website with the Grammarly extension, and edits are recorded as `producer: organizer`. Must be verified on the deployed page.
+- **2026-10-16 | live (partial) | account setup:**
+  - Google OAuth: a test project with External/Testing consent, and only the user's own Gmail as a test user. Web client redirect is `http://localhost:8000/api/dev/google/callback`. Calendar and Gmail APIs are enabled. The live consent grant succeeded with all five scopes.
+  - Read-only `preview_distribution` returned over the public tunnel (create Calendar event and Gmail draft, blocked `awaiting_go`). Nothing has been sent.
+  - Credentials are only in git-ignored `backend/.env.dev-go`.
+  - The dev server needs `APP_DOMAIN=<tunnel host>`; otherwise MCP's DNS-rebinding check returns "Invalid Host header".
+- **2026-10-16 | blocked | Go → MCP transport:**
+  - Pack 72744 was uploaded and release 1 published from Pack Studio. The CLI `packs release` refuses to run while the tunnel URL sits uncommitted in `config.ts`.
+  - The pack installed in Go (Connectors → search "Hackathon"; it is not listed until searched) and shows Connected.
+  - Go's first chat said the tools were unavailable. Its session log shows `Mcp call init` → `POST https://<x>.trycloudflare.com/mcp <no HTTP response>` after **7 ms**, request ID `3e8ed224-…`. Neither the tunnel log nor the server log received it.
+  - The same URL answers other external fetchers.
+  - Follow-up tests on 2026-10-16:
+    - A Go "Add custom MCP" connector (a pack with no auth) **did** reach the same trycloudflare URL from AWS IPs and got a 401 from us.
+    - Pack v2 pointed at a localhost.run tunnel got a real HTTP 502 there. The free tunnel rotated its hostname mid-test, so it is unusable.
+    - Pack v3, back on trycloudflare, again failed with `<no HTTP response>`.
+  - So the failure is specific to authenticated pack requests to `trycloudflare.com`, not to all of Superhuman's traffic.
+- **2026-10-16 | live, resolved | Go → MCP:**
+  - After re-signing in to pack v3 with the token copied with no trailing newline (`tr -d '\n' | pbcopy`), Go called `list_go_work` over the trycloudflare tunnel and returned the queued `dev-event-1` `prepare_content` item (server: `POST /mcp 200`).
+  - Likely root cause: a stray newline in the first pasted token makes the gateway fail before sending (`<no HTTP response>`, 7 ms). The domain was not blocked.
+  - Each domain change in a pack release requires the user to sign in again.
+  - Go asks for in-chat approval before each write tool (`claim_go_work`, `save_generated_content`).
 
 ## Handoffs (proposed, awaiting recipient agreement)
 
@@ -52,7 +72,7 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
 
 ## Blockers / next action
 
-1. A human creates the Google OAuth client, deploys over HTTPS, and installs the Pack in Go (see `docs/SUPERHUMAN.md`).
+1. Host the backend on a non-quick-tunnel HTTPS domain that Superhuman's fetcher reaches, or confirm with Superhuman why `trycloudflare.com` gets no response. Then re-run `npm run configure`, upload, and release. (Done: the Google OAuth client and the Pack install.)
 2. Live proof: Go → `list_go_work` → `get_event` → `save_generated_content` on `dev-event-1`. Then run publish → revise → change notice → RSVP against authorized test inboxes only.
 3. Merge with Member 2's repositories and Member 4's branch, then swap the in-memory store in composition.
 
