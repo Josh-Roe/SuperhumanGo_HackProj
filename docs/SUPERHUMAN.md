@@ -46,6 +46,10 @@ This seeds the in-memory event `dev-event-1`. `DEV_CONNECTOR_TOKEN` is both the 
 
 Google: create an OAuth client (Web application) with redirect `https://YOUR-DOMAIN/api/dev/google/callback`. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REDIRECT_URI`. Scopes: `calendar.events`, `gmail.compose`, `gmail.readonly`, `openid`, `email`. In testing mode, add test users. Use only invitees who agreed to receive test mail.
 
+### Temporary tunnel (testing only, until the backend has a permanent host)
+
+With the backend running on port 8000, `cd integrations/superhuman && npm run tunnel` opens a Cloudflare quick tunnel, writes its `/mcp` URL into `config.ts`, and uploads and releases the connector (`-- --no-upload` skips that). The hostname changes on every run and dies with the process or a sleeping laptop. Test the dashboard locally with `npm run dev:frontend`; the Vercel site needs `BACKEND_ORIGIN` set to the printed origin and a redeploy. Do not commit `config.ts` with a tunnel hostname.
+
 The [official tutorial](https://coda.io/packs/build/latest/tutorials/build/mcp/) requires a hosted endpoint. A localhost server and SDK validation alone cannot verify live Go behavior.
 
 ## Connect to your account
