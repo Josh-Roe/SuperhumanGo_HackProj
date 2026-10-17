@@ -134,33 +134,39 @@ If time runs short, cut in this order. Each cut must be stated honestly in the d
 
 Never cut: live Go writing plus a provider receipt, organizer approval before sending, and the same-ID Calendar update.
 
-## 5. Code first, docs last: coding assignments
+## 5. Code first, docs last: four-user assignments
 
-User decision, 2026-10-16: finish every coding task below before writing any documentation (A3, A12, PRESENTATION, context write-ups beyond one-line evidence). The user's own agent (the **lead coder**, on the stronger agentic plan) takes most of the coding, across owner boundaries. This is the explicit user authorization AGENTS.md requires for working outside your own paths. Other members still claim items per rule 2 before starting; the lead coder claims one queue item at a time, not the whole queue.
+User decision, 2026-10-16: finish every coding task before writing any documentation (A3, A12, PRESENTATION, and context write-ups beyond one-line evidence). These assignments override the ownership table in AGENTS.md for the items listed here. This is the explicit user authorization AGENTS.md requires for working outside your own paths. Everyone still claims one item at a time (rule 2), not a whole queue.
 
-**Lead coder (user): parallel lanes.** Each lane touches its own files, so lanes can run at the same time as separate agent sessions. Within a lane, go top to bottom. Every item can be built and tested locally/mocked now. The manual task named after **live:** only gates the live check, so leave that item `[~]` until it lands (rule 4). Migrations: each lane uses its own timestamped file, and Member 2 applies them.
+**Who is who.** **User 1** is the user, on the stronger agentic plan; they have been acting as Members 1 and 3 and hold the Google Cloud console and Pack Studio access. **User 2** holds the Member 2 seat (Supabase, Render, Vercel). **User 4** holds the Member 4 seat (Canva, pitch). **User 3** is the fourth teammate.
+
+| User | Coding | Manual | Docs (after all coding) |
+| --- | --- | --- | --- |
+| **1** | A14, A1, A10, A18, A11, A19, A9, A16, A17 (the lanes below) | M3 Google OAuth client, M4 Go connector release | — |
+| **2** | A2 live Supabase check; review and apply the migrations from A10 and A11 | M1 Render env, M2 Vercel env, M11 Gemini/Notion migration | A3 contract docs, README |
+| **3** | A15 `?event=` deep link; review the UI from A16 and A17 | M5 organizer accounts and test inboxes, M7 Grammarly proof, M9 screen-reader audit | — |
+| **4** | A7 live Canva export, A8 Canva revision on change | M6 Canva OAuth client, M10 Devpost | A12 pitch |
+| **All** | | M8 live rehearsal (User 3 drives it, everyone joins) | |
+
+**User 1's parallel lanes.** Each lane touches its own files, so the lanes can run as separate agent sessions at the same time. Within a lane, go top to bottom. Every item can be built and tested locally against mocks now. The manual task listed under "Live check waits on" only gates the live check, so leave the item `[~]` until it lands (rule 4). Each lane writes its own timestamped migration file, and User 2 applies them.
 
 | Lane | Files (mostly) | Queue | Live check waits on |
 | --- | --- | --- | --- |
-| **L1 Workflows / Google** | `workflows/**`, `providers/google/**` | A14 → A11 (Google token-cache forget part) | live: M1 + M3 + M5 (a real reconnect) |
-| **L2 Backend API / Supabase** | `api/**`, `repositories/**`, `supabase/**` | A10 → A18 | live: Member 2 applies migrations (with M11); A18's SQL test needs Supabase access |
-| **L3 Canva** | `providers/canva/**`, `services/assets/**` | A19 → A11 (Canva OAuth + flyer-job table) → A8 → A9 | live: **M6** (Canva OAuth client) + an organizer connecting their Canva |
-| **L4 Frontend** | `frontend/**` | A16 (against the A13/A10 contracts, mocked) → A17 (after L2's A10 endpoint shape is pushed) | live: M1 + M2 + M3 |
-| **L5 Deploy** | `backend/Dockerfile`, `render.yaml` | A1 (small; run it first or alongside L1) | live: M1 (Render redeploy) |
+| **L1 Workflows / Google** | `workflows/**`, `providers/google/**` | A14 → A11 (the Google token-cache forget part) | M1, M3, M5 (a real reconnect) |
+| **L2 Backend API / Supabase** | `api/**`, `repositories/**`, `supabase/**` | A10 → A18 | User 2 applying the migrations; A18's SQL test needs Supabase access |
+| **L3 Canva** | `providers/canva/**`, `services/assets/**` | A19 → A11 (Canva OAuth and the flyer-job table) → A9 | M6, plus an organizer connecting their own Canva |
+| **L4 Frontend** | `frontend/**` | A16 (mocked against the A13/A10 contracts) → A17 (once L2 pushes the A10 endpoint shape) | M1, M2, M3 |
+| **L5 Deploy** | `backend/Dockerfile`, `render.yaml` | A1 (small; run it first or alongside L1) | M1 (Render redeploy) |
 
-Cross-lane handoffs: L4's A17 waits on L2's A10 inclusion-fact endpoint, and L3's A9 needs L2's read routes. Push those contracts first so dependent lanes can mock against them. All lanes share one checkout on `main` (no worktrees, per the user's CLAUDE.md): commit only your lane's files, and pull before each commit.
+Cross-lane handoffs:
+- L4's A17 and User 4's A8 need L2's A10 endpoints. L3's A9 needs L2's read routes. Push those contracts first so the dependent work can mock against them.
+- A7 and A8 also need L3's Canva OAuth work and M6.
 
-**Manual tasks to run in parallel with the lanes**, in order of how much coding they unblock:
+All lanes share one checkout on `main` (no worktrees, per the user's CLAUDE.md). Commit only your lane's files, and pull before each commit.
 
-- **M6** (Member 4): the Canva OAuth client gates all live L3 work, so start it now.
-- **M1 + M3** (Members 2 and 3): Render env plus the Google redirect gate live L1, L4 and L5, then M2 → M4 → M5.
-- **M11** (Member 2): Supabase migration access gates live L2 and A2.
-- **M7** (Grammarly): nothing waits on it, so do it any time.
+**Manual work to start right away, alongside the coding:**
+- M6 (User 4): it gates all live Canva work.
+- M1 and M2 (User 2) and M3 (User 1): together they gate live Google and the website.
+- M11 (User 2): it gates live L2 work and A2.
 
-**Other members (small, isolated, or need their own accounts):**
-
-- **Member 1: A15** `?event=<id>` deep link (frontend only, no dependencies). Then review the UI from A16 and A17.
-- **Member 2: A2** live Supabase check, which needs project credentials. Also review and apply migrations from A10 and A11, plus M1 and M11.
-- **Member 4: A7** live Canva export, after M6 provides the OAuth client and at least one organizer has connected their own Canva. Then verify A8 live.
-
-**Docs, only after the coding above is done or cut:** A3 (contract docs), A12 (pitch), and README/PROJECT_CONTEXT evidence.
+After those come M4 (User 1) and M5 (User 3). M7 and M9 can happen whenever someone is free. M10 depends on the M8 recording.
