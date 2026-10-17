@@ -26,7 +26,7 @@ export interface EventInput {
   timezone: string;
   organizer_contact: string;
   links: string[];
-  invitees: { id: string; email: string }[];
+  invitees: { id: string; email: string; display_name?: string | null }[];
 }
 export interface EventRecord extends EventInput {
   id: string;
@@ -76,6 +76,7 @@ export interface Finding {
   sources: { reference: string; checked_on: string }[];
 }
 export interface Operation {
+  approval_id?: string;
   id: string;
   provider: string;
   kind: string;
@@ -95,6 +96,19 @@ export interface Rsvp {
   conflict?: boolean;
 }
 export interface WorkspaceEvent {
+  live?: {
+    warnings: string[];
+    factsReadOnly: boolean;
+    reviewAvailable: boolean;
+    receiptsAvailable: boolean;
+    rsvpsAvailable: boolean;
+    approval?: {
+      id: string;
+      event_revision: number;
+      action: "publish" | "update";
+      invitation_content_id: string;
+    };
+  };
   event: EventRecord;
   content: Content[];
   work: { id: string; event_revision: number; state: WorkState }[];
@@ -138,6 +152,7 @@ export interface EventGateway {
     revision: number,
     action: "publish" | "update",
     idempotency_key: string,
+    invitation_content_id?: string,
   ): Promise<WorkspaceEvent>;
 }
 export function emptyFacts(): Record<FactKey, Fact> {
@@ -152,7 +167,9 @@ export function safeUrl(value?: string): string | undefined {
   if (!value) return undefined;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" ? url.href : undefined;
+    return url.protocol === "https:" && !url.username && !url.password
+      ? url.href
+      : undefined;
   } catch {
     return undefined;
   }
