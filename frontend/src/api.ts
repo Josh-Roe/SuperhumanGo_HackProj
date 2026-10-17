@@ -307,9 +307,11 @@ export class ApiError extends Error {
     this.code = code;
   }
 }
+// A string, or a getter so a long-lived gateway always sends the latest renewed token.
+export type BearerToken = string | (() => string);
 export async function requestJson(
   path: string,
-  token: string,
+  token: BearerToken,
   method = "GET",
   body?: unknown,
   idempotencyKey?: string,
@@ -319,7 +321,7 @@ export async function requestJson(
     signal: AbortSignal.timeout(12000),
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${typeof token === "string" ? token : token()}`,
       ...(body ? { "Content-Type": "application/json" } : {}),
       ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
@@ -389,7 +391,10 @@ async function tokenSession(
       body: JSON.stringify(body),
     },
   );
-  if (!response.ok) throw new Error(failure);
+  if (!response.ok)
+    throw response.status === 400 || response.status === 401
+      ? new ApiError("unauthenticated", failure)
+      : new Error(failure);
   const data: unknown = await response.json();
   if (
     !isRecord(data) ||
@@ -401,11 +406,78 @@ async function tokenSession(
     typeof data.user.email !== "string"
   )
     throw new Error("Supabase returned an invalid session.");
+  if (config && typeof data.refresh_token === "string")
+    saveSession({ config, refresh_token: data.refresh_token });
   return {
     access_token: data.access_token,
     email: data.user.email,
     expires_at: Date.now() + data.expires_in * 1000,
   };
+}
+// Only Supabase's refresh token persists, so a reload or new tab can renew the
+// session without another sign-in. Access tokens stay in memory.
+const SAVED_SESSION = "organizer-session";
+interface SavedSession {
+  config: PublicAuthConfig;
+  refresh_token: string;
+}
+function saveSession(saved: SavedSession) {
+  try {
+    localStorage.setItem(SAVED_SESSION, JSON.stringify(saved));
+  } catch {
+    // Storage blocked: the session still works until the page closes.
+  }
+}
+export function forgetSession() {
+  try {
+    localStorage.removeItem(SAVED_SESSION);
+  } catch {
+    // Nothing was saved.
+  }
+}
+function savedSession(): SavedSession | null {
+  try {
+    const value: unknown = JSON.parse(
+      localStorage.getItem(SAVED_SESSION) ?? "null",
+    );
+    if (
+      isRecord(value) &&
+      typeof value.refresh_token === "string" &&
+      isRecord(value.config) &&
+      typeof value.config.supabase_url === "string" &&
+      typeof value.config.supabase_publishable_key === "string"
+    )
+      return {
+        refresh_token: value.refresh_token,
+        config: {
+          supabase_url: value.config.supabase_url,
+          supabase_publishable_key: value.config.supabase_publishable_key,
+        },
+      };
+  } catch {
+    // Unreadable storage counts as signed out.
+  }
+  return null;
+}
+// Returns null when nothing is saved or Supabase revoked it (the saved copy is
+// then dropped). Network failures throw and keep it for the next attempt.
+// Reads storage each time: another tab may have rotated the refresh token.
+export async function renewSession(): Promise<Session | null> {
+  const saved = savedSession();
+  if (!saved) return null;
+  try {
+    return await tokenSession(
+      saved.config,
+      "refresh_token",
+      { refresh_token: saved.refresh_token },
+      "Your session could not be renewed. Sign in again.",
+    );
+  } catch (error) {
+    if (!(error instanceof ApiError && error.code === "unauthenticated"))
+      throw error;
+    forgetSession();
+    return null;
+  }
 }
 // Google sign-in through Supabase Auth's PKCE flow. The verifier and the public
 // config survive the redirect in sessionStorage; tokens never appear in the URL.
@@ -473,7 +545,7 @@ export async function completeGoogleSignIn(): Promise<Session | null> {
 }
 
 // Member 2's published canonical event REST contract. Narrow, read-only transfer test.
-export function createEventTransferGateway(token: string): EventGateway {
+export function createEventTransferGateway(token: BearerToken): EventGateway {
   const blocked = async (): Promise<WorkspaceEvent> => {
     throw new Error(
       "This connection tests event details only. Editing and distribution are not enabled.",
