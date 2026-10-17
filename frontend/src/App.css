@@ -738,22 +738,6 @@ main#main {
   border: 1px solid #e2dfda;
   color: #605d59;
 }
-.notice.next-step {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 20px;
-  font-size: 13px;
-}
-.notice.next-step p {
-  margin: 0;
-  flex: 1 1 260px;
-}
-.notice.next-step .error-box {
-  margin: 0;
-  flex-basis: 100%;
-}
 .error-box {
   background: #fff3ed;
   border: 1px solid #edc6b1;
@@ -795,6 +779,24 @@ main#main {
 }
 .go-handoff .small {
   font-size: 12px;
+}
+.setup-guide summary {
+  cursor: pointer;
+}
+.setup-guide summary h2 {
+  display: inline;
+}
+.setup-steps li > button,
+.setup-steps li > .error-box,
+.setup-steps .go-key {
+  display: block;
+  margin-top: 10px;
+}
+.setup-steps .go-key label {
+  margin: 0 0 8px;
+}
+.setup-steps code {
+  overflow-wrap: anywhere;
 }
 .setup-steps {
   padding-left: 20px;

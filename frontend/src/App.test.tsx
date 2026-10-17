@@ -47,11 +47,9 @@ describe("simplified event workspace", () => {
     expect(
       screen.getByRole("link", { name: /Connect Canva in Go/ }),
     ).toHaveAttribute("href", "https://go.superhuman.com/");
-    await user.click(screen.getByText("How to set up Go (one time)"));
     expect(
       (screen.getByLabelText("Message for Go") as HTMLTextAreaElement).value,
     ).toContain("preview-gathering");
-    expect(screen.getByText(/isn’t ready to connect to Go yet/)).toBeVisible();
   });
   it("edits writing with provenance and requires explicit review", async () => {
     const user = await sample();

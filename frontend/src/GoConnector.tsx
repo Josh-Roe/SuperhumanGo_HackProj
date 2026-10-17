@@ -21,12 +21,7 @@ export function GoConnector({
     hadCredential.current = Boolean(credential);
   }, [credential]);
   return (
-    <section className="panel">
-      <h2>Connect Go</h2>
-      <p>
-        Go needs a key to see your events. Create one and paste it into Go when
-        it asks for a key. Don’t paste it into a chat message.
-      </p>
+    <div className="go-key">
       {credential ? (
         <>
           <label>
@@ -77,6 +72,6 @@ export function GoConnector({
         </button>
       )}
       {error && <p role="alert">{error}</p>}
-    </section>
+    </div>
   );
 }

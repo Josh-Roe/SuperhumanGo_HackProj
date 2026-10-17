@@ -56,10 +56,8 @@ it("signs in with Google and connects the organizer workspace on return", async 
   render(<App />);
   await user.click(await screen.findByRole("button", { name: "Your events" }));
   expect(await screen.findByText(event.title)).toBeVisible();
-  await user.click(screen.getByRole("button", { name: "Get your Go key" }));
-  expect(
-    await screen.findByRole("button", { name: "Create Go key" }),
-  ).toBeVisible();
+  expect(screen.getByText("Signed in as organizer@example.com.")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Create Go key" })).toBeVisible();
   expect(exchanged?.auth_code).toBe("google-code");
   const digest = await crypto.subtle.digest(
     "SHA-256",
