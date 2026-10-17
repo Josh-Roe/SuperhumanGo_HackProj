@@ -56,6 +56,10 @@ it("signs in with Google and connects the organizer workspace on return", async 
   render(<App />);
   await user.click(await screen.findByRole("button", { name: "Your events" }));
   expect(await screen.findByText(event.title)).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Get your Go key" }));
+  expect(
+    await screen.findByRole("button", { name: "Create Go key" }),
+  ).toBeVisible();
   expect(exchanged?.auth_code).toBe("google-code");
   const digest = await crypto.subtle.digest(
     "SHA-256",
@@ -67,6 +71,28 @@ it("signs in with Google and connects the organizer workspace on return", async 
     .replaceAll("=", "");
   expect(authorize.searchParams.get("code_challenge")).toBe(challenge);
   expect(location.search).toBe("");
+});
+
+it("offers Google sign-in on the events page without visiting Settings", async () => {
+  const { fetcher } = await backend();
+  const original = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (url, options) =>
+    url === "/api/config"
+      ? new Response(JSON.stringify(config))
+      : original(url, options),
+  );
+  const assign = vi.fn();
+  vi.spyOn(window, "location", "get").mockReturnValue({
+    ...window.location,
+    assign,
+  });
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Sign in with Google" }));
+  await vi.waitFor(() => expect(assign).toHaveBeenCalledOnce());
+  expect(new URL(assign.mock.calls[0][0]).searchParams.get("provider")).toBe(
+    "google",
+  );
 });
 
 it("reports a denied Google sign-in without exchanging a code", async () => {
