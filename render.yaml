@@ -1,14 +1,17 @@
-# Render Blueprint for the backend. Secrets are set in the Render dashboard
-# (sync: false); see docs/MASTER_TODO.md M1 for the values to use.
+# Optional native Python deployment. No Docker or new database required.
 services:
   - type: web
     name: superhuman-go-event-backend
-    runtime: docker
+    runtime: python
     plan: free
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    rootDir: backend
+    buildCommand: uv sync --frozen --no-dev
+    startCommand: .venv/bin/python -m hackathon_backend.api.serve
     healthCheckPath: /api/health
+    autoDeployTrigger: "off"
     envVars:
+      - key: UV_VERSION
+        value: 0.12.13
       # Defaults to RENDER_EXTERNAL_HOSTNAME when unset.
       - key: APP_DOMAIN
         sync: false

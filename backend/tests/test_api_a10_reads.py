@@ -222,7 +222,7 @@ def test_saving_facts_returns_new_version_and_observance_conflict_review():
         "traditions": ["jewish"],
     }
     fake = FakeSupabase()
-    fake.rpc_results["organizer_save_inclusion"] = [
+    fake.rpc_results["organizer_save_inclusion_facts"] = [
         httpx.Response(
             200,
             json={
@@ -249,14 +249,14 @@ def test_saving_facts_returns_new_version_and_observance_conflict_review():
     assert findings["step_free_entrance"]["status"] == "recorded"
     assert findings["religious_observances"]["status"] == "attention"
     assert findings["religious_observances"]["conflicts"] == ["Synthetic Fast"]
-    save = next(body for name, body in fake.calls if name == "organizer_save_inclusion")
+    save = next(body for name, body in fake.calls if name == "organizer_save_inclusion_facts")
     assert save["p_owner"] == OWNER and save["p_expected_version"] == 0
     assert save["p_facts"]["elevator"] == {"value": "no", "source": None}
 
 
 def test_stale_inclusion_version_is_a_409_conflict():
     fake = FakeSupabase()
-    fake.rpc_results["organizer_save_inclusion"] = [
+    fake.rpc_results["organizer_save_inclusion_facts"] = [
         httpx.Response(400, json={"message": "revision_conflict"})
     ]
     with client_for(fake) as client:

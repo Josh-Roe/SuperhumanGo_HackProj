@@ -12,7 +12,7 @@ from hackathon_backend.config import Settings
 
 
 def schema() -> dict:
-    app = FastAPI(title="Organizer backend contract", version="0.2.0")
+    app = FastAPI(title="Organizer backend contract", version="0.3.0")
     app.include_router(create_router(Settings()))
     return app.openapi()
 

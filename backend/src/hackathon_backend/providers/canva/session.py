@@ -13,7 +13,7 @@ from pydantic import TypeAdapter
 from hackathon_backend.providers.canva import CanvaError, CanvaMCPAdapter, ExportJobReader
 from hackathon_backend.services.assets.models import BoundaryModel, Identifier
 
-CANVA_MCP_URL = "https://mcp.canva.com/mcp"
+CANVA_MCP_URL = "https://api.canva.com/connect/v1/mcp"
 WORKFLOW_TOOLS = {
     "create": ("create-design", "get-create-design-async-job", "get-design"),
     "review": ("get-design", "get-design-content"),

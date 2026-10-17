@@ -120,3 +120,23 @@ def test_vault_encrypts_tokens_and_detects_cross_owner_ciphertext_swap():
 def test_vault_fails_closed_without_server_key_or_encryption_key():
     with pytest.raises(DomainError):
         SupabaseCredentialVault(Database(SETTINGS, token="user"), "")
+
+
+def test_google_reconnect_forgets_only_matching_organizer_cache_across_vault_instances():
+    class Cache:
+        def __init__(self):
+            self.values = {OWNER: "old-account-token", OTHER: "other-organizer-token"}
+
+        def forget(self, owner_id):
+            self.values.pop(owner_id, None)
+
+    transport = httpx.MockTransport(lambda _: httpx.Response(201))
+    database = Database(SETTINGS, admin=True, transport=transport)
+    key = Fernet.generate_key().decode()
+    executor_vault = SupabaseCredentialVault(database, key)
+    callback_vault = SupabaseCredentialVault(database, key)
+    cache = Cache()
+    executor_vault.watch_refresh(cache.forget)
+    run(callback_vault.put_refresh_token(OWNER, "fixture@example.invalid", "new-refresh", "gmail"))
+    assert OWNER not in cache.values
+    assert cache.values[OTHER] == "other-organizer-token"

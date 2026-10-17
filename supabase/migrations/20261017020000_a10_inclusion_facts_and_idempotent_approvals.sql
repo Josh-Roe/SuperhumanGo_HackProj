@@ -40,7 +40,8 @@ create trigger inclusion_guard before insert or update on public.event_inclusion
 for each row execute function public.organizer_inclusion_guard();
 
 -- Compare-and-set save. expected_version 0 means "no facts saved yet".
-create function public.organizer_save_inclusion(
+-- Separate from the already-deployed revision-advancing organizer_save_inclusion RPC.
+create function public.organizer_save_inclusion_facts(
   p_owner uuid, p_event uuid, p_expected_version integer, p_facts jsonb
 ) returns jsonb language plpgsql security invoker set search_path='' as $$
 declare e public.events; f public.event_inclusion_facts; begin
@@ -60,8 +61,8 @@ declare e public.events; f public.event_inclusion_facts; begin
   end if;
   return to_jsonb(f);
 end $$;
-revoke all on function public.organizer_save_inclusion(uuid,uuid,integer,jsonb) from public, anon;
-grant execute on function public.organizer_save_inclusion(uuid,uuid,integer,jsonb) to authenticated, service_role;
+revoke all on function public.organizer_save_inclusion_facts(uuid,uuid,integer,jsonb) from public, anon;
+grant execute on function public.organizer_save_inclusion_facts(uuid,uuid,integer,jsonb) to authenticated, service_role;
 revoke all on function public.organizer_inclusion_guard() from public, anon;
 grant execute on function public.organizer_inclusion_guard() to authenticated, service_role;
 
