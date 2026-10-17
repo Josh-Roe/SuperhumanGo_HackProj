@@ -1885,5 +1885,111 @@
     ],
     "title": "FlyerCreationPreparation",
     "type": "object"
+  },
+  "AssetPreviewMetadata": {
+    "additionalProperties": false,
+    "description": "Authenticated preview DTO; provider/source IDs are references, never credentials.",
+    "properties": {
+      "event_id": {
+        "pattern": "^[A-Za-z0-9_-]{1,128}$",
+        "title": "Event Id",
+        "type": "string"
+      },
+      "event_revision": {
+        "minimum": 1,
+        "title": "Event Revision",
+        "type": "integer"
+      },
+      "kind": {
+        "enum": [
+          "event_document",
+          "flyer_png"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "content_type": {
+        "title": "Content Type",
+        "type": "string"
+      },
+      "sha256": {
+        "pattern": "^[a-f0-9]{64}$",
+        "title": "Sha256",
+        "type": "string"
+      },
+      "byte_length": {
+        "maximum": 10000000,
+        "minimum": 1,
+        "title": "Byte Length",
+        "type": "integer"
+      },
+      "canva_design_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Canva Design Id"
+      },
+      "canva_export_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Canva Export Id"
+      },
+      "canva_generation_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Canva Generation Id"
+      },
+      "go_generation_id": {
+        "pattern": "^[A-Za-z0-9_-]{1,128}$",
+        "title": "Go Generation Id",
+        "type": "string"
+      },
+      "created_at": {
+        "format": "date-time",
+        "title": "Created At",
+        "type": "string"
+      },
+      "review_state": {
+        "enum": [
+          "needs_review",
+          "reviewed"
+        ],
+        "title": "Review State",
+        "type": "string"
+      }
+    },
+    "required": [
+      "event_id",
+      "event_revision",
+      "kind",
+      "content_type",
+      "sha256",
+      "byte_length",
+      "canva_design_id",
+      "canva_export_id",
+      "canva_generation_id",
+      "go_generation_id",
+      "created_at",
+      "review_state"
+    ],
+    "title": "AssetPreviewMetadata",
+    "type": "object"
   }
 }
