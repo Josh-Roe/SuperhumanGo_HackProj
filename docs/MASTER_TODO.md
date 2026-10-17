@@ -67,12 +67,14 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
   - Note (Member 3, 2026-10-16): pack 72744 v3 proved Go → MCP live in dev mode via a quick tunnel (`ea41bef`, `13605de`). That tunnel was shut down on 2026-10-16, so the installed connector now points at a dead host until this item lands. Render `/api/health` still did not answer at reconcile time (curl timeout).
 - [ ] **M5 — Organizer account setup.** Each demo organizer: sign in at the website, Settings → "Create personal Go token" (use it in M4), then Connect Google (`POST /api/google/connect`) and check that `GET /api/google/status` shows connected.
 - [ ] **M6 — Canva.** Owner 4. Get an eligible Canva account, the flyer template and its fields, and the Canva app credentials. Record their names (never values) in the 04 context. Unblocks A7 and A8.
+  - Note (user decision, 2026-10-16): no team Canva account and no template. Each organizer connects **their own** Canva (per-organizer token in the vault, already how `connect_canva` works; custom design per event per the 04 context). What M6 still needs is only a registered Canva OAuth client (app client ID/secret, plus redirect URI) so organizers can connect their Canva via A11's connect flow. Record names, never values.
 - [ ] **M7 — Grammarly proof.** Owner 3 or 4. In a supported Grammarly or Superhuman client, show Grammarly assistance on Go-written event prose. Record a screenshot outside Git and note it in the context.
 
 ### Live proof and submission
 
 - [ ] **M8 — Full live rehearsal on Supabase.** Everyone. Use authorized test inboxes only. Steps: ask Go to create an event (open its `dashboard_url`) → prepare assets → website inclusion review → website approval → Go `execute_distribution` → change the time and location through Go or the website → re-prepare, approve and execute → a second test account replies "yes" and accepts in Calendar → `sync_rsvps`/`list_rsvps`. Capture receipt IDs (Calendar event ID, Gmail message/thread IDs, Canva design/export IDs, revisions) in the 03 context. Requires M1–M7 and A2, A3 and A5.
-- [ ] **M9 — Accessibility audit.** Owner 1. Real phone check and a screen-reader pass on the deployed site.
+- [ ] **M9 — Accessibility audit.** Owner 1. ~~Real phone check and~~ a screen-reader pass on the deployed site.
+  - Note (user decision, 2026-10-16): phones are not a target; desktop only. Phone check dropped.
 - [ ] **M10 — Devpost by 8 PM PT.** Team lead. Fill in: name (still undecided), primary track (working pick: Productivity), description, agent-integration write-up, demo video recorded from M8, repo plus working demo link and setup steps, all four member names, tools and credits including the **pre-existing scaffold disclosure** (HACKATHON.md). Before submitting, check that no link exposes keys or private data. Prepare the 2-minute live pitch ([PRESENTATION.md](PRESENTATION.md)).
 
 ## 3. Agentic tasks `[AGENT]`
