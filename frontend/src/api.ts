@@ -367,8 +367,13 @@ export async function signIn(
     config?.supabase_url ?? import.meta.env.VITE_SUPABASE_URL,
   );
   if (
-    url.protocol !== "https:" &&
-    !["localhost", "127.0.0.1"].includes(url.hostname)
+    url.username ||
+    url.password ||
+    (url.protocol !== "https:" &&
+      !(
+        url.protocol === "http:" &&
+        ["localhost", "127.0.0.1"].includes(url.hostname)
+      ))
   )
     throw new Error("Supabase requires HTTPS.");
   const response = await fetch(
@@ -393,7 +398,10 @@ export async function signIn(
   if (
     !isRecord(data) ||
     typeof data.access_token !== "string" ||
+    !data.access_token ||
     typeof data.expires_in !== "number" ||
+    !Number.isFinite(data.expires_in) ||
+    data.expires_in <= 0 ||
     !isRecord(data.user) ||
     typeof data.user.email !== "string"
   )
@@ -462,11 +470,23 @@ export async function loadPublicAuthConfig(): Promise<PublicAuthConfig> {
     signal: AbortSignal.timeout(8000),
     headers: { Accept: "application/json" },
   });
-  if (!response.ok)
+  if (!response.ok) {
+    if (response.status === 404)
+      throw new Error(
+        "The event API is not registered on this backend yet. The connection test cannot run.",
+      );
     throw new Error(
-      "The event API is not registered on this backend yet. The connection test cannot run.",
+      `The event API is unavailable (HTTP ${response.status}). Check the backend deployment and Vercel BACKEND_ORIGIN, then retry.`,
     );
-  const value: unknown = await response.json();
+  }
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch {
+    throw new Error(
+      "The event API returned an invalid response. Check that /api/config reaches the Python backend, then retry.",
+    );
+  }
   if (
     !isRecord(value) ||
     value.configured !== true ||
@@ -476,6 +496,24 @@ export async function loadPublicAuthConfig(): Promise<PublicAuthConfig> {
     throw new Error(
       "The backend needs public Supabase authentication configuration.",
     );
+  try {
+    const url = new URL(value.supabase_url);
+    if (
+      url.username ||
+      url.password ||
+      (url.protocol !== "https:" &&
+        !(
+          url.protocol === "http:" &&
+          ["localhost", "127.0.0.1"].includes(url.hostname)
+        )) ||
+      !value.supabase_publishable_key.trim()
+    )
+      throw new Error();
+  } catch {
+    throw new Error(
+      "The backend returned invalid public Supabase authentication configuration.",
+    );
+  }
   return {
     supabase_url: value.supabase_url,
     supabase_publishable_key: value.supabase_publishable_key,

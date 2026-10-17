@@ -140,3 +140,43 @@ describe("published event transfer contract", () => {
     expect(fetcher.mock.calls[0][0]).toBe("/api/config");
   });
 });
+
+describe("deployment readiness diagnostics", () => {
+  it.each([502, 503])(
+    "reports HTTP %s as deployment failure instead of missing registration",
+    async (status) => {
+      const { loadPublicAuthConfig } = await import("./api");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response("{}", { status })),
+      );
+      await expect(loadPublicAuthConfig()).rejects.toThrow(
+        /deployment.*BACKEND_ORIGIN/,
+      );
+    },
+  );
+  it("explains an HTML fallback and rejects unsafe Supabase configuration before sign-in", async () => {
+    const { loadPublicAuthConfig } = await import("./api");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response("<!doctype html>"))
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              configured: true,
+              supabase_url: "ftp://localhost",
+              supabase_publishable_key: "public-key",
+            }),
+          ),
+        ),
+    );
+    await expect(loadPublicAuthConfig()).rejects.toThrow(
+      /\/api\/config reaches/,
+    );
+    await expect(loadPublicAuthConfig()).rejects.toThrow(
+      /invalid public Supabase/,
+    );
+  });
+});

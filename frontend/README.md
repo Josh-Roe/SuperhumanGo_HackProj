@@ -72,3 +72,14 @@ The main backend merge is incorporated into `codex/member-1-frontend`. Merge [PR
 4. **Go account owner:** install/authorize the backend MCP connector in standalone Go. In website Settings, check the event API and connect the same organizer. Run the synthetic prompt above and compare saved ID/revision and exact fields. Returning to the window refreshes events; visible pages also check every ten seconds. Change the location and confirm the same ID plus a newer revision.
 
 Actual Vercel routing, standalone Go authorization and the full transfer remain unverified. Proxy checks use mocked upstream responses. See [Vercel function API](https://vercel.com/docs/functions/functions-api-reference) and [quickstart](https://vercel.com/docs/functions/quickstart).
+
+### Vercel `404 NOT_FOUND` at the home page
+
+A root-page Vercel 404 happens before React loads. Confirm the project builds this repository's **frontend**, rather than the repository root:
+
+- Project Settings → Build and Deployment → Root Directory: `frontend`.
+- Framework Preset: Vite; Build Command: `npm run build`; Output Directory: `dist`; Install Command: `npm ci`.
+- Deploy the latest `main` commit to Production. A successful build must contain `dist/index.html`.
+- Check Settings → Domains: `mtcxhackathon.vercel.app` must belong to this project and its Production deployment. Open the deployment's generated URL too: if that works but the project URL does not, investigate the domain assignment.
+
+Root Directory changes apply on the **next deployment**, so saving settings alone does not fix an existing deployment. See [Vercel build configuration](https://vercel.com/docs/builds/configure-a-build). Missing `BACKEND_ORIGIN` affects API calls after the site loads; it does not explain a platform 404 at `/`.
