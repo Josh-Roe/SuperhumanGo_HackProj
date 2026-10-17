@@ -1,4 +1,3 @@
-// Replace using npm run configure -- https://YOUR-DOMAIN/mcp before uploading.
-// This placeholder is for local SDK validation; it is not a live deployment.
-export const mcpEndpoint = "https://hackathon.example.com/mcp";
-export const networkDomain = "hackathon.example.com";
+// Public endpoint only. Credentials are entered when installing the connector in Go.
+export const mcpEndpoint = "https://superhuman-go-event-backend.onrender.com/mcp";
+export const networkDomain = "superhuman-go-event-backend.onrender.com";

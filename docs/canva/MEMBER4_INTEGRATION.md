@@ -1,7 +1,7 @@
 # Custom Canva flyers and Go-written documents
 
 Owner: Member 4. Updated 2026-10-16. Branch: `codex/member-4-canva-inclusion`.
-These are implemented service interfaces and proposed cross-member bindings, not registered HTTP endpoints.
+Member 3 registered these services in main via `d5ce546`. Member 4 verified the registered host on main `973bdb9`; see the [exact tool/REST/UI handoff](ASSET_WIRING_HANDOFF.md) and its local-versus-live evidence. Older sections below retain the service API and historical handoffs.
 
 ## Accepted direction
 

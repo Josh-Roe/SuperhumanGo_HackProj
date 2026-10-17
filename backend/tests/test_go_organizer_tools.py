@@ -170,6 +170,34 @@ def test_create_event_is_idempotent_and_hides_invitee_emails(setup):
     assert [e["id"] for e in listed] == [first["id"]]
 
 
+def test_event_results_link_to_the_dashboard_when_app_url_is_set():
+    db, principals = FakeOrganizerDB(), InMemoryPrincipalResolver()
+    token = principals.issue(OWNER_A)
+    mcp = FastMCP(
+        "test",
+        stateless_http=True,
+        json_response=True,
+        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+    )
+    settings = Settings(app_url="https://dashboard.example")
+    register_organizer_tools(mcp, settings, principals, lambda _s, who: FakeRepo(db, who.owner_id))
+    with TestClient(mcp.streamable_http_app(), base_url="http://localhost") as client:
+        event = ok(call(client, token, "create_event", EVENT))
+        link = f"https://dashboard.example/?event={event['id']}"
+        assert event["dashboard_url"] == link
+        assert ok(call(client, token, "list_events", {}))[0]["dashboard_url"] == link
+        update = {"event_id": event["id"], "expected_revision": 1, "location": "Library"}
+        assert ok(call(client, token, "update_event", update))["dashboard_url"] == link
+
+
+@pytest.mark.parametrize(
+    "app_url", ["mtcx.vercel.app", "https://mtcx.vercel.app/events", "http://evil.example"]
+)
+def test_app_url_rejects_non_origins(app_url):
+    with pytest.raises(ValueError):
+        Settings(app_url=app_url)
+
+
 def test_update_event_merges_fields_and_rejects_stale_revision(setup):
     db, client, tokens = setup
     event = ok(call(client, tokens["a"], "create_event", EVENT))

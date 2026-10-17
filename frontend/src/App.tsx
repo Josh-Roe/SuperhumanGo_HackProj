@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   ApiError,
@@ -1347,6 +1347,16 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   const heading = useRef<HTMLHeadingElement>(null);
   const publishKeys = useRef(new Map<string, string>());
   const epoch = useRef(0);
+  const pendingLinkedEvent = useRef(
+    new URLSearchParams(location.search).get("event"),
+  );
+  const openLinkedEvent = useEffectEvent((id: string) => openEvent(id));
+  useEffect(() => {
+    if (gateway.mode !== "live" || pendingLinkedEvent.current === null) return;
+    const id = pendingLinkedEvent.current;
+    pendingLinkedEvent.current = null;
+    openLinkedEvent(id);
+  }, [gateway]);
   const watchedId =
     gateway.mode === "live" && editing ? record?.event.id : undefined;
   const watchPaused = Boolean(gateway.mode === "live" && (busy || dirty));
@@ -1503,8 +1513,24 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   }
   function openEvent(id: string) {
     void run(
-      () => gateway.get(id),
+      async () => {
+        try {
+          return await gateway.get(id);
+        } catch (error) {
+          if (
+            error instanceof ApiError &&
+            ["api_unavailable", "forbidden"].includes(error.code)
+          ) {
+            throw new Error(
+              "Event not found. It may not exist or be available to this organizer.",
+            );
+          }
+          throw error;
+        }
+      },
       (value) => {
+        setPage("events");
+        setStarting(false);
         setRecord(value);
         setEditing(true);
         setStep("details");
@@ -1640,6 +1666,18 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
               </button>
             )}
           </header>
+          {pendingLinkedEvent.current !== null &&
+            gateway.mode === "preview" && (
+              <section className="notice">
+                <p>Connect your organizer account to open the linked event.</p>
+                <button
+                  className="secondary"
+                  onClick={() => navigate("settings")}
+                >
+                  Connect to open event
+                </button>
+              </section>
+            )}
           <p className="preview-note">
             {gateway.mode === "preview"
               ? "Local preview · sample data · changes stay in this tab · no invitations send"
