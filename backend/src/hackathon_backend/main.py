@@ -21,6 +21,7 @@ from hackathon_backend.config import Settings
 from hackathon_backend.inference import OnnxRunner
 from hackathon_backend.mcp_tools.event_tools import EventToolDeps, register_event_tools
 from hackathon_backend.mcp_tools.organizer_tools import register_organizer_tools
+from hackathon_backend.mcp_tools.pipeline_tools import register_pipeline_tools
 from hackathon_backend.workflows.asset_wiring import register_asset_services
 from hackathon_backend.workflows.dev import DevWorkflow, dev_router, dev_workflow_from_env
 from hackathon_backend.workflows.distribution_routes import register_distribution_routes
@@ -28,6 +29,7 @@ from hackathon_backend.workflows.google_connect import (
     google_connect_configured,
     google_connect_router,
 )
+from hackathon_backend.workflows.pipeline import MemoryChatApprovals, SupabaseChatApprovals
 
 
 class SuperhumanStatus(BaseModel):
@@ -146,6 +148,9 @@ def create_app(
         register_event_tools(mcp, events)
     if supabase and events is not None:
         register_organizer_tools(mcp, settings, events.principals)
+        register_pipeline_tools(mcp, events, SupabaseChatApprovals(settings))
+    elif dev is not None:
+        register_pipeline_tools(mcp, dev.deps, MemoryChatApprovals(dev.store))
 
     mcp_app = mcp.streamable_http_app()
 
