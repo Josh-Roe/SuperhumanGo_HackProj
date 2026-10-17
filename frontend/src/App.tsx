@@ -27,7 +27,7 @@ import {
   DistributionPreview,
   FlyerApproval,
   ProviderCallbackNotice,
-  ProviderConnection,
+  ConnectedServices,
 } from "./ProviderPanels";
 
 type Page = "events" | "settings" | "profile";
@@ -2098,30 +2098,10 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   accessToken={session.access_token}
                 />
               )}
-              {providerSession &&
-                (["google", "canva"] as const).map((provider) => (
-                  <ProviderConnection
-                    key={`${provider}:${providerSession.expires_at}`}
-                    provider={provider}
-                    accessToken={providerSession.access_token}
-                  />
-                ))}
-              <section className="panel settings-connections">
-                <h2>Your connected tools</h2>
-                <p className="muted">
-                  Authorize Canva, Gmail, and Calendar in Go. Go uses the
-                  website’s custom MCP to save event changes back here.
-                </p>
-                {["Canva", "Gmail", "Google Calendar"].map((provider) => (
-                  <div className="connection-row" key={provider}>
-                    <strong>{provider}</strong>
-                    <span>Connection unverified</span>
-                    <a href={GO_URL} target="_blank" rel="noreferrer">
-                      Connect in Go ↗
-                    </a>
-                  </div>
-                ))}
-              </section>
+              <ConnectedServices
+                key={providerSession?.expires_at ?? "signed-out"}
+                accessToken={providerSession?.access_token}
+              />
               <details className="panel">
                 <summary>Workspace connection status</summary>
                 <p className="small muted">{backend}</p>

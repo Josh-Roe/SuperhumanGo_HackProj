@@ -175,10 +175,16 @@ describe("simplified event workspace", () => {
   it("provides Go setup in settings and saves a local profile without sign-up", async () => {
     const user = await workspace();
     await user.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Your connected tools")).toBeVisible();
-    expect(screen.getAllByRole("link", { name: /Connect in Go/ })).toHaveLength(
-      3,
-    );
+    const services = screen.getByRole("region", {
+      name: "Connected services",
+    });
+    expect(services).toHaveTextContent(/Gmail · Google Calendar/);
+    expect(
+      screen.getByRole("button", { name: "Connect Google" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Connect Canva" }),
+    ).toBeDisabled();
     expect(screen.getByLabelText("Prompt for Go")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Profile" }));
     await user.clear(screen.getByLabelText("Your name"));
