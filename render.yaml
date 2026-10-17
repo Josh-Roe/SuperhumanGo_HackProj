@@ -1,0 +1,26 @@
+# Optional native Python deployment. No Docker or new database required.
+services:
+  - type: web
+    name: event-organizer-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: uv sync --frozen --no-dev
+    startCommand: .venv/bin/python -m hackathon_backend.api.serve
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: UV_VERSION
+        value: 0.12.13
+      - key: WORKFLOW_DEV_MODE
+        value: "0"
+      - key: MCP_AUTH_TOKEN
+        generateValue: true
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        sync: false

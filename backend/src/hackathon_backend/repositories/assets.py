@@ -8,7 +8,9 @@ from uuid import UUID
 from hackathon_backend.domain.models import DomainError
 from hackathon_backend.repositories.organizer import OrganizerRepository
 from hackathon_backend.repositories.transport import Database
+from hackathon_backend.services.assets.attachments import RevisionedAttachmentSource
 from hackathon_backend.services.assets.models import AssetRecord, StaleRevisionError, StorageReceipt
+from hackathon_backend.workflows.go_work import WorkflowError
 
 BUCKET = "event-assets"
 OBJECT_KEY = re.compile(
@@ -122,42 +124,42 @@ class SupabaseAssetStorage:
         return f"{self.db.settings.supabase_url}/storage/v1{path}"
 
 
+class PrivateAttachmentRepository:
+    """Principal-bound implementation of Member 4's strict attachment read port."""
+
+    def __init__(self, database: Database, owner_id: str) -> None:
+        self.storage = SupabaseAssetStorage(database, owner_id)
+
+    async def assert_current(self, owner_id: str, event_id: str, revision: int) -> None:
+        await self.storage.assert_current(owner_id, event_id, revision)
+
+    async def current_asset(self, owner_id: str, event_id: str, kind: str) -> AssetRecord | None:
+        if owner_id != self.storage.owner_id:
+            raise PermissionError("Asset is outside the organizer scope")
+        rows = await self.storage.repo.event_children(event_id, "artifacts")
+        matches = [row for row in rows if row["is_current"] and row["kind"] == kind]
+        if len(matches) > 1:
+            raise DomainError("provider_failed", "Current asset pointers need reconciliation", 502)
+        return AssetRecord.model_validate(matches[0]["data"]) if matches else None
+
+    async def read_bytes(self, owner_id: str, object_key: str, *, max_bytes: int) -> bytes:
+        parts = OBJECT_KEY.fullmatch(object_key)
+        if not parts or parts["owner"] != owner_id or owner_id != self.storage.owner_id:
+            raise PermissionError("Asset is outside the organizer scope")
+        await self.storage.repo.get("events", parts["event"])
+        return await self.storage.db.download(
+            f"/storage/v1/object/{BUCKET}/{quote(object_key, safe='/')}", max_bytes=max_bytes
+        )
+
+
 class SupabaseAttachmentSource:
     def __init__(self, database: Database) -> None:
         self.db = database
 
     async def current_attachments(self, owner_id: str, event) -> list[tuple[str, str, bytes]]:
-        if event.owner_id != owner_id:
-            raise PermissionError("Event is outside the organizer scope")
-        storage = SupabaseAssetStorage(self.db, owner_id)
-        await storage.assert_current(owner_id, event.id, event.revision)
-        rows = await storage.repo.event_children(event.id, "artifacts")
-        files = []
-        for row in rows:
-            if not row["is_current"] or row["event_revision"] != event.revision:
-                continue
-            record = AssetRecord.model_validate(row["data"])
-            if record.review_state != "reviewed":
-                raise DomainError("needs_review", "Artifact needs organizer review")
-            parts = OBJECT_KEY.fullmatch(record.object_key)
-            if (
-                not parts
-                or parts["owner"] != str(UUID(owner_id))
-                or parts["event"] != str(UUID(event.id))
-            ):
-                raise PermissionError("Artifact path is outside the event scope")
-            content = await self.db.request(
-                "GET",
-                f"/storage/v1/object/{BUCKET}/{record.object_key}",
-                binary=True,
-            )
-            if (
-                len(content) != record.byte_length
-                or hashlib.sha256(content).hexdigest() != record.sha256
-            ):
-                raise DomainError("provider_failed", "Stored artifact failed integrity check", 502)
-            suffix = "png" if record.kind == "flyer_png" else "html"
-            files.append(
-                (f"{record.kind}-r{event.revision}.{suffix}", record.content_type, content)
-            )
-        return files
+        source = RevisionedAttachmentSource(
+            PrivateAttachmentRepository(self.db, owner_id),
+            kinds=("flyer_png", "event_document"),
+            error_factory=WorkflowError,
+        )
+        return await source.current_attachments(owner_id, event)

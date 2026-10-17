@@ -114,6 +114,14 @@ class ContentReview(RevisionInput):
     subject: str | None = Field(default=None, min_length=1, max_length=200)
 
 
+class ArtifactReview(RevisionInput):
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class DistributionInput(RevisionInput):
+    approval_id: UUID
+
+
 class ConnectorInput(Input):
     label: str = Field(default="Superhuman Go", min_length=1, max_length=100)
     expires_in_days: int = Field(default=30, ge=1, le=90)

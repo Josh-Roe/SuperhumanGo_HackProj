@@ -137,7 +137,70 @@ class OrganizerRepository:
             "rsvps",
             "artifacts",
             "inclusion_facts",
+            "approvals",
         }:
             raise ValueError("Unsupported event child table")
         await self.get("events", event_id)
-        return await self.db.rows(table, event_id=f"eq.{UUID(event_id)}", limit=500)
+        return await self.db.rows(
+            table,
+            event_id=f"eq.{UUID(event_id)}",
+            limit=500,
+            **({"owner_id": f"eq.{self.owner_id}"} if table == "approvals" else {}),
+        )
+
+    async def workspace(self, event_id: str) -> dict[str, Any]:
+        """Private organizer read model; never expose vault/continuation records.
+
+        Children are fetched after authorization and the revision is checked again,
+        so an edit during this read cannot produce a mixed-revision snapshot.
+        Historical rows keep their own revisions; callers must display stale state.
+        """
+        from hackathon_backend.repositories.workflow import SupabaseWorkflowStore
+        from hackathon_backend.services.assets.models import AssetRecord
+
+        event = await self.get("events", event_id)
+        store = SupabaseWorkflowStore(self.db)
+        children = {
+            table: await self.event_children(event_id, table)
+            for table in ("generated_content", "artifacts", "inclusion_facts")
+        }
+        work = await self.db.rows(
+            "go_work",
+            owner_id=f"eq.{self.owner_id}",
+            event_id=f"eq.{UUID(event_id)}",
+            order="created_at.desc",
+            limit=500,
+        )
+        # Explicit projection: arbitrary worker payloads may contain private replies.
+        jobs = [
+            {key: row[key] for key in ("id", "event_revision", "kind", "state")} for row in work
+        ]
+        result = {
+            "event": event,
+            **children,
+            "work": jobs,
+            "operations": await store.list_operations(self.owner_id, event_id),
+            "rsvps": await store.list_rsvps(self.owner_id, event_id),
+            "calendar": await store.get_calendar_binding(self.owner_id, event_id),
+            "gmail": await store.get_gmail_binding(self.owner_id, event_id),
+            "approvals": await self.event_children(event_id, "approvals"),
+            "truncated": {
+                **{key: len(value) == 500 for key, value in children.items()},
+                "work": len(work) == 500,
+            },
+        }
+        current = await self.get("events", event_id)
+        if current["revision"] != event["revision"]:
+            raise DomainError("revision_conflict", "Event changed while loading the workspace")
+        result["artifacts"] = [
+            {
+                "id": row["id"],
+                "is_current": row["is_current"],
+                **AssetRecord.model_validate(row["data"]).preview_metadata(),
+            }
+            for row in children["artifacts"]
+        ]
+        result["truncated"].update(
+            {key: len(result[key]) == 500 for key in ("operations", "rsvps", "approvals")}
+        )
+        return result

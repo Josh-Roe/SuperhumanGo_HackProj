@@ -33,7 +33,9 @@ class Settings:
         model_path = os.getenv("ONNX_MODEL_PATH", "").strip()
         return cls(
             mcp_auth_token=os.getenv("MCP_AUTH_TOKEN", "").strip(),
-            app_domain=os.getenv("APP_DOMAIN", "").strip(),
+            app_domain=(
+                os.getenv("APP_DOMAIN") or os.getenv("RENDER_EXTERNAL_HOSTNAME", "")
+            ).strip(),
             onnx_model_path=Path(model_path) if model_path else None,
             supabase_url=os.getenv("SUPABASE_URL", "").strip().rstrip("/"),
             supabase_publishable_key=os.getenv("SUPABASE_PUBLISHABLE_KEY", "").strip(),

@@ -9,6 +9,73 @@ Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), [all
 
 Own Python event domain/API/auth/repositories, `supabase/**` schema/migrations/RLS/Storage setup, shared backend dependencies/config, root tooling/CI/VPS, and canonical architecture/contracts. Member 3 owns `main.py` composition and Google/Go workflows; Member 4 owns Canva/inclusion/assets services. Integrate their factories through explicit handoffs.
 
+## Continued Member 2 delivery — 2026-10-16
+
+**User | agreed:** finish Member 2's remaining responsibilities, keep working through
+role handoffs, automatically commit/push finished work. A VPS is optional; user asked
+about free hosting. Native Render Free configuration is prepared, not deployed.
+
+**Integrated baseline:** fast-forwarded the clean branch from `4ec2367` to merged
+main `1752141`, preserving peer work. PR #3 is merged; its draft descriptions below
+are historical. Read new Member 1 live-adapter PR #6 and accepted its canonical
+CRUD/content/approval mapping. No frontend/main.py/MCP/Google/Canva-owner files edited.
+
+**Implemented | exact handoff:** [BACKEND_API.md](../BACKEND_API.md), OpenAPI v0.3
+(24 paths, 42 components): private workspace/work/binding/approval reads, retry-safe
+approval recovery, distribution preview/execute using existing approval, exact export
+review, and Member 4's typed private inclusion read/save/report. Inclusion saves advance
+the canonical revision, invalidating old assets/prose/jobs/approvals. New consumer
+mapping still needs 1/3 acceptance; existing endpoints stay compatible.
+
+**Implemented | attachment safety:** production factory composes `PersistentDistributor`
+with Member 4's strict `RevisionedAttachmentSource` over scoped Supabase reads. Require
+both current reviewed PNG/document, validate type/path/source/revision/hash/size, and
+pin bounded immutable bytes before Calendar invitations. Concurrent organizers cannot
+mix MIME bytes; missing/corrupt assets block all provider writes. Retries reuse receipts.
+
+**Tested live SQL:** migrations `20261017003828` (export review) and `20261017004313`
+(approval recovery/private facts) applied to project `qkfebdbwrmpisejnazud`. Rollback
+tests pass for exact hash/revision/source review, duplicate-free approval recovery,
+private sourced inputs, changed-fact revision invalidation, foreign/anonymous denial
+and prior isolation suite. Initial SQL syntax/fixture errors were corrected before
+passing runs; test data rolled back. Security advisor has no findings; performance
+advisor only unused-index INFO ([reference](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)).
+SQL/metadata tests are not actual file-upload/provider-send evidence.
+
+**Prepared deployment:** `render.yaml`, native `api.serve`, read-only `api.readiness`,
+and [setup/migration guide](../DEPLOYMENT.md). Supabase remains in place; no Docker/VPS
+required. Native startup refuses absent/hidden REST registration, absent/different
+persistent MCP dependencies, missing/invalid secrets or dev mode. Render Free sleeps
+after 15 idle minutes; an infinite calculation cannot prevent it. No host/account or
+paid resource provisioned.
+
+**Tested locally:** backend **284 passed / 1 optional ML skipped**, uncached Ruff
+and diff whitespace pass; integrated-main frontend **37 tests**, lint/build pass.
+Exact response schemas export successfully. All three rollback SQL suites passed
+on hosted Supabase; a count check after the first two showed zero events/tasks,
+export reviews and synthetic users. CI now replays every `supabase/tests/*.sql`.
+Current CLI readiness correctly fails the unregistered production composition.
+Render Blueprint parsing/actual deployment and final PR CI are separate checks.
+
+**User requested an actual stable backend address:** discovered an available Render
+integration, not yet installed/connected. Requested installation/connection; no host
+URL has been fabricated. A service's stable URL does not imply free always-on runtime.
+
+**Exact next owners:** 3 registers `create_router(settings, events=deps)` before MCP
+and passes the same `create_tool_dependencies(settings)` to `create_app`; adds typed
+create/update MCP tools, persistent OAuth callbacks, and 4's preparation/Canva preview
+approval/commit coordination. Durable Canva preview/job locks need the coordinator's
+exact lifecycle contract; encrypted vault writes alone are not exclusive write locks.
+1 adopts workspace/approval recovery/inclusion endpoints as needed. Export-byte review
+is distinct from staged Canva transaction approval.
+
+**Remaining Member 2 live blockers:** no selected/connected host, service-role/encryption
+credentials, authenticated organizer fixture, or provider grant in this checkout.
+After 3's composition: deploy, configure Vercel `BACKEND_ORIGIN`, verify actual private
+Storage upload/sign/read, restart persistence and cross-owner HTTP isolation, then
+join the rehearsal. 3's live development-store Google/Go evidence is not proof of this
+persistent path. Member 2 performed no real invitation/Calendar/Canva writes here.
+
 ## First deliverables
 
 1. Publish exact v0 event, generation, artifact, operation, and RSVP schemas/examples. Obtain 1/3/4 agreement before schema-dependent work spreads.
