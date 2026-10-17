@@ -157,14 +157,9 @@ export function ConnectedServices({
     >
       <h2 id="connected-services">Connected services</h2>
       <p className="muted">
-        Connect your own accounts once. Go needs them when it sends invitations
-        or makes a flyer, and it can’t open a sign-in page mid-task.
+        Connect these once so Go can send your invitations and make your flyer.
       </p>
-      {!accessToken && (
-        <p className="notice small">
-          Connect your organizer workspace above to link these accounts.
-        </p>
-      )}
+      {!accessToken && <p className="notice small">Sign in above first.</p>}
       {(["google", "canva"] as const).map((provider) => (
         <ProviderConnection
           key={provider}

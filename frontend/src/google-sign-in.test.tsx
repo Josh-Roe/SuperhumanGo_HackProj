@@ -42,10 +42,7 @@ it("signs in with Google and connects the organizer workspace on return", async 
   const user = userEvent.setup();
   const { unmount } = render(<App />);
   await user.click(screen.getByRole("button", { name: "Settings" }));
-  await user.click(screen.getByRole("button", { name: "Check event API" }));
-  await user.click(
-    await screen.findByRole("button", { name: "Sign in with Google" }),
-  );
+  await user.click(screen.getByRole("button", { name: "Sign in with Google" }));
   await vi.waitFor(() => expect(assign).toHaveBeenCalledOnce());
   const authorize = new URL(assign.mock.calls[0][0]);
   expect(authorize.origin + authorize.pathname).toBe(
