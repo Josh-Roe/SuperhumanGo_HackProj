@@ -14,7 +14,15 @@ The user has authorized every member's agent to edit this file. This is an excep
 6. **Adding tasks.** New tasks take the next free ID: **next manual = M11, next agent = A18**. Bump these numbers in the same edit. IDs are permanent: never renumber or reuse one. Put the task under the right owner heading with files, change and verify step. Cite where the need came from (spec line, context handoff, failing check). Add it to §4 if it is on the critical path.
 7. **Never delete tasks.** If a task is obsolete, mark it `[x]` and strike it through: `~~text~~ **Dropped:** <reason, who decided>`. Cutting scope listed in §4 needs the user's or team lead's decision. Record who made it.
 8. **Keep §1 true.** When your evidence changes a row in the Current state table, update that row and the snapshot line (date + main SHA).
-9. **Commit separately.** Commit to-do edits on their own or together with the code they report, with messages like `todo: claim A5` or `todo: done A5 (abc1234)`. If a push is rejected, merge `origin/main` and keep both sides' edits. Never force-push.
+9. **Joining with prior work (one-time reconcile).** If you already did work for your member before reading this file, do this before anything else, in a single commit (`todo: reconcile Member N`):
+   - **Done items:** for each item your work finished, mark it `[x]` with evidence per rule 4.
+   - **Partial items:** mark them `[~]` with what is left.
+   - **In-progress work:** claim the items you are working on right now.
+   - **Missing tasks:** add any your context or handoffs know about but this file lacks, per rule 6. That includes requests you made of other members that are still open.
+   - **Current state:** correct any §1 row your evidence contradicts.
+
+   Check against git history, not memory. If something can't be verified now, say so on the item.
+10. **Commit separately.** Commit to-do edits on their own or together with the code they report, with messages like `todo: claim A5` or `todo: done A5 (abc1234)`. If a push is rejected, merge `origin/main` and keep both sides' edits. Never force-push.
 
 **Deadline:** Devpost submission at 8:00 PM Pacific ([HACKATHON.md](HACKATHON.md)).
 
