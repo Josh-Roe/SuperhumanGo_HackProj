@@ -1356,5 +1356,534 @@
     ],
     "title": "InclusionReport",
     "type": "object"
+  },
+  "AssetPreparation": {
+    "$defs": {
+      "EventSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "owner_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "location": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Location",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "owner_id",
+          "revision",
+          "title",
+          "location",
+          "starts_at",
+          "ends_at",
+          "timezone"
+        ],
+        "title": "EventSnapshot",
+        "type": "object"
+      },
+      "GoContent": {
+        "additionalProperties": false,
+        "description": "Load from Member 3's trusted content repository, never raw browser claims.",
+        "properties": {
+          "event_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "owner_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "event_revision": {
+            "minimum": 1,
+            "title": "Event Revision",
+            "type": "integer"
+          },
+          "producer": {
+            "const": "superhuman_go",
+            "title": "Producer",
+            "type": "string"
+          },
+          "generation_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Generation Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "flyer_brief",
+              "flyer_copy",
+              "event_document",
+              "plain_language_summary",
+              "flyer_alt_text"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "body": {
+            "maxLength": 30000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "language": {
+            "default": "en",
+            "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$",
+            "title": "Language",
+            "type": "string"
+          },
+          "reviewed_by_organizer": {
+            "default": false,
+            "title": "Reviewed By Organizer",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "event_id",
+          "owner_id",
+          "event_revision",
+          "producer",
+          "generation_id",
+          "kind",
+          "body"
+        ],
+        "title": "GoContent",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "Internal snapshot. Transport consumers use body-free preview_metadata().",
+    "properties": {
+      "event": {
+        "$ref": "#/$defs/EventSnapshot"
+      },
+      "contents": {
+        "items": {
+          "$ref": "#/$defs/GoContent"
+        },
+        "title": "Contents",
+        "type": "array"
+      },
+      "missing_kinds": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Missing Kinds",
+        "type": "array"
+      },
+      "unreviewed_kinds": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Unreviewed Kinds",
+        "type": "array"
+      },
+      "prose_state": {
+        "enum": [
+          "awaiting_go",
+          "needs_review",
+          "reviewed"
+        ],
+        "title": "Prose State",
+        "type": "string"
+      }
+    },
+    "required": [
+      "event",
+      "contents",
+      "missing_kinds",
+      "unreviewed_kinds",
+      "prose_state"
+    ],
+    "title": "AssetPreparation",
+    "type": "object"
+  },
+  "DocumentPreparation": {
+    "$defs": {
+      "AssetRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "owner_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "event_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_revision": {
+            "minimum": 1,
+            "title": "Event Revision",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "event_document",
+              "flyer_png"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "object_key": {
+            "title": "Object Key",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "byte_length": {
+            "maximum": 10000000,
+            "minimum": 1,
+            "title": "Byte Length",
+            "type": "integer"
+          },
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "go_generation_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Go Generation Id",
+            "type": "string"
+          },
+          "review_state": {
+            "enum": [
+              "needs_review",
+              "reviewed"
+            ],
+            "title": "Review State",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "canva_design_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Canva Design Id"
+          },
+          "canva_export_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Canva Export Id"
+          },
+          "canva_generation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Canva Generation Id"
+          }
+        },
+        "required": [
+          "owner_id",
+          "event_id",
+          "event_revision",
+          "kind",
+          "object_key",
+          "sha256",
+          "byte_length",
+          "content_type",
+          "go_generation_id",
+          "review_state",
+          "created_at"
+        ],
+        "title": "AssetRecord",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "event_id": {
+        "title": "Event Id",
+        "type": "string"
+      },
+      "event_revision": {
+        "title": "Event Revision",
+        "type": "integer"
+      },
+      "state": {
+        "enum": [
+          "awaiting_go",
+          "stored"
+        ],
+        "title": "State",
+        "type": "string"
+      },
+      "missing_kinds": {
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "title": "Missing Kinds",
+        "type": "array"
+      },
+      "asset": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/AssetRecord"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      }
+    },
+    "required": [
+      "event_id",
+      "event_revision",
+      "state"
+    ],
+    "title": "DocumentPreparation",
+    "type": "object"
+  },
+  "FlyerCreationPreparation": {
+    "$defs": {
+      "CreationJob": {
+        "additionalProperties": false,
+        "properties": {
+          "owner_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "event_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_revision": {
+            "title": "Event Revision",
+            "type": "integer"
+          },
+          "generation_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Generation Id",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "completed",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Job Id"
+          },
+          "continuation_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Continuation Token"
+          },
+          "next_poll_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Poll At"
+          },
+          "polling_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Polling Instructions"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure Code"
+          },
+          "design": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DesignRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "owner_id",
+          "event_id",
+          "event_revision",
+          "generation_id",
+          "state"
+        ],
+        "title": "CreationJob",
+        "type": "object"
+      },
+      "DesignRef": {
+        "additionalProperties": false,
+        "properties": {
+          "owner_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "event_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_revision": {
+            "minimum": 1,
+            "title": "Event Revision",
+            "type": "integer"
+          },
+          "design_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Design Id",
+            "type": "string"
+          },
+          "edit_url": {
+            "title": "Edit Url",
+            "type": "string"
+          },
+          "view_url": {
+            "title": "View Url",
+            "type": "string"
+          },
+          "generation_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Generation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner_id",
+          "event_id",
+          "event_revision",
+          "design_id",
+          "edit_url",
+          "view_url",
+          "generation_id"
+        ],
+        "title": "DesignRef",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/$defs/CreationJob"
+      },
+      "generation_ids": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Generation Ids",
+        "type": "object"
+      }
+    },
+    "required": [
+      "job",
+      "generation_ids"
+    ],
+    "title": "FlyerCreationPreparation",
+    "type": "object"
   }
 }

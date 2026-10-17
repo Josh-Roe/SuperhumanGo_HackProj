@@ -2,7 +2,7 @@
 
 Member 4 working script, 2026-10-16. Website name undecided. Primary track recommendation: Productivity, with inclusion review demonstrated as a core feature. Final track belongs to the team lead. Rubric mapping follows the team's [hackathon brief](HACKATHON.md); no weights or guaranteed scores are assumed.
 
-**Current readiness:** Member 4 services pass local/synthetic tests, including a temporary combined suite against Member 3's actual queue and Gmail MIME code. A standalone fictional Canva flyer was created live through this chat; its editable elements were inspected and the transaction cancelled without edits. Local synthetic document HTML was visually inspected. Native Python Canva OAuth, real Go generation, Canva edit commit/export, Supabase and the full website → Go → Canva → Storage → Gmail/Calendar flow remain unverified. This script is a rehearsal plan, not evidence of a completed live demo.
+**Current readiness:** Member 3 reports a real Go → hosted MCP read, a claim/read/save loop for three core drafts, and authorized Calendar/Gmail publish plus duplicate-free retry (main commits `ea41bef`, `13605de`, `341b09e`). Member 4 independently checked that committed handoff; no dev server/Go credentials are present on this device to repeat it. These are owner-reported live dev-mode results, not Supabase or five-kind asset prose, automated triggers, Canva execution or Storage delivery. Member 4's preparation/queue/Storage adapters pass local integrated tests. A standalone fictional Canva flyer was created live through this chat; editable elements were inspected and cancelled without edits. Synthetic HTML was visually inspected. Native Canva OAuth, five actual Go asset outputs, live Canva commit/export, actual Storage delivery and the complete cross-provider run remain unverified. This script is a rehearsal plan.
 
 ## Story and speaking cues
 
@@ -22,7 +22,8 @@ The spoken wording is a team pitch draft, not generated event prose. All actual 
 ## Demo acceptance checklist
 
 - [ ] Consent-based test organizer/recipient accounts; no real audience list or private needs.
-- [ ] Go reads the authenticated event and stores output with correct owner/revision and generation reference; no hidden substitute model.
+- [ ] Go reads the authenticated event and stores all five asset kinds (`flyer_brief`, `flyer_copy`, `event_document`, `plain_language_summary`, `flyer_alt_text`) with current revision and generation IDs; no hidden substitute model. Use the [rehearsal prompt](canva/GO_ASSET_REHEARSAL.md).
+- [ ] Asset preparation shows actual missing/unreviewed kinds; the document is not stored until both its Go prose and summary exist. A stored review draft is not a reviewed/published artifact.
 - [ ] Custom Canva creation completes through MCP without a template; organizer edits the actual design.
 - [ ] UI renders the real inclusion report with sources and unknowns.
 - [ ] Revised time AND location appear in a saved, reviewed Canva design; old values checked and layout inspected.
