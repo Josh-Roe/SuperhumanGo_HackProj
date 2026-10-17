@@ -94,3 +94,40 @@ it("forwards nested rewritten routes and removes only the routing parameter", as
   );
   expect(response.status).toBe(400);
 });
+
+it.each(["/mcp", "/api/mcp"])(
+  "forwards the MCP protocol through %s",
+  async (path) => {
+    const { forwardMcp } = await import("./proxy.ts");
+    vi.stubEnv("BACKEND_ORIGIN", "https://backend.example");
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        new Response("{}", {
+          headers: { "Mcp-Session-Id": "synthetic-session" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    const response = await forwardMcp(
+      new Request(`https://site.example${path}`, {
+        method: "POST",
+        body: "{}",
+        headers: {
+          Authorization: "Bearer personal",
+          Accept: "application/json, text/event-stream",
+          "Mcp-Protocol-Version": "2025-03-26",
+        },
+      }),
+    );
+    expect(String(fetcher.mock.calls[0][0])).toBe(
+      "https://backend.example/mcp",
+    );
+    expect(fetcher.mock.calls[0][1].headers.get("authorization")).toBe(
+      "Bearer personal",
+    );
+    expect(fetcher.mock.calls[0][1].headers.get("accept")).toBe(
+      "application/json, text/event-stream",
+    );
+    expect(response.headers.get("mcp-session-id")).toBe("synthetic-session");
+  },
+);
