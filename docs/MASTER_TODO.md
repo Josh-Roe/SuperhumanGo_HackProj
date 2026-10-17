@@ -138,18 +138,24 @@ Never cut: live Go writing plus a provider receipt, organizer approval before se
 
 User decision, 2026-10-16: finish every coding task below before writing any documentation (A3, A12, PRESENTATION, context write-ups beyond one-line evidence). The user's own agent (the **lead coder**, on the stronger agentic plan) takes most of the coding, across owner boundaries. This is the explicit user authorization AGENTS.md requires for working outside your own paths. Other members still claim items per rule 2 before starting; the lead coder claims one queue item at a time, not the whole queue.
 
-**Lead coder (user), in this order:**
+**Lead coder (user): parallel lanes.** Each lane touches its own files, so lanes can run at the same time as separate agent sessions. Within a lane, go top to bottom. Every item can be built and tested locally/mocked now. The manual task named after **live:** only gates the live check, so leave that item `[~]` until it lands (rule 4). Migrations: each lane uses its own timestamped file, and Member 2 applies them.
 
-1. **A14**: finish unknown-effect reconciliation. Partial work is already in the working tree on the user's machine.
-2. **A1**: Render-compatible Dockerfile and `render.yaml`. This replaces the M1 `PORT` stopgap.
-3. **A10**: owner-scoped reads, idempotent approvals and the inclusion-fact save endpoint. Member 2 reviews any migration or `config.py` change before it is applied.
-4. **A16**: provider UI (flyer approve/abandon, distribution blockers, Connect Google and the A13 callback page).
-5. **A17**: inclusion fact editing in the UI, using the server's fact shape (see the note on A17).
-6. **A11**: Canva OAuth connect (per-organizer, see M6), a durable flyer-job table and lease, and Google token-cache forget.
-7. **A19**: Canva pending-export poll.
-8. **A9**: inclusion report and Canva preview transport to the UI.
-9. **A8**: Canva revision on event change. This is cut first if time runs short (§4).
-10. **A18**: organizer-tenancy check for the Go tools, with a two-organizer RPC isolation test.
+| Lane | Files (mostly) | Queue | Live check waits on |
+| --- | --- | --- | --- |
+| **L1 Workflows / Google** | `workflows/**`, `providers/google/**` | A14 → A11 (Google token-cache forget part) | live: M1 + M3 + M5 (a real reconnect) |
+| **L2 Backend API / Supabase** | `api/**`, `repositories/**`, `supabase/**` | A10 → A18 | live: Member 2 applies migrations (with M11); A18's SQL test needs Supabase access |
+| **L3 Canva** | `providers/canva/**`, `services/assets/**` | A19 → A11 (Canva OAuth + flyer-job table) → A8 → A9 | live: **M6** (Canva OAuth client) + an organizer connecting their Canva |
+| **L4 Frontend** | `frontend/**` | A16 (against the A13/A10 contracts, mocked) → A17 (after L2's A10 endpoint shape is pushed) | live: M1 + M2 + M3 |
+| **L5 Deploy** | `backend/Dockerfile`, `render.yaml` | A1 (small; run it first or alongside L1) | live: M1 (Render redeploy) |
+
+Cross-lane handoffs: L4's A17 waits on L2's A10 inclusion-fact endpoint, and L3's A9 needs L2's read routes. Push those contracts first so dependent lanes can mock against them. All lanes share one checkout on `main` (no worktrees, per the user's CLAUDE.md): commit only your lane's files, and pull before each commit.
+
+**Manual tasks to run in parallel with the lanes**, in order of how much coding they unblock:
+
+- **M6** (Member 4): the Canva OAuth client gates all live L3 work, so start it now.
+- **M1 + M3** (Members 2 and 3): Render env plus the Google redirect gate live L1, L4 and L5, then M2 → M4 → M5.
+- **M11** (Member 2): Supabase migration access gates live L2 and A2.
+- **M7** (Grammarly): nothing waits on it, so do it any time.
 
 **Other members (small, isolated, or need their own accounts):**
 
