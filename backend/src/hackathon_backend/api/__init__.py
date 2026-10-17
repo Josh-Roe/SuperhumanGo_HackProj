@@ -6,7 +6,7 @@ from typing import Annotated
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from starlette.responses import JSONResponse
@@ -16,6 +16,8 @@ from hackathon_backend.auth.identity import authenticate
 from hackathon_backend.config import Settings
 from hackathon_backend.domain.models import (
     ApprovalInput,
+    ApprovalRecord,
+    BindingsResponse,
     ConnectorInput,
     ContentReview,
     DomainError,
@@ -24,15 +26,21 @@ from hackathon_backend.domain.models import (
     EventRecord,
     EventUpdate,
     IdempotencyKey,
+    InclusionFactsResponse,
+    InclusionFactsUpdate,
     RevisionInput,
     TaskInput,
     TaskRecord,
     TaskUpdate,
+    WorkRecord,
+    WorkState,
 )
 from hackathon_backend.repositories.assets import SupabaseAssetStorage
 from hackathon_backend.repositories.organizer import OrganizerRepository
 from hackathon_backend.repositories.transport import Database
 from hackathon_backend.repositories.workflow import SupabaseWorkflowStore
+from hackathon_backend.services.assets.preparation import EventAssetPreparationService
+from hackathon_backend.services.inclusion import HolidayCalendar, InclusionInput
 from hackathon_backend.workflows.go_work import WorkflowError
 from hackathon_backend.workflows.models import WorkItem, WorkKind
 from hackathon_backend.workflows.ports import RevisionConflict
@@ -67,8 +75,12 @@ class DomainRoute(APIRoute):
 
 
 def create_router(
-    settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
+    settings: Settings,
+    *,
+    transport: httpx.AsyncBaseTransport | None = None,
+    holidays: HolidayCalendar | None = None,
 ) -> APIRouter:
+    holidays = holidays or HolidayCalendar()
     router = APIRouter(
         prefix="/api",
         route_class=DomainRoute,
@@ -186,15 +198,66 @@ def create_router(
             payload.subject,
         )
 
-    @router.post("/events/{event_id}/approvals", status_code=201)
-    async def approve(event_id: UUID, payload: ApprovalInput, repo: Repo):
-        return await repo.approve(
+    @router.post("/events/{event_id}/approvals", status_code=201, response_model=ApprovalRecord)
+    async def approve(event_id: UUID, payload: ApprovalInput, repo: Repo, response: Response):
+        """Idempotent per (revision, action, invitation_content_id): repeats return 200."""
+        approval = await repo.approve(
             str(event_id),
             payload.expected_revision,
             str(payload.invitation_content_id),
             payload.action,
             payload.acknowledged_unknowns,
         )
+        if approval.pop("replayed", False):
+            response.status_code = 200
+        return approval
+
+    @router.get("/events/{event_id}/approvals", response_model=list[ApprovalRecord])
+    async def approvals(
+        event_id: UUID,
+        repo: Repo,
+        revision: Annotated[int | None, Query(ge=1)] = None,
+    ):
+        return await repo.list_approvals(str(event_id), revision)
+
+    @router.get("/events/{event_id}/work", response_model=list[WorkRecord])
+    async def work(
+        event_id: UUID,
+        repo: Repo,
+        state: Annotated[list[WorkState] | None, Query()] = None,
+    ):
+        return await repo.list_work(str(event_id), set(state or ("awaiting_go", "running")))
+
+    @router.get("/events/{event_id}/bindings", response_model=BindingsResponse)
+    async def bindings(event_id: UUID, repo: Repo):
+        return await repo.bindings(str(event_id))
+
+    async def inclusion_view(repo: OrganizerRepository, event_id: str, row: dict | None):
+        facts = InclusionInput.model_validate(row["facts"]) if row else InclusionInput()
+        event = await repo.get("events", event_id)
+        review = await EventAssetPreparationService(
+            SupabaseWorkflowStore(repo.db), None, holidays
+        ).inclusion(repo.owner_id, event_id, event["revision"], facts)
+        return {
+            "event_id": event_id,
+            "version": row["version"] if row else 0,
+            "saved_at_event_revision": row["event_revision"] if row else None,
+            "updated_at": row["updated_at"] if row else None,
+            "facts": facts,
+            "review": review,
+        }
+
+    @router.get("/events/{event_id}/inclusion", response_model=InclusionFactsResponse)
+    async def inclusion(event_id: UUID, repo: Repo):
+        await repo.get("events", str(event_id))
+        return await inclusion_view(repo, str(event_id), await repo.inclusion_facts(str(event_id)))
+
+    @router.put("/events/{event_id}/inclusion", response_model=InclusionFactsResponse)
+    async def save_inclusion(event_id: UUID, payload: InclusionFactsUpdate, repo: Repo):
+        row = await repo.save_inclusion_facts(
+            str(event_id), payload.expected_version, payload.facts.model_dump(mode="json")
+        )
+        return await inclusion_view(repo, str(event_id), row)
 
     @router.get("/events/{event_id}/operations")
     async def operations(event_id: UUID, repo: Repo):
