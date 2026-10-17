@@ -1252,8 +1252,8 @@ function Rsvps({ record }: { record: WorkspaceEvent }) {
       <p className="eyebrow">PRIVATE / ORGANIZER ONLY</p>
       <h2>Who’s coming along?</h2>
       <p className="muted">
-        Calendar responses and Go-classified replies retain their source.
-        Ambiguous or conflicting replies need organizer review.
+        Guests answer Yes, Maybe or No on the Google Calendar invite. Email
+        replies aren’t counted yet.
       </p>
       {record.live?.rsvpsAvailable !== false && (
         <div className="metric-grid">

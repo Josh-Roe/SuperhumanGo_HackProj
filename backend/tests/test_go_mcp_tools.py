@@ -138,27 +138,14 @@ def test_go_round_trip_publish_and_rsvp(setup):
 
     thread = world.store.gmail["event-1"].thread_id
     world.gmail.receive_reply(thread, "ada@example.com", "Yes! I'm vegan, FYI.")
+    remote = next(iter(world.calendar.events.values()))
+    remote["attendees"][0]["responseStatus"] = "accepted"
     synced = ok(call(client, tokens["a"], "sync_rsvps", {"event_id": "event-1"}))
-    (reply_id,) = synced["replies_to_classify"]
-    reply = ok(call(client, tokens["a"], "get_reply", {"reply_id": reply_id}))
-    assert reply["body_text"].startswith("Yes!")
-    recorded = ok(
-        call(
-            client,
-            tokens["a"],
-            "record_rsvp_classification",
-            {
-                "reply_id": reply_id,
-                "status": "attending",
-                "confidence": 0.9,
-                "evidence": "Yes!",
-                "private_note": "vegan",
-            },
-        )
-    )
-    assert recorded["status"] == "attending" and "private_note" not in recorded
+    assert synced == {"calendar_changes": 1}  # RSVPs come from Calendar; email replies are ignored
     rows = ok(call(client, tokens["a"], "list_rsvps", {"event_id": "event-1"}))
-    assert "vegan" not in str(rows) and "example.com" not in str(rows)
+    assert [row["status"] for row in rows] == ["attending", "no_response"]
+    assert "example.com" not in str(rows)
+    assert call(client, tokens["a"], "get_reply", {"reply_id": "any"})["isError"]
 
 
 def test_google_tools_report_missing_configuration():

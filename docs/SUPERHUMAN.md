@@ -27,11 +27,11 @@ The MCP server rejects requests without a valid bearer token. `MCP_AUTH_TOKEN` i
 | Tool | Effect |
 | --- | --- |
 | `get_event` | Current revision, facts, and saved Go content; no invitee emails |
-| `list_go_work` / `claim_go_work` | Queue of prose to write and replies to classify |
+| `list_go_work` / `claim_go_work` | Queue of prose to write |
 | `save_generated_content` | Stores Go-written prose for one revision (`producer: superhuman_go`, `needs_review`) |
 | `preview_distribution` | Calendar create/update and Gmail draft/replace/change-notice plan, with blockers |
 | `execute_distribution` | Runs an organizer-made approval; idempotent Calendar upsert + Gmail send |
-| `sync_rsvps` / `get_reply` / `record_rsvp_classification` / `list_rsvps` | Calendar statuses plus Go-classified replies |
+| `sync_rsvps` / `list_rsvps` | Guests' Google Calendar responses (Yes / Maybe / No); email replies are not read |
 
 ### Guided pipeline tools (Member 3)
 
@@ -43,6 +43,10 @@ One Go conversation walks the organizer through every step; approval happens in 
 | `approve_draft` | Marks the invitation/change notice the organizer approved in chat `ready`; edited text is saved as `producer: organizer` |
 | `save_inclusion_facts` | Organizer's yes/no/unknown answers, merged with saved facts; unknown stays unsourced |
 | `send_invitations` | Records the exact-content approval and runs the same idempotent distribution; retries never resend |
+
+### Future work: RSVPs from email replies
+
+Removed 2026-10-16 to keep the demo on one RSVP source. RSVPs now come only from Google Calendar attendee response statuses. A later version could let Go read guests' replies in the sent Gmail thread and classify them (attending / maybe / not attending / needs review). Requirements carried over from the removed design: match the reply to an invited sender *and* the event's thread; strip quoted and forwarded text so one guest cannot change another's answer; require Go to quote the guest's own words as evidence; downgrade conditional, low-confidence or unsupported readings to `needs_review`; flag disagreement with the Calendar response instead of overwriting it; keep dietary/accessibility details private to the organizer. The removed implementation (`RSVPTracker.ingest_replies` / `record_classification`, MCP tools `get_reply` / `record_rsvp_classification`) is in git history before this change. The storage tables and `gmail.readonly` scope remain.
 
 The backend is the only writer to Calendar and Gmail. Go agent instructions: [`integrations/superhuman/agent/INSTRUCTIONS.md`](../integrations/superhuman/agent/INSTRUCTIONS.md).
 

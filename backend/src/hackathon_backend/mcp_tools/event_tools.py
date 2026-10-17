@@ -15,7 +15,7 @@ from pydantic import Field
 from hackathon_backend.workflows import go_work
 from hackathon_backend.workflows.distribution import Distributor
 from hackathon_backend.workflows.go_work import WorkflowError
-from hackathon_backend.workflows.models import ContentKind, Principal, RSVPStatus
+from hackathon_backend.workflows.models import ContentKind, Principal
 from hackathon_backend.workflows.ports import PrincipalResolver, WorkflowStore
 from hackathon_backend.workflows.rsvp import RSVPTracker
 
@@ -162,54 +162,11 @@ def register_event_tools(mcp: FastMCP, deps: EventToolDeps) -> None:
 
     @mcp.tool(annotations=SYNC)
     async def sync_rsvps(event_id: EventId, ctx: Context) -> dict[str, Any]:
-        """Pull Calendar responses and new invitee replies; replies queue for you to classify."""
+        """Pull guests' Calendar responses (Yes / Maybe / No). Email replies are not read."""
         who = await principal(deps, ctx)
         _, tracker = _google(deps)
         changed = await _run(tracker.sync_calendar(who.owner_id, event_id))
-        queued = await _run(tracker.ingest_replies(who.owner_id, event_id))
-        return {"calendar_changes": changed, "replies_to_classify": [r.id for r in queued]}
-
-    @mcp.tool(annotations=READ)
-    async def get_reply(
-        reply_id: Annotated[str, Field(max_length=128)], ctx: Context
-    ) -> dict[str, Any]:
-        """Read one invitee reply (quoted history removed) so you can classify it."""
-        who = await principal(deps, ctx)
-        reply = await deps.store.get_reply(who.owner_id, reply_id)
-        if reply is None or reply.invitee_id is None:
-            raise ToolError("forbidden: matched reply not found for this organizer")
-        return reply.model_dump(mode="json", include={"id", "subject", "body_text", "forwarded"})
-
-    @mcp.tool(annotations=WRITE)
-    async def record_rsvp_classification(
-        reply_id: Annotated[str, Field(max_length=128)],
-        status: RSVPStatus,
-        confidence: Annotated[float, Field(ge=0, le=1)],
-        evidence: Annotated[str, Field(max_length=500)],
-        ctx: Context,
-        conditional: bool = False,
-        private_note: Annotated[str | None, Field(max_length=1000)] = None,
-    ) -> dict[str, Any]:
-        """Record your RSVP reading of a reply: attending, maybe, not_attending or needs_review.
-
-        `evidence` must quote the sender's own words. Set conditional=true for answers like "yes
-        if it's not raining". Put dietary/accessibility details only in private_note.
-        Forwarded, conditional, low-confidence or unquoted classifications become needs_review.
-        """
-        who = await principal(deps, ctx)
-        _, tracker = _google(deps)
-        observation = await _run(
-            tracker.record_classification(
-                who.owner_id,
-                reply_id=reply_id,
-                status=status,
-                confidence=confidence,
-                evidence=evidence,
-                conditional=conditional,
-                private_note=private_note,
-            )
-        )
-        return observation.model_dump(mode="json", exclude={"private_note"})
+        return {"calendar_changes": changed}
 
     @mcp.tool(annotations=READ)
     async def list_rsvps(event_id: EventId, ctx: Context) -> list[dict[str, Any]]:

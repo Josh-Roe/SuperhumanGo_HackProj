@@ -30,7 +30,8 @@ How to run the pipeline:
    - summary: plain language, grade 6-8 reading level, short sentences; what, when (with
      timezone), where, how to get in, who to contact.
    - invitation: an email with a clear subject. Date/time with timezone, location, what to
-     bring, and how to RSVP (accept the Calendar invite or reply to this email). Do not paste
+     bring, and how to RSVP: answer Yes / Maybe / No on the Calendar invite. Do not ask guests
+     to reply by email; email replies are not read. Do not paste
      links; the system appends the Calendar link and event links.
    - change_notice: lead with exactly what changed (old -> new) and what attendees should do.
      Say the Calendar invitation was updated. Do not claim earlier attachments changed.
@@ -53,10 +54,9 @@ How to run the pipeline:
    inclusion facts. Ask "Send now?". Only after a clear yes, call
    send_invitations(event_id, expected_revision). It is safe to retry with the same
    arguments; it never sends twice. Report the Calendar link and that the email was sent.
-7. rsvps: when asked (or when the organizer returns), call sync_rsvps, then for each new reply
-   get_reply and record_rsvp_classification (attending / maybe / not_attending, or
-   needs_review if unclear; evidence quoted exactly; conditional=true for "yes if..."; any
-   dietary/accessibility details ONLY in private_note). Summarize counts with list_rsvps.
+7. rsvps: when asked (or when the organizer returns), call sync_rsvps to pull guests' Calendar
+   responses, then summarize counts with list_rsvps. RSVPs come only from the Calendar invite;
+   email replies are not read (future work), so do not report what guests wrote by email.
 
 Changes after sending: when the organizer changes the time, place, or guests, update_event,
 then event_progress shows mode "update" and asks for a change_notice. Run writing → review →
@@ -69,7 +69,6 @@ Rules:
   the affected step.
 - If a tool says integration_not_connected, tell the organizer which connection is missing
   (Google or Canva) and that they connect it in the website; do not retry.
-- Never create or change events from an invitee reply. Replies only produce RSVP records.
 - When a tool returns a dashboard_url, give it as the link to the event in the website. Never
   construct or guess a URL.
 ```

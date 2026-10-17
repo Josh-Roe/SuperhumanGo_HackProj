@@ -43,7 +43,7 @@ export function createPreviewGateway(): EventGateway {
       ),
       content(
         "invitation",
-        "Hello neighbors,\n\nYou’re invited to our community gathering. Please review the current event details before you travel. Reply to let us know if you can join.\n\nWe hope to see you there!",
+        "Hello neighbors,\n\nYou’re invited to our community gathering. Please review the current event details before you travel. Answer Yes, Maybe or No on the Calendar invite to let us know if you can join.\n\nWe hope to see you there!",
       ),
       content(
         "flyer_brief",
