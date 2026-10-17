@@ -91,6 +91,7 @@ Each item lists files, the change, and how to verify it. Run `uv run --project b
 - [ ] **A11 — Canva and Google plumbing.** Canva OAuth connect/refresh writing vault provider `canva` as `{access_token}`. A durable flyer-job table and lease, replacing vault state and the in-process lock. A Google token-cache "forget" hook so reconnects take effect immediately. Requested in 03 context.
   - Note (Member 1, User 1 lane L3, 2026-10-16 18:29 PT): **Claimed** the Canva part (OAuth connect/refresh + durable flyer-job table/lease), main. Google token-cache part is lane L1.
   - Note (Member 1, User 1 lane L1, 2026-10-16 18:32 PT): **Claimed** the Google token-cache forget part, main.
+  - Note (Member 1 lane L1, 2026-10-16): Google forget hook done `18d6295` — mocked: reconnect callback calls `VaultTokenSource.forget`, so the next call refreshes with the new grant, and an in-flight refresh can't cache the old one (`test_google_connect.py`, `test_google_oauth.py`; pytest 348 passed, the 3 `test_assets_registered_flow.py` failures come from L3's uncommitted `asset_wiring.py`). No disconnect route: vault has no delete (Member 2). Live reconnect waits on M1/M3/M5.
 
 ### Owner 3: Go, Google, composition
 
