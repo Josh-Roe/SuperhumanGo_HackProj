@@ -22,6 +22,7 @@ import { eventDate, localTime, toInstant } from "./dates";
 import "./App.css";
 import { createOrganizerGateway } from "./live";
 import { GoConnector } from "./GoConnector";
+import { InclusionEditor } from "./InclusionEditor";
 import {
   DistributionPreview,
   FlyerApproval,
@@ -549,7 +550,9 @@ function Review({
   onReview,
   onDirty,
   onContinue,
+  inclusionElsewhere = false,
 }: {
+  inclusionElsewhere?: boolean;
   record: WorkspaceEvent;
   busy: boolean;
   onPrepare: () => void;
@@ -733,7 +736,7 @@ function Review({
             })}
           </div>
         </section>
-        <section className="panel">
+        <section className="panel" hidden={inclusionElsewhere}>
           <h2>A quick inclusion check.</h2>
           {record.live?.factsReadOnly && (
             <p className="notice">
@@ -1921,9 +1924,17 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   accessToken={providerSession.access_token}
                 />
               )}
+              {record && step === "review" && providerSession && (
+                <InclusionEditor
+                  eventId={record.event.id}
+                  revision={record.event.revision}
+                  accessToken={providerSession.access_token}
+                />
+              )}
               {record && step === "review" && (
                 <Review
                   key={`${editorKey}:${recordVersion}`}
+                  inclusionElsewhere={Boolean(providerSession)}
                   record={record}
                   busy={busy}
                   onDirty={() => setDirty(true)}
