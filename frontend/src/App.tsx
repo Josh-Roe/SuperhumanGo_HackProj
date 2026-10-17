@@ -5,6 +5,8 @@ import {
   loadPublicAuthConfig,
   loadProjectStatus,
   signIn,
+  googleSignInUrl,
+  completeGoogleSignIn,
 } from "./api";
 import { createPreviewGateway } from "./preview";
 import { contentDefinitions, destinations, routeContent } from "./content";
@@ -255,6 +257,19 @@ function TransferConnection({
       setBusy(false);
     }
   }
+  async function google() {
+    if (!config) return;
+    setBusy(true);
+    setError("");
+    try {
+      window.location.assign(await googleSignInUrl(config));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to start Google sign-in.",
+      );
+      setBusy(false);
+    }
+  }
   async function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!config) return;
@@ -308,36 +323,44 @@ function TransferConnection({
         </p>
       )}
       {config && (
-        <form onSubmit={connect} className="profile-form">
-          <fieldset disabled={busy}>
-            <label>
-              Organizer account email
-              <input
-                name="email"
-                type="email"
-                autoComplete="username"
-                required
-              />
-            </label>
-            <label>
-              Account password
-              <input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-              />
-            </label>
-          </fieldset>
-          <button className="secondary" disabled={busy}>
-            {busy ? "Connecting…" : "Connect existing workspace"}
-          </button>
-        </form>
+        <button className="primary" disabled={busy} onClick={google}>
+          {busy ? "Connecting…" : "Sign in with Google"}
+        </button>
+      )}
+      {config && (
+        <details>
+          <summary>Use email and password instead</summary>
+          <form onSubmit={connect} className="profile-form">
+            <fieldset disabled={busy}>
+              <label>
+                Organizer account email
+                <input
+                  name="email"
+                  type="email"
+                  autoComplete="username"
+                  required
+                />
+              </label>
+              <label>
+                Account password
+                <input
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+            </fieldset>
+            <button className="secondary" disabled={busy}>
+              {busy ? "Connecting…" : "Connect existing workspace"}
+            </button>
+          </form>
+        </details>
       )}
       <p className="small muted">
-        No signup is required here. Session access stays in this tab and expires
-        automatically. A connected event list alone does not prove a Go write;
-        compare it with Go’s saved ID.
+        Google sign-in creates your organizer account on first use. Session
+        access stays in this tab and expires automatically. A connected event
+        list alone does not prove a Go write; compare it with Go’s saved ID.
       </p>
     </section>
   );
@@ -1449,6 +1472,46 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
     );
     return () => clearTimeout(timer);
   }, [session]);
+  function connectWorkspace(next: EventGateway, activeSession: Session) {
+    if (!canLeave()) return;
+    epoch.current++;
+    setEvents([]);
+    setBusy(false);
+    setGateway(next);
+    setSession(activeSession);
+    setRecord(null);
+    setEditing(false);
+    setStarting(false);
+    setDirty(false);
+    setMessage(
+      "Connected to real organizer events. Open Your events to compare Go’s saved ID.",
+    );
+  }
+  const googleSignInResult = useEffectEvent(
+    (result: { gateway: EventGateway; session: Session } | Error) => {
+      if (!(result instanceof Error))
+        return connectWorkspace(result.gateway, result.session);
+      setPage("settings");
+      setError(result.message);
+    },
+  );
+  useEffect(() => {
+    if (eventGateway) return;
+    completeGoogleSignIn()
+      .then(async (activeSession) => {
+        if (!activeSession) return;
+        const next = createOrganizerGateway(activeSession.access_token);
+        await next.list();
+        googleSignInResult({ gateway: next, session: activeSession });
+      })
+      .catch((err: unknown) =>
+        googleSignInResult(
+          err instanceof Error
+            ? err
+            : new Error("Google sign-in did not finish."),
+        ),
+      );
+  }, [eventGateway]);
   async function run<T>(action: () => Promise<T>, done: (value: T) => void) {
     const requestEpoch = epoch.current;
     setBusy(true);
@@ -2050,23 +2113,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
             <>
               <GoHandoff expanded />
               {gateway.mode === "preview" ? (
-                <TransferConnection
-                  onConnected={(next, activeSession) => {
-                    if (!canLeave()) return;
-                    epoch.current++;
-                    setEvents([]);
-                    setBusy(false);
-                    setGateway(next);
-                    setSession(activeSession);
-                    setRecord(null);
-                    setEditing(false);
-                    setStarting(false);
-                    setDirty(false);
-                    setMessage(
-                      "Connected to real organizer events. Open Your events to compare Go’s saved ID.",
-                    );
-                  }}
-                />
+                <TransferConnection onConnected={connectWorkspace} />
               ) : (
                 <section className="panel">
                   <h2>Workspace connected</h2>
