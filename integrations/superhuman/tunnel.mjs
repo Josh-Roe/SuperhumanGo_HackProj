@@ -2,6 +2,7 @@
 // through a Cloudflare quick tunnel and point the Go connector at the tunnel's random hostname.
 // Usage: npm run tunnel [-- --port 8000] [-- --no-upload]
 import { spawn, spawnSync } from "node:child_process";
+import { Resolver } from "node:dns/promises";
 
 const args = process.argv.slice(2);
 const portIndex = args.indexOf("--port");
@@ -38,9 +39,17 @@ const origin = await new Promise((resolve, reject) => {
   });
 });
 
-// A new quick-tunnel hostname takes a few seconds to resolve.
+// A new quick-tunnel hostname takes a few seconds to exist. Ask 1.1.1.1 until it does: an early
+// system lookup caches the "not found" answer and the tunnel looks dead for minutes.
+const resolver = new Resolver();
+resolver.setServers(["1.1.1.1"]);
+let resolved = false;
+for (let attempt = 0; attempt < 30 && !resolved; attempt++) {
+  resolved = await resolver.resolve4(new URL(origin).hostname).then(() => true, () => false);
+  if (!resolved) await new Promise((done) => setTimeout(done, 2000));
+}
 let reachable = false;
-for (let attempt = 0; attempt < 30 && !reachable; attempt++) {
+for (let attempt = 0; attempt < 15 && resolved && !reachable; attempt++) {
   const response = await fetch(`${origin}/api/health`).catch(() => null);
   reachable = Boolean(response?.ok);
   if (!reachable) await new Promise((done) => setTimeout(done, 2000));
