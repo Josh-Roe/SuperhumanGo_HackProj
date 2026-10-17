@@ -72,7 +72,7 @@ async function forwardBackend(
       headers,
       body,
       redirect: "manual",
-      signal: AbortSignal.any([request.signal, AbortSignal.timeout(20000)]),
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(40000)]),
     });
     // Redirects must not redirect organizer credentials or browser navigation to another host.
     if (upstream.status >= 300 && upstream.status < 400)

@@ -42,7 +42,7 @@ const steps: { id: Step; name: string }[] = [
 ];
 const GO_URL = "https://go.superhuman.com/";
 // Name of the Pack installed in Go (integrations/superhuman, pack 72744).
-const CONNECTOR_NAME = "Hackathon Workspace";
+const CONNECTOR_NAME = "Onrender";
 // Bird art: Microsoft Fluent Emoji 3D (MIT), see public/flock/LICENSE.txt.
 function flock(name: string) {
   return `/flock/${name}.png`;

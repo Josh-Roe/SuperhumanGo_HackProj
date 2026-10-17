@@ -318,7 +318,8 @@ export async function requestJson(
 ): Promise<unknown> {
   const response = await fetch(path, {
     method,
-    signal: AbortSignal.timeout(12000),
+    // Render Free can take longer to serve concurrent event panel reads.
+    signal: AbortSignal.timeout(45000),
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${typeof token === "string" ? token : token()}`,
