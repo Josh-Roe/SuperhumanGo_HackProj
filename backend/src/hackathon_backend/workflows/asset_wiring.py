@@ -132,6 +132,30 @@ class FlyerState(BaseModel):
             "prior_attempts": len(self.history),
         }
 
+    def pending_approval(self, current_revision: int) -> dict[str, Any] | None:
+        """A9: the Canva operation awaiting organizer approval, or None.
+
+        Only a preview of the current event revision is approvable; Canva thumbnail URLs are
+        short-lived, so re-preview (which yields a new digest) when they stop loading.
+        """
+        if self.stage != "previewed" or not self.preview or self.event_revision != current_revision:
+            return None
+        return {
+            "operation_id": (self.job or {}).get("job_id"),
+            "design_id": (self.design or {}).get("design_id"),
+            "event_revision": self.event_revision,
+            "digest": self.preview["digest"],
+            "thumbnail_urls": self.preview["thumbnail_urls"],
+            "approve": {
+                "method": "POST",
+                "path": f"/api/events/{self.event_id}/assets/flyer/approve",
+                "body": {
+                    "expected_revision": self.event_revision,
+                    "preview_digest": self.preview["digest"],
+                },
+            },
+        }
+
     def archived(self) -> dict[str, Any]:
         return self.model_dump(mode="json", exclude={"continuation_token", "history"})
 
@@ -530,6 +554,8 @@ class AssetCoordinator:
             return {
                 "prose": batch.preview_metadata(),
                 "flyer": flyer.public() if flyer else None,
+                "flyer_stale": bool(flyer and flyer.event_revision < event.revision),
+                "flyer_pending_approval": flyer.pending_approval(event.revision) if flyer else None,
                 "flyer_required_for_invitations": bool(flyer and flyer.stage != "abandoned"),
                 "canva": "connected" if connected else "integration_not_connected",
                 "storage": "configured"
