@@ -1,6 +1,6 @@
 # Master to-do: everything left before the spec is met
 
-Snapshot 2026-10-16 (America/Los_Angeles), main at `64eaa74`. Written for agents. Read [AGENTS.md](../AGENTS.md) and the four [contexts](contexts/) first. Those files take precedence over this list. Never record secrets or private RSVP data here.
+Snapshot 2026-10-16 (America/Los_Angeles), main at `2ff7f6f`. Written for agents. Read [AGENTS.md](../AGENTS.md) and the four [contexts](contexts/) first. Those files take precedence over this list. Never record secrets or private RSVP data here.
 
 ## How to contribute (all agents, read before editing)
 
@@ -34,7 +34,7 @@ Tags: `[MANUAL]` needs a human with an account, browser, dashboard or judgment. 
 
 | Demo step | Evidence today | Gap |
 | --- | --- | --- |
-| Backend hosting | Render service `https://superhuman-go-event-backend.onrender.com` exists, but `/api/health` and `/mcp` return no response (checked 2026-10-16). Likely cause: `backend/Dockerfile` hardcodes `--port 8000`, while Render injects `PORT`. | A host that answers (see A1, M1) |
+| Backend hosting | Member 4 verified Render `/api/health` and `/api/config` return 200 (2026-10-16); `/api/canva/status` is 404. Service settings are inaccessible in the signed-in Render workspace. | Provider env/routes deployment and owner access (M1, A11) |
 | Website | `https://mtcxhackathon1.vercel.app` serves the frontend. `/api/*` returns 503 because `BACKEND_ORIGIN` is unset. | M2 |
 | Create event via Go | `create_event`/`update_event` MCP tools are implemented and tested (mocked). They return `dashboard_url` when `APP_URL` is set. Not live against Supabase. | M1–M5, A2, A3 |
 | Go prepares prose | Live in **dev mode** (in-memory, `dev-event-1`): Go saved description, summary, invitation, change notice. Not live on Supabase. | Re-run on Supabase (M8) |
@@ -66,7 +66,7 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
   - Note (Member 3, 2026-10-16): the Render build is uploaded (A4). Remaining: Release in Pack Studio → Go → Connectors → sign in again with an organizer token. Owner 3. After M1: run `npm --prefix integrations/superhuman run configure -- https://superhuman-go-event-backend.onrender.com/mcp`, then `check` and `upload` (an agent can run these if the Pack CLI is logged in; see A4). Release from the Pack Studio web UI. Then, in Go → Connectors, sign in again with an organizer token (no trailing newline). Done when Go runs `workspace_status` and `list_events` successfully.
   - Note (Member 3, 2026-10-16): pack 72744 v3 proved Go → MCP live in dev mode via a quick tunnel (`ea41bef`, `13605de`). That tunnel was shut down on 2026-10-16, so the installed connector now points at a dead host until this item lands. Render `/api/health` still did not answer at reconcile time (curl timeout).
 - [ ] **M5 — Organizer account setup.** Each demo organizer: sign in at the website, Settings → "Create personal Go token" (use it in M4), then Connect Google (`POST /api/google/connect`) and check that `GET /api/google/status` shows connected.
-- [ ] **M6 — Canva.** Owner 4. Get an eligible Canva account, the flyer template and its fields, and the Canva app credentials. Record their names (never values) in the 04 context. Unblocks A7 and A8.
+- [x] **M6 — Canva.** Owner 4. Registered the per-organizer Canva OAuth client; no template is required per the user clarification below. **Done:** Member 4, 2026-10-16, `codex/member-4-canva-oauth` — live: draft app `Event Workspace` (`AAHOGIOFimI`), MCP enabled, HTTPS Render callback saved; generated credentials kept only in ignored server environment file. OAuth consent/deployment and export proof remain A11/A7/A8.
   - Note (user decision, 2026-10-16): no team Canva account and no template. Each organizer connects **their own** Canva (per-organizer token in the vault, already how `connect_canva` works; custom design per event per the 04 context). What M6 still needs is only a registered Canva OAuth client (app client ID/secret, plus redirect URI) so organizers can connect their Canva via A11's connect flow. Record names, never values.
 - [x] ~~**M7 — Grammarly proof.** Owner 3 or 4. In a supported Grammarly or Superhuman client, show Grammarly assistance on Go-written event prose. Record a screenshot outside Git and note it in the context.~~ **Dropped:** user decision 2026-10-16, Grammarly is out of scope entirely.
 
@@ -90,6 +90,7 @@ Each item lists files, the change, and how to verify it. Run `uv run --project b
 - [~] **A10 — Read contracts the UI needs.** Owner-scoped REST reads for current Go work, Gmail binding (sent/draft IDs + revision), and approvals. Make approval creation idempotent and recoverable on reload. A versioned save endpoint for inclusion facts. Requested in 01 context. **Claimed:** Member 1 (User 1, lane L2), 2026-10-16 18:25 PT, main
 - [ ] **A11 — Canva and Google plumbing.** Canva OAuth connect/refresh writing vault provider `canva` as `{access_token}`. A durable flyer-job table and lease, replacing vault state and the in-process lock. A Google token-cache "forget" hook so reconnects take effect immediately. Requested in 03 context.
   - Note (Member 1, User 1 lane L3, 2026-10-16 18:29 PT): **Claimed** the Canva part (OAuth connect/refresh + durable flyer-job table/lease), main. Google token-cache part is lane L1.
+  - Note (Member 4, 2026-10-16): before this claim was discovered, the user explicitly requested backend Canva OAuth; a locally tested PKCE/vault-refresh/Settings implementation was prepared on `codex/member-4-canva-oauth`. Publishing it as an integration candidate for L3 to adopt; L3 retains A11 ownership. Render deployment requires the service owner; the signed-in account has no service access.
 
 ### Owner 3: Go, Google, composition
 
