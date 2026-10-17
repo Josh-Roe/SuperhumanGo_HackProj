@@ -1513,3 +1513,19 @@ summary {
     display: none;
   }
 }
+
+/* Provider panels (ProviderPanels.tsx) */
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.expected-text div {
+  display: flex;
+  gap: 8px;
+}
+.expected-text dt {
+  font-weight: 600;
+  text-transform: capitalize;
+}

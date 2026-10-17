@@ -1,12 +1,26 @@
 # Member 4 context: Canva, inclusion, documents, presentation
 
 Owner: Member 4 (human name/GitHub pending). Updated 2026-10-16.
-Status: **Member 3 asset registration accepted and verified locally through actual main/app composition; live Canva account/export/Storage gates remain**.
-Branch: `codex/member-4-canva-inclusion`; fast-forwarded main through `973bdb9` on 2026-10-16.
-Current follow-up: [PR #8](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/8), ready for peer review; not merged.
+Status: **Canva app/callback configured live; backend OAuth candidate implemented/tested for the lane L3 owner; shared provider Settings UI adopted from main; live grant/deployment blocked on Render service-owner access**.
+Current branch: `codex/member-4-canva-oauth`, integrates main `2d2c99d`. Earlier asset work used `codex/member-4-canva-inclusion`.
+Earlier [PR #8](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/8) merged at `f99555b` after CI `38988449611` passed checks/database jobs.
 Earlier implementation [PR #1](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/1) merged at `30029f7`; its corrected CI run `38986042015` passed both jobs. Current follow-up preserves peer-owned composition.
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/04_CANVA_INCLUSION.md) before work. Write only this personal context. Preserve other members' files.
+
+## Canva Developer Portal and backend OAuth — 2026-10-16
+
+**User explicitly requested creating the Canva app and getting OAuth working with the backend**, supplied `https://superhuman-go-event-backend.onrender.com/`, and completed Canva MFA after the portal required it. This task authorizes the necessary small config/composition and Settings connection edits beyond Member 4's usual paths; other members' contexts remain untouched. No `main.py`, dependency, lockfile, database migration or Google provider logic was changed.
+
+**Live portal setup:** created public **draft** app `Event Workspace`, app ID `AAHOGIOFimI`, OAuth client ID `OC-AaFHb2zo0SoS`, under the visible Josh R account. Enabled Canva MCP and disabled the unused REST integration. Registered `https://superhuman-go-event-backend.onrender.com/api/canva/callback`. Generated a client secret and saved it only in ignored `backend/.env.canva` with mode 0600; no secret values are in Git or this context. App was not submitted/released. Browser proof is a local screenshot outside Git. Read Canva's actual protected-resource `/mcp` and authorization-server metadata: resource `https://mcp.canva.com/mcp`, authorization `/authorize`, token `/token`, S256 PKCE and Basic client authentication.
+
+**Implemented/tested:** `providers/canva/oauth.py` obtains and refreshes owner-scoped tokens in the existing encrypted vault, preserving rotated refresh tokens. `providers/canva/oauth_routes.py` supplies authenticated POST `/api/canva/connect`, GET `/status`, POST `/verify`, and browser `/start`/`/callback`. The bootstrap checks the configured dashboard/backend referrer, binds an HttpOnly/Secure/SameSite cookie, and consumes bounded 10-minute owner-bound state/PKCE once. This supports the Vercel proxy without passing Supabase tokens through URLs. Callback returns a credential-free success page. Verification discovers actual create/review/export tools without publishing a flyer. All provider errors are sanitized; responses are private/no-store. Token refresh and consent state use one process: keep one worker until durable shared leases/state are added.
+
+**Integration handoff (2026-10-16):** discovered A11's lane L3 claim after preparing OAuth; that owner retains the task. This branch is an adoption candidate, not a competing main implementation. Uses `oauth_routes.py` to preserve upstream `connect.py` export polling; retains A19 pending-job resume and adopts `c308e0e`'s shared provider UI instead of adding a duplicate Settings panel. No frontend or main.py changes remain. Backend **337 passed / 1 optional ML skipped**, Ruff passes; shared UI **61 tests**, lint/build pass. Provider/Auth tests are mocked; no live grant/export proof.
+
+**Blocked live activation:** Render health and public config both returned HTTP 200; Canva routes are not deployed yet (status HTTP 404). The signed-in Render account exposes only an empty CalSpork workspace, not this backend service. User asked for instructions to its owner; copy-ready deployment instructions were provided. The owner must grant service access or deploy the OAuth code and set the three Canva env variables plus correct `APP_URL`, retaining existing Supabase credentials/vault key. No actual account grant, hosted token refresh, Canva export or Storage/email run was claimed or performed. After deployment, sign into the website with the actual organizer account, connect Canva from shared Settings, finish consent, verify tools through POST `/api/canva/verify`, then perform the five-kind Go → reviewed flyer → export/Storage rehearsal.
+
+**New live gate:** main `25baa36` independently added REST OAuth while this portal app is MCP-only. A20 records the mismatch for lane L3; this branch is a draft candidate and must not be merged over its new OAuth module. Verify token audience and REST-export-poll compatibility live before claiming A7/A8.
 
 ## PR #8 merge integration — 2026-10-16
 
