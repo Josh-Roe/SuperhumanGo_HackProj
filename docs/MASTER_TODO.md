@@ -1,6 +1,6 @@
 # Master to-do: everything left before the spec is met
 
-Snapshot 2026-10-16 (America/Los_Angeles), main at `e052761`. Written for agents. Read [AGENTS.md](../AGENTS.md) and the four [contexts](contexts/) first. Those files take precedence over this list. Never record secrets or private RSVP data here.
+Snapshot 2026-10-16 (America/Los_Angeles), main at `64eaa74`. Written for agents. Read [AGENTS.md](../AGENTS.md) and the four [contexts](contexts/) first. Those files take precedence over this list. Never record secrets or private RSVP data here.
 
 ## How to contribute (all agents, read before editing)
 
@@ -44,7 +44,7 @@ Tags: `[MANUAL]` needs a human with an account, browser, dashboard or judgment. 
 | Change time/location | Live in dev mode: same Calendar ID patched, change notice in same Gmail thread. | Same, plus Canva revision |
 | RSVP | `sync_rsvps` live returns `no_response`. Reply classification is not live-verified. | M8 |
 | Grammarly | Dropped (user decision 2026-10-16). | None |
-| Tests | 313 backend tests pass on `e052761` (rerun by Member 3); frontend 51 tests pass (Member 1 context). | Keep green |
+| Tests | 313 backend tests pass on `e052761` (rerun by Member 3); frontend 52 tests pass (User 3, `c524b06`/`64eaa74`, local). | Keep green |
 
 ## 2. Manual tasks `[MANUAL]`
 
@@ -73,7 +73,7 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
 ### Live proof and submission
 
 - [ ] **M8 — Full live rehearsal on Supabase.** Everyone. Use authorized test inboxes only. Steps: ask Go to create an event (open its `dashboard_url`) → prepare assets → website inclusion review → website approval → Go `execute_distribution` → change the time and location through Go or the website → re-prepare, approve and execute → a second test account replies "yes" and accepts in Calendar → `sync_rsvps`/`list_rsvps`. Capture receipt IDs (Calendar event ID, Gmail message/thread IDs, Canva design/export IDs, revisions) in the 03 context. Requires M1–M6 and A2, A3 and A5.
-- [~] **M9 — Accessibility audit.** **Claimed:** User 3, 2026-10-16 18:25 PT, `main`. Owner 1. ~~Real phone check and~~ a screen-reader pass on the deployed site.
+- [!] **M9 — Accessibility audit.** **Claimed:** User 3, 2026-10-16 18:25 PT, `main`. Owner 1. ~~Real phone check and~~ a screen-reader pass on the deployed site. **Evidence:** `64eaa74` — local: six desktop AX/axe screens, skip-link keyboard check, focus fixes; 52 tests/lint/build pass. **Blocked:** native desktop bridge failed to start; actual screen-reader speech/control unavailable → needs local desktop VoiceOver pass (no deploy needed).
   - Note (user decision, 2026-10-16): phones are not a target; desktop only. Phone check dropped.
 - [ ] **M10 — Devpost by 8 PM PT.** Team lead. Fill in: name (still undecided), primary track (working pick: Productivity), description, agent-integration write-up, demo video recorded from M8, repo plus working demo link and setup steps, all four member names, tools and credits including the **pre-existing scaffold disclosure** (HACKATHON.md). Before submitting, check that no link exposes keys or private data. Prepare the 2-minute live pitch ([PRESENTATION.md](PRESENTATION.md)).
 
