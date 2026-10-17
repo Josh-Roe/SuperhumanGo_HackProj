@@ -5,6 +5,7 @@ import {
   loadAssetStatus,
   loadConnection,
   loadDistributionPlan,
+  loadPipelineProgress,
   ProviderRequestError,
   providerNames,
   readCallback,
@@ -15,6 +16,7 @@ import type {
   CallbackResult,
   Connection,
   DistributionPlan,
+  PipelineProgress as Progress,
   FlyerView,
   Provider,
 } from "./providers";
@@ -443,6 +445,92 @@ export function DistributionPreview({
             </p>
           )}
         </>
+      )}
+    </section>
+  );
+}
+
+const stageNames: Record<string, string> = {
+  details: "Event details",
+  writing: "Go writes the drafts",
+  review: "You approve the invitation",
+  inclusion: "Access, food and sensory check",
+  flyer: "Canva flyer (optional)",
+  send: "Send invites and email",
+  rsvps: "Track RSVPs",
+};
+const badgeTone: Record<string, string> = {
+  done: "success",
+  todo: "",
+  optional: "neutral",
+  blocked: "warning",
+};
+const statusText: Record<string, string> = {
+  done: "Done",
+  todo: "To do",
+  optional: "Optional",
+  blocked: "Blocked",
+};
+
+export function PipelineProgress({
+  eventId,
+  revision,
+  accessToken,
+}: {
+  eventId: string;
+  revision: number;
+  accessToken: string;
+}) {
+  const [progress, setProgress] = useState<Progress>();
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    loadPipelineProgress(eventId, accessToken).then(
+      (value) => active && setProgress(value),
+      (err) => {
+        if (!active) return;
+        setError(
+          err instanceof ProviderRequestError && err.code === "api_unavailable"
+            ? 'Progress is not available on this server yet. Ask Go: "Where is my event in the pipeline?"'
+            : failure(err, "Pipeline progress could not be loaded."),
+        );
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [eventId, accessToken, revision]);
+  return (
+    <section className="panel pipeline" aria-labelledby="pipeline-progress">
+      <h2 id="pipeline-progress">Where this event is</h2>
+      <p>
+        Superhuman Go walks you through each step in one chat. This page shows
+        your progress.
+      </p>
+      {error && <p role="alert">{error}</p>}
+      {!progress && !error && <p role="status">Loading progress…</p>}
+      {progress && (
+        <ol aria-label="Pipeline stages">
+          {progress.stages.map((item) => (
+            <li
+              key={item.stage}
+              className={`stage-${item.status}`}
+              aria-current={
+                item.stage === progress.next_stage ? "step" : undefined
+              }
+            >
+              <strong>{stageNames[item.stage] ?? item.stage}</strong>{" "}
+              <span className={`badge ${badgeTone[item.status]}`}>
+                {statusText[item.status]}
+              </span>
+              {item.stage === progress.next_stage && (
+                <span className="badge"> Next</span>
+              )}
+              <br />
+              <small>{item.detail}</small>
+            </li>
+          ))}
+        </ol>
       )}
     </section>
   );
