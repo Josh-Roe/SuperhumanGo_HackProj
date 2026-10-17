@@ -1,6 +1,6 @@
 """Strict public inputs. Owner identity and revisions are always server controlled."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -13,6 +13,8 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+
+from hackathon_backend.services.inclusion import InclusionInput, InclusionReport
 
 IdempotencyKey = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[!-~]+$")]
 
@@ -125,6 +127,73 @@ class DistributionInput(RevisionInput):
 class ConnectorInput(Input):
     label: str = Field(default="Superhuman Go", min_length=1, max_length=100)
     expires_in_days: int = Field(default=30, ge=1, le=90)
+
+
+# A10 read contracts. Responses never include owner IDs, credentials or private RSVP notes.
+
+WorkState = Literal["awaiting_go", "running", "succeeded", "failed", "superseded"]
+
+
+class WorkRecord(BaseModel):
+    id: str
+    event_id: str
+    event_revision: int
+    kind: str
+    state: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: AwareDatetime | None = None
+    claimed_at: AwareDatetime | None = None
+
+
+class GmailBindingRecord(BaseModel):
+    event_revision: int
+    content_id: str
+    draft_id: str | None = None
+    message_id: str | None = None
+    thread_id: str | None = None
+    sent: bool = False
+    sent_history: list[dict[str, Any]] = Field(default_factory=list)
+    stale: bool
+
+
+class CalendarBindingRecord(BaseModel):
+    event_revision: int
+    calendar_id: str = "primary"
+    remote_event_id: str
+    html_link: str | None = None
+    stale: bool
+
+
+class BindingsResponse(BaseModel):
+    event_id: UUID
+    event_revision: int
+    calendar: CalendarBindingRecord | None
+    gmail: GmailBindingRecord | None
+
+
+class ApprovalRecord(BaseModel):
+    id: UUID
+    event_id: UUID
+    event_revision: int
+    action: Literal["publish", "update", "draft_only"]
+    invitation_content_id: UUID
+    content_hash: str
+    acknowledged_unknowns: bool
+    approved_at: AwareDatetime
+
+
+class InclusionFactsUpdate(Input):
+    expected_version: int = Field(ge=0)
+    facts: InclusionInput
+
+
+class InclusionFactsResponse(BaseModel):
+    event_id: UUID
+    version: int
+    saved_at_event_revision: int | None
+    updated_at: AwareDatetime | None
+    facts: InclusionInput
+    review: InclusionReport
 
 
 class ErrorDetail(BaseModel):

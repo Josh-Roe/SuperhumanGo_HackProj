@@ -55,6 +55,13 @@ jobs:
         run: docker build -t hackathon-frontend ./frontend
       - name: Build backend image
         run: docker build -t hackathon-backend ./backend
+      - name: Backend image honors Render's PORT
+        env:
+          MCP_AUTH_TOKEN: ci-placeholder-not-a-secret
+        run: |
+          docker run -d --name render-port -e PORT=10000 -e MCP_AUTH_TOKEN -e RENDER_EXTERNAL_HOSTNAME=localhost -p 10000:10000 hackathon-backend
+          curl --retry 12 --retry-all-errors --retry-delay 2 --fail http://localhost:10000/api/health || { docker logs render-port; exit 1; }
+          docker rm -f render-port
       - name: Smoke test container stack
         env:
           MCP_AUTH_TOKEN: ci-placeholder-not-a-secret

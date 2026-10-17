@@ -28,6 +28,7 @@ class FakeCalendar:
         self.events: dict[str, dict] = {}
         self.calls: list[tuple[str, str]] = []
         self.fail_next: int | None = None
+        self.crash_after_insert = False  # the worker process dies after Google applied the insert
 
     def _maybe_fail(self):
         if self.fail_next:
@@ -40,6 +41,9 @@ class FakeCalendar:
         if body["id"] in self.events:
             raise ProviderError(409, "duplicate")
         self.events[body["id"]] = {**body, "etag": '"1"', "htmlLink": f"https://cal/{body['id']}"}
+        if self.crash_after_insert:
+            self.crash_after_insert = False
+            raise RuntimeError("worker process crashed")
         return self.events[body["id"]]
 
     async def get_event(self, owner_id, calendar_id, event_id):
@@ -69,7 +73,10 @@ class FakeGmail:
         self.threads: dict[str, list[str]] = {}
         self.sent: list[dict] = []
         self.counter = 0
+        self.drafts_created = 0
         self.crash_after_send = False
+        self.fail_send_before: int | None = None  # request never reached Gmail (status raised)
+        self.fail_after_create: int | None = None  # draft created, then the response was lost
 
     def _id(self, prefix):
         self.counter += 1
@@ -92,6 +99,10 @@ class FakeGmail:
         draft_id = self._id("d")
         message = self._store(raw_mime, thread_id, ["DRAFT"])
         self.drafts[draft_id] = message
+        self.drafts_created += 1
+        if self.fail_after_create:
+            status, self.fail_after_create = self.fail_after_create, None
+            raise ProviderError(status, "Gmail request timed out")
         return {"id": draft_id, "message": {"id": message["id"], "threadId": message["threadId"]}}
 
     async def update_draft(self, owner_id, draft_id, raw_mime, thread_id):
@@ -108,6 +119,9 @@ class FakeGmail:
         return {"id": draft_id} if draft_id in self.drafts else None
 
     async def send_draft(self, owner_id, draft_id):
+        if self.fail_send_before:
+            status, self.fail_send_before = self.fail_send_before, None
+            raise ProviderError(status, "Gmail request timed out")
         if draft_id not in self.drafts:
             raise ProviderError(404, "not found")
         message = self.drafts.pop(draft_id)
@@ -115,7 +129,7 @@ class FakeGmail:
         self.sent.append(message)
         if self.crash_after_send:
             self.crash_after_send = False
-            raise ProviderError(503, "connection lost after send")
+            raise ProviderError(504, "Gmail request timed out after the send was applied")
         return {"id": message["id"], "threadId": message["threadId"], "labelIds": ["SENT"]}
 
     async def get_message(self, owner_id, message_id):
@@ -123,6 +137,27 @@ class FakeGmail:
 
     async def list_thread_messages(self, owner_id, thread_id):
         return [self.messages[m] for m in self.threads.get(thread_id, [])]
+
+    async def find_by_message_id(self, owner_id, rfc822_message_id):
+        bare = rfc822_message_id.strip("<>")
+        draft_ids = {message["id"]: draft_id for draft_id, message in self.drafts.items()}
+        return [
+            {
+                "id": message["id"],
+                "threadId": message["threadId"],
+                "labelIds": message["labelIds"],
+                "draft_id": draft_ids.get(message["id"]),
+            }
+            for message in self.messages.values()
+            if "parsed" in message and (message["parsed"]["Message-ID"] or "").strip("<>") == bare
+        ]
+
+    def user_deletes_drafts(self):
+        """Deleting a draft in Gmail deletes its message too; nothing was sent."""
+        for message in self.drafts.values():
+            self.messages.pop(message["id"], None)
+            self.threads[message["threadId"]].remove(message["id"])
+        self.drafts.clear()
 
     def receive_reply(self, thread_id, sender, text, subject="Re: Invitation"):
         message_id = self._id("r")

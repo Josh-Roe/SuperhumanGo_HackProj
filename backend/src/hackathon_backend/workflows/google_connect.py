@@ -91,7 +91,10 @@ def google_connect_router(
     *,
     states: OAuthStates | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
+    on_change: Callable[[str], None] | None = None,
 ) -> APIRouter:
+    """`on_change(owner_id)` runs after a new grant is stored, e.g. VaultTokenSource.forget, so
+    the next Google call uses the reconnected account instead of a cached access token."""
     config = GoogleOAuthConfig(
         settings.google_client_id, settings.google_client_secret, settings.google_redirect_uri
     )
@@ -147,6 +150,8 @@ def google_connect_router(
         if not isinstance(email, str) or not email:
             raise DomainError("provider_failed", "Google did not return the account email", 502)
         await vault.put_refresh_token(owner_id, email, grant.refresh_token, grant.scope)
+        if on_change is not None:
+            on_change(owner_id)
         return email
 
     @router.get("/status")

@@ -349,20 +349,7 @@ export async function requestJson(
   }
   return response.status === 204 ? null : response.json();
 }
-export const authConfigured = Boolean(
-  import.meta.env.VITE_SUPABASE_URL &&
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY &&
-  import.meta.env.VITE_EVENT_API_ENABLED === "true",
-);
-export async function signIn(
-  email: string,
-  password: string,
-  config?: PublicAuthConfig,
-): Promise<Session> {
-  if (!config && !authConfigured)
-    throw new Error(
-      "Live sign-in is awaiting a connected organizer account. Use the local preview.",
-    );
+function supabaseOrigin(config?: PublicAuthConfig): string {
   const url = new URL(
     config?.supabase_url ?? import.meta.env.VITE_SUPABASE_URL,
   );
@@ -376,24 +363,33 @@ export async function signIn(
       ))
   )
     throw new Error("Supabase requires HTTPS.");
+  return url.origin;
+}
+function publishableKey(config?: PublicAuthConfig): string {
+  return (
+    config?.supabase_publishable_key ??
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+  );
+}
+async function tokenSession(
+  config: PublicAuthConfig | undefined,
+  grant: string,
+  body: unknown,
+  failure: string,
+): Promise<Session> {
   const response = await fetch(
-    `${url.origin}/auth/v1/token?grant_type=password`,
+    `${supabaseOrigin(config)}/auth/v1/token?grant_type=${grant}`,
     {
       method: "POST",
       signal: AbortSignal.timeout(12000),
       headers: {
-        apikey:
-          config?.supabase_publishable_key ??
-          import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey: publishableKey(config),
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(body),
     },
   );
-  if (!response.ok)
-    throw new Error(
-      "Sign-in failed. Check your credentials and Supabase email/password settings.",
-    );
+  if (!response.ok) throw new Error(failure);
   const data: unknown = await response.json();
   if (
     !isRecord(data) ||
@@ -410,6 +406,70 @@ export async function signIn(
     email: data.user.email,
     expires_at: Date.now() + data.expires_in * 1000,
   };
+}
+// Google sign-in through Supabase Auth's PKCE flow. The verifier and the public
+// config survive the redirect in sessionStorage; tokens never appear in the URL.
+const GOOGLE_PENDING = "google-sign-in";
+const CALLBACK_PARAMS = ["code", "error", "error_code", "error_description"];
+function base64Url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+export async function googleSignInUrl(
+  config: PublicAuthConfig,
+): Promise<string> {
+  const origin = supabaseOrigin(config);
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64Url(
+    new Uint8Array(
+      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
+    ),
+  );
+  sessionStorage.setItem(GOOGLE_PENDING, JSON.stringify({ verifier, config }));
+  const url = new URL(`${origin}/auth/v1/authorize`);
+  url.searchParams.set("provider", "google");
+  url.searchParams.set("redirect_to", location.href.split("#")[0]);
+  url.searchParams.set("code_challenge", challenge);
+  url.searchParams.set("code_challenge_method", "s256");
+  return url.href;
+}
+// Returns null when this page load is not a Google sign-in return.
+export async function completeGoogleSignIn(): Promise<Session | null> {
+  const params = new URLSearchParams(location.search);
+  if (!CALLBACK_PARAMS.some((name) => params.has(name))) return null;
+  const code = params.get("code");
+  const denied = params.get("error_description") ?? params.get("error");
+  const raw = sessionStorage.getItem(GOOGLE_PENDING);
+  sessionStorage.removeItem(GOOGLE_PENDING);
+  const cleaned = new URL(location.href);
+  for (const name of CALLBACK_PARAMS) cleaned.searchParams.delete(name);
+  history.replaceState(history.state, "", cleaned);
+  if (!raw) {
+    if (!code && !denied) return null;
+    throw new Error("Google sign-in expired. Sign in with Google again.");
+  }
+  if (denied || !code)
+    throw new Error(`Google sign-in did not finish: ${denied ?? "no code"}.`);
+  const pending: unknown = JSON.parse(raw);
+  if (
+    !isRecord(pending) ||
+    typeof pending.verifier !== "string" ||
+    !isRecord(pending.config) ||
+    typeof pending.config.supabase_url !== "string" ||
+    typeof pending.config.supabase_publishable_key !== "string"
+  )
+    throw new Error("Google sign-in expired. Sign in with Google again.");
+  return tokenSession(
+    {
+      supabase_url: pending.config.supabase_url,
+      supabase_publishable_key: pending.config.supabase_publishable_key,
+    },
+    "pkce",
+    { auth_code: code, code_verifier: pending.verifier },
+    "Google sign-in failed. Check that the Google provider is enabled in Supabase Auth.",
+  );
 }
 
 // Member 2's published canonical event REST contract. Narrow, read-only transfer test.

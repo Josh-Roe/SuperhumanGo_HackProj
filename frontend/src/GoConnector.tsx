@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { issueGoConnector } from "./api";
 
 export function GoConnector({ accessToken }: { accessToken: string }) {
@@ -6,19 +6,27 @@ export function GoConnector({ accessToken }: { accessToken: string }) {
     useState<Awaited<ReturnType<typeof issueGoConnector>>>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const tokenField = useRef<HTMLInputElement>(null);
+  const createButton = useRef<HTMLButtonElement>(null);
+  const hadCredential = useRef(false);
+  useEffect(() => {
+    if (credential) tokenField.current?.focus();
+    else if (hadCredential.current) createButton.current?.focus();
+    hadCredential.current = Boolean(credential);
+  }, [credential]);
   return (
     <section className="panel">
-      <h2>Authorize Go for your events</h2>
+      <h2>Connect Go</h2>
       <p>
-        Create a personal connector token, then paste it into the connector’s
-        authentication setting in Go. Keep it out of chat prompts. It grants
-        access to this organizer’s event tools.
+        Go needs a key to see your events. Create one and paste it into Go when
+        it asks for a key. Don’t paste it into a chat message.
       </p>
       {credential ? (
         <>
           <label>
-            Personal Go connector token
+            Your Go key
             <input
+              ref={tokenField}
               type="password"
               readOnly
               value={credential.token}
@@ -27,21 +35,20 @@ export function GoConnector({ accessToken }: { accessToken: string }) {
             />
           </label>
           <p className="small muted">
-            Select the field and copy it. Expires{" "}
-            {new Date(credential.expires_at).toLocaleDateString()}. This value
-            disappears when you leave Settings; the authorization stays active
-            until expiry or server revocation.
+            Copy it now: it’s hidden when you leave this page. It works until{" "}
+            {new Date(credential.expires_at).toLocaleDateString()}.
           </p>
           <button
             className="secondary"
             onClick={() => setCredential(undefined)}
           >
-            Hide token
+            Hide key
           </button>
         </>
       ) : (
         <button
           className="secondary"
+          ref={createButton}
           disabled={busy}
           onClick={async () => {
             setBusy(true);
@@ -52,14 +59,14 @@ export function GoConnector({ accessToken }: { accessToken: string }) {
               setError(
                 err instanceof Error
                   ? err.message
-                  : "Could not authorize the connector.",
+                  : "Could not create a key. Try again.",
               );
             } finally {
               setBusy(false);
             }
           }}
         >
-          {busy ? "Creating…" : "Create personal Go token"}
+          {busy ? "Creating…" : "Create Go key"}
         </button>
       )}
       {error && <p role="alert">{error}</p>}

@@ -352,7 +352,7 @@ def test_inclusion_save_authorizes_user_then_versions_facts_using_server_credent
         return httpx.Response(200, json=saved_event(2))
 
     with client_for(handler) as client:
-        url = f"/api/events/{EVENT}/inclusion"
+        url = f"/api/events/{EVENT}/inclusion/revision"
         response = client.put(url, headers=HEADERS, json={"expected_revision": 1, "facts": {}})
         assert response.status_code == 200 and response.json()["revision"] == 2
         forged = client.put(
@@ -372,7 +372,7 @@ def test_inclusion_read_runs_actual_member4_checker_without_claiming_unknown_fac
         return httpx.Response(200, json=[])
 
     with client_for(handler) as client:
-        response = client.get(f"/api/events/{EVENT}/inclusion", headers=HEADERS)
+        response = client.get(f"/api/events/{EVENT}/inclusion/revision", headers=HEADERS)
     assert response.status_code == 200
     data = response.json()
     assert data["facts_saved"] is False

@@ -17,19 +17,17 @@ it("issues a personal token with the organizer session and keeps it masked and e
   vi.stubGlobal("fetch", fetcher);
   const user = userEvent.setup();
   const view = render(<GoConnector accessToken="synthetic-session" />);
-  await user.click(
-    screen.getByRole("button", { name: "Create personal Go token" }),
-  );
-  const field = await screen.findByLabelText("Personal Go connector token");
+  await user.click(screen.getByRole("button", { name: "Create Go key" }));
+  const field = await screen.findByLabelText("Your Go key");
   expect(field).toHaveValue(token);
+  expect(field).toHaveFocus();
   expect(field).toHaveAttribute("type", "password");
   expect(fetcher.mock.calls[0][0]).toBe("/api/connectors");
   expect(fetcher.mock.calls[0][1].headers.Authorization).toBe(
     "Bearer synthetic-session",
   );
-  await user.click(screen.getByRole("button", { name: "Hide token" }));
-  expect(
-    screen.queryByLabelText("Personal Go connector token"),
-  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Hide key" }));
+  expect(screen.queryByLabelText("Your Go key")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Create Go key" })).toHaveFocus();
   view.unmount();
 });

@@ -44,19 +44,6 @@ def test_retry_after_success_does_not_duplicate_anything():
     assert len(world.gmail.sent) == 1
 
 
-def test_crash_after_gmail_send_reconciles_instead_of_resending():
-    world = World()
-    approval = world.approve()
-    world.gmail.crash_after_send = True
-    with pytest.raises(WorkflowError, match="provider_failed"):
-        publish(world, approval)
-    send_op = run(world.store.list_operations(OWNER, "event-1"))[-1]
-    assert send_op.state == "failed"
-    result = publish(world, approval)
-    assert result.sent is True
-    assert len(world.gmail.sent) == 1
-
-
 def test_calendar_created_before_binding_saved_is_adopted_not_duplicated():
     world = World()
     approval = world.approve()

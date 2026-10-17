@@ -111,6 +111,38 @@ export async function backend({
           },
           202,
         );
+      if (url.endsWith("/inclusion") && method === "GET")
+        return json({
+          event_id: event.id,
+          version: 0,
+          saved_at_event_revision: null,
+          updated_at: null,
+          facts: {},
+          review: {
+            event_id: event.id,
+            event_revision: event.revision,
+            audience: "organizer_private",
+            requires_review: true,
+            certification: false,
+            findings: [
+              {
+                category: "religious_observances",
+                status: "attention",
+                reason: "overlap_with_observance",
+                sources: [
+                  {
+                    label: "Google Calendar public holidays: Jewish Holidays",
+                    observed_at: "2026-10-16T00:00:00Z",
+                    confirmed_by: "Google Calendar public holiday feed",
+                    url: null,
+                  },
+                ],
+                conflicts: ["Yom Kippur"],
+                go_generation_id: null,
+              },
+            ],
+          },
+        });
       if (url.endsWith("/operations")) return json([]);
       if (url.endsWith("/rsvps"))
         return json([

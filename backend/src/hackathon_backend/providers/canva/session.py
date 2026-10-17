@@ -10,7 +10,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from pydantic import TypeAdapter
 
-from hackathon_backend.providers.canva import CanvaError, CanvaMCPAdapter
+from hackathon_backend.providers.canva import CanvaError, CanvaMCPAdapter, ExportJobReader
 from hackathon_backend.services.assets.models import BoundaryModel, Identifier
 
 CANVA_MCP_URL = "https://mcp.canva.com/mcp"
@@ -46,15 +46,25 @@ def _field(value: Any, name: str, default: Any = None) -> Any:
 
 class DiscoveredCanvaSession:
     def __init__(
-        self, session: DiscoverableSession, *, owner_id: str, tool_names: dict[str, str]
+        self,
+        session: DiscoverableSession,
+        *,
+        owner_id: str,
+        tool_names: dict[str, str],
+        export_jobs: ExportJobReader | None = None,
     ) -> None:
         self._session = session
+        self._export_jobs = export_jobs
         self.owner_id = TypeAdapter(Identifier).validate_python(owner_id)
         self._tool_names = dict(tool_names)
 
     @classmethod
     async def discover(
-        cls, session: DiscoverableSession, *, owner_id: str
+        cls,
+        session: DiscoverableSession,
+        *,
+        owner_id: str,
+        export_jobs: ExportJobReader | None = None,
     ) -> "DiscoveredCanvaSession":
         TypeAdapter(Identifier).validate_python(owner_id)
         names: set[str] = set()
@@ -93,7 +103,7 @@ class DiscoveredCanvaSession:
                 raise CanvaError("ambiguous_canva_tool_alias")
             if matches:
                 mapping[canonical] = matches.pop()
-        return cls(session, owner_id=owner_id, tool_names=mapping)
+        return cls(session, owner_id=owner_id, tool_names=mapping, export_jobs=export_jobs)
 
     @property
     def tool_names(self) -> dict[str, str]:
@@ -114,7 +124,7 @@ class DiscoveredCanvaSession:
     def adapter(self, *, owner_id: str) -> CanvaMCPAdapter:
         if owner_id != self.owner_id:
             raise PermissionError("Canva session is outside the current organizer scope")
-        return CanvaMCPAdapter(self, owner_id=owner_id)
+        return CanvaMCPAdapter(self, owner_id=owner_id, export_jobs=self._export_jobs)
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
         actual = self._tool_names.get(name)
@@ -151,4 +161,9 @@ async def connect_canva(
                 read, write, read_timeout_seconds=timedelta(minutes=5)
             ) as session:
                 await session.initialize()
-                yield await DiscoveredCanvaSession.discover(session, owner_id=owner_id)
+                yield await DiscoveredCanvaSession.discover(
+                    session,
+                    owner_id=owner_id,
+                    # MCP grants are audience-bound. Do not send them to the REST API;
+                    # pending exports need an explicitly authorized reader.
+                )

@@ -1,5 +1,6 @@
 """Production Google connect: Supabase session auth, single-use owner-bound state, vault."""
 
+import asyncio
 import base64
 import json
 from dataclasses import replace
@@ -11,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from hackathon_backend.config import Settings
+from hackathon_backend.providers.google.oauth import GoogleOAuthConfig, VaultTokenSource
 from hackathon_backend.workflows.google_connect import OAuthStates, google_connect_router
 
 OWNER_A = "00000000-0000-4000-8000-00000000000a"
@@ -210,3 +212,39 @@ def test_callback_redirects_failures_with_reason_code(env, params, reason):
     assert response.status_code == 303
     assert response.headers["location"] == f"{APP}/?google=error&reason={reason}"
     assert not vault.saved
+
+
+def test_reconnect_drops_cached_access_token_so_next_call_uses_new_grant():
+    vault = FakeVault()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth/v1/user":
+            return httpx.Response(200, json={"id": OWNER_A})
+        form = parse_qs(request.content.decode())
+        if form["grant_type"] == ["authorization_code"]:
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "unused",
+                    "refresh_token": "refresh-" + form["code"][0],
+                    "id_token": id_token("organizer@example.com"),
+                },
+            )
+        return httpx.Response(
+            200, json={"access_token": "access-for-" + form["refresh_token"][0], "expires_in": 3600}
+        )
+
+    transport = httpx.MockTransport(handler)
+    config = GoogleOAuthConfig("client-id", "client-secret", SETTINGS.google_redirect_uri)
+    tokens = VaultTokenSource(config, vault, transport)
+    app = FastAPI()
+    app.include_router(
+        google_connect_router(SETTINGS, vault, transport=transport, on_change=tokens.forget)
+    )
+    with TestClient(app, base_url="http://localhost") as client:
+        client.get("/api/google/callback", params={"state": connect(client), "code": "old"})
+        assert asyncio.run(tokens.access_token(OWNER_A)) == "access-for-refresh-old"
+
+        client.get("/api/google/callback", params={"state": connect(client), "code": "new"})
+
+        assert asyncio.run(tokens.access_token(OWNER_A)) == "access-for-refresh-new"
