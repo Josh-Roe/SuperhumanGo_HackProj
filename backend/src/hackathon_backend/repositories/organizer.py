@@ -233,7 +233,7 @@ class OrganizerRepository:
             "go_work",
             owner_id=f"eq.{self.owner_id}",
             event_id=f"eq.{UUID(event_id)}",
-            order="created_at.desc",
+            order="data->>created_at.desc,id.desc",
             limit=500,
         )
         # Explicit projection: arbitrary worker payloads may contain private replies.

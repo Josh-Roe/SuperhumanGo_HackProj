@@ -62,6 +62,8 @@ def test_workspace_contains_real_revisioned_rows_and_excludes_worker_secrets():
             return httpx.Response(200, json=saved_event())
         if request.url.path.endswith("go_work"):
             assert request.url.params["owner_id"] == "eq." + OWNER
+            # go_work has no created_at column; the durable timestamp is inside data.
+            assert request.url.params["order"] == "data->>created_at.desc,id.desc"
             return httpx.Response(
                 200,
                 json=[
