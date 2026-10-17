@@ -1045,7 +1045,7 @@ function Distribution({
   return (
     <>
       {approval && (
-        <section className="panel" role="status">
+        <section className="panel">
           <h2>
             {executed
               ? "Gmail send confirmed by provider receipt."
@@ -1562,6 +1562,13 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           : editing
             ? (record?.event.title ?? "New event")
             : "Your events";
+  useEffect(() => {
+    const stage =
+      editing && page === "events"
+        ? ` · ${steps.find((item) => item.id === step)?.name}`
+        : "";
+    document.title = `${title}${stage} · Event Workspace · Superhuman Go`;
+  }, [title, editing, page, step]);
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main">
@@ -1633,7 +1640,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
         </div>
       </aside>
       <div className="main-shell">
-        <main id="main">
+        <main id="main" tabIndex={-1}>
           <header className="page-heading">
             <div>
               {(editing || starting) && page === "events" && (
@@ -1645,10 +1652,16 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   ← Your events
                 </button>
               )}
-              <h1 ref={heading} tabIndex={-1}>
+              <h1
+                ref={heading}
+                tabIndex={-1}
+                aria-describedby={
+                  editing && page === "events" ? "page-description" : undefined
+                }
+              >
                 {title}
               </h1>
-              <p className="muted">
+              <p className="muted" id="page-description">
                 {page === "settings"
                   ? "Connect Go to your workspace."
                   : page === "profile"
@@ -1656,7 +1669,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     : starting
                       ? "Describe the plan in Go, then review it here."
                       : editing
-                        ? "Details, design, then distribution."
+                        ? `Step ${steps.findIndex((item) => item.id === step) + 1} of 3: ${steps.find((item) => item.id === step)?.name}.`
                         : "All your gatherings, in one place."}
               </p>
             </div>
@@ -1691,7 +1704,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
             </p>
           )}
           <p className="status-message" role="status">
-            {busy ? "Saving your request…" : message}
+            {busy ? "Working…" : message}
           </p>
           {page === "events" && starting && (
             <>
@@ -1982,7 +1995,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                         (value) => {
                           update(value);
                           setMessage(
-                            "Request recorded. Check provider receipts for completion.",
+                            value.live?.approval
+                              ? "Approval recorded. Awaiting Go. Check provider receipts for completion."
+                              : "Request recorded. Check provider receipts for completion.",
                           );
                         },
                       );

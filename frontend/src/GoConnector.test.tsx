@@ -22,6 +22,7 @@ it("issues a personal token with the organizer session and keeps it masked and e
   );
   const field = await screen.findByLabelText("Personal Go connector token");
   expect(field).toHaveValue(token);
+  expect(field).toHaveFocus();
   expect(field).toHaveAttribute("type", "password");
   expect(fetcher.mock.calls[0][0]).toBe("/api/connectors");
   expect(fetcher.mock.calls[0][1].headers.Authorization).toBe(
@@ -31,5 +32,8 @@ it("issues a personal token with the organizer session and keeps it masked and e
   expect(
     screen.queryByLabelText("Personal Go connector token"),
   ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Create personal Go token" }),
+  ).toHaveFocus();
   view.unmount();
 });
