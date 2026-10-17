@@ -3,8 +3,8 @@ import type { FormEvent, ReactNode } from "react";
 import {
   ApiError,
   loadPublicAuthConfig,
-  loadProjectStatus,
-  signIn,
+  googleSignInUrl,
+  completeGoogleSignIn,
 } from "./api";
 import { createPreviewGateway } from "./preview";
 import { contentDefinitions, destinations, routeContent } from "./content";
@@ -22,8 +22,15 @@ import { eventDate, localTime, toInstant } from "./dates";
 import "./App.css";
 import { createOrganizerGateway } from "./live";
 import { GoConnector } from "./GoConnector";
+import { InclusionEditor } from "./InclusionEditor";
+import {
+  DistributionPreview,
+  FlyerApproval,
+  ProviderCallbackNotice,
+  ConnectedServices,
+} from "./ProviderPanels";
 
-type Page = "events" | "settings" | "profile";
+type Page = "events" | "settings";
 type Step = "details" | "review" | "distribution";
 const steps: { id: Step; name: string }[] = [
   { id: "details", name: "Event details" },
@@ -122,15 +129,15 @@ function GoHandoff({
 }) {
   const [copyMessage, setCopyMessage] = useState("");
   const prompt = event
-    ? `Use the Event Workspace connector to read event ${event.id} (${event.title}), revision ${event.revision}. Update its Canva flyer, event document, plain-language summary, and invitation in the website. Check holiday conflicts, dietary options, and accessibility, keeping unknown facts unknown. Save previews for my review. Do not send invitations until I approve distribution in the website.`
-    : "Use the Event Workspace connector to create my event, then prepare its Canva flyer, event document, and invitation. Check inclusion and save everything to the website for my review. Do not send until I approve distribution.";
+    ? `Use the Event Workspace connector to open my event "${event.title}" (ID ${event.id}, revision ${event.revision}). Prepare its Canva flyer, event summary, and invitation email, and check for holiday conflicts, food options, and accessibility. If you don't know something, say so instead of guessing. Save everything to the website for me to review. Don't send anything until I approve it there.`
+    : "Use the Event Workspace connector to create my event from the details below. Then prepare its Canva flyer, event summary, and invitation email, and save everything to the website for me to review. If you don't know something, ask me. Don't send anything until I approve it there.\n\nMy event:";
   async function copy(value: string) {
     try {
       if (!navigator.clipboard) throw new Error();
       await navigator.clipboard.writeText(value);
-      setCopyMessage("Copied. Paste it in Superhuman Go.");
+      setCopyMessage("Copied. Now paste it into Superhuman Go.");
     } catch {
-      setCopyMessage("Select the text below and copy it to Superhuman Go.");
+      setCopyMessage("Select the text above and copy it.");
     }
   }
   return (
@@ -139,11 +146,11 @@ function GoHandoff({
         <div>
           <span className="eyebrow">SUPERHUMAN GO</span>
           <h2>
-            {event ? "Let Go take it from here." : "Plan in Go. See it here."}
+            {event ? "Let Go take it from here." : "Plan by chatting with Go."}
           </h2>
           <p>
-            Describe the whole event in your own words in Go—details, design,
-            guests, and invitations. Go saves each part into its place here.
+            Tell Go about your event in your own words. It fills in everything
+            here, and nothing is sent until you approve it.
           </p>
         </div>
         <a className="primary" href={GO_URL} target="_blank" rel="noreferrer">
@@ -151,19 +158,18 @@ function GoHandoff({
         </a>
       </div>
       <details open={expanded || undefined}>
-        <summary>Connect the custom MCP & get your prompt</summary>
+        <summary>How to set up Go (one time)</summary>
         <ol className="setup-steps">
           <li>
-            <strong>Open Superhuman Go.</strong> Go to Connectors and add the
-            Event Workspace custom MCP connector provided by your team.
+            <strong>Sign in here with Google</strong> on the Settings page.
           </li>
           <li>
-            <strong>Connect this website.</strong> Use its hosted MCP address
-            and sign in with your organizer account.{" "}
+            <strong>Add this website to Go.</strong> In Superhuman Go, open
+            Connectors, add a custom connector, and paste this address.{" "}
             {MCP_URL ? (
               <>
                 <label>
-                  Website MCP address
+                  Connector address
                   <input
                     readOnly
                     value={MCP_URL}
@@ -175,23 +181,23 @@ function GoHandoff({
                   className="text-button"
                   onClick={() => copy(MCP_URL)}
                 >
-                  Copy MCP address
+                  Copy address
                 </button>
               </>
             ) : (
               <p className="connection-note">
-                The hosted MCP address is awaiting setup. Your team needs to
-                configure it before Go can write to this workspace.
+                This website isn’t ready to connect to Go yet. Ask the person
+                who set it up for the connector address.
               </p>
             )}
+            When Go asks for a key, create one under “Connect Go” in Settings.
           </li>
           <li>
-            <strong>Describe what you want.</strong> Use any order or wording in
-            Go. Ask it to save event details, design instructions, and writing
-            through the connector. If something is unclear, Go should ask you
-            rather than guess. Return here to review the results.
+            <strong>Tell Go what you want.</strong> Copy this message into Go
+            and add your event details. Then come back here to check the
+            results.
             <label>
-              Prompt for Go
+              Message for Go
               <textarea
                 readOnly
                 rows={5}
@@ -204,19 +210,17 @@ function GoHandoff({
               className="secondary"
               onClick={() => copy(prompt)}
             >
-              Copy prompt
+              Copy message
             </button>
           </li>
         </ol>
         <p className="small muted">
-          Opening Go does not install the connector or send this prompt
-          automatically. Connection has not been verified.{" "}
           <a
             href="https://support.grammarly.com/hc/en-us/articles/40642362241293-About-Superhuman-Go-agents-and-connectors"
             target="_blank"
             rel="noreferrer"
           >
-            Connector help ↗
+            Help with Go connectors ↗
           </a>
         </p>
         <p className="small" role="status">
@@ -226,112 +230,38 @@ function GoHandoff({
     </section>
   );
 }
-function TransferConnection({
-  onConnected,
-}: {
-  onConnected: (gateway: EventGateway, session: Session) => void;
-}) {
+function GoogleSignIn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [config, setConfig] =
-    useState<Awaited<ReturnType<typeof loadPublicAuthConfig>>>();
-  async function check() {
+  async function google() {
     setBusy(true);
     setError("");
     try {
-      setConfig(await loadPublicAuthConfig());
+      window.location.assign(
+        await googleSignInUrl(await loadPublicAuthConfig()),
+      );
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to check the event API.",
+        err instanceof Error ? err.message : "Unable to start Google sign-in.",
       );
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function connect(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!config) return;
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    setBusy(true);
-    setError("");
-    try {
-      const session = await signIn(
-        String(data.get("email")),
-        String(data.get("password")),
-        config,
-      );
-      const gateway = createOrganizerGateway(session.access_token);
-      await gateway.list();
-      form.reset();
-      onConnected(gateway, session);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to connect.");
-    } finally {
       setBusy(false);
     }
   }
   return (
     <section className="panel">
-      <h2>Test Go → website.</h2>
+      <h2>Sign in</h2>
       <p className="muted">
-        Once the backend and Go connector are hosted, connect an existing
-        organizer account here to edit events, review Go’s material, and
-        authorize distribution. Go executes approved provider work.
+        Sign in with the Google account you use for email and calendar. Your
+        first sign-in creates your account.
       </p>
-      <ol className="setup-steps">
-        <li>Connect Go to the public HTTPS MCP endpoint.</li>
-        <li>
-          Ask Go to create a uniquely named test event and return its saved
-          event ID.
-        </li>
-        <li>
-          Connect the same organizer account below, then refresh Your events and
-          compare the saved details.
-        </li>
-      </ol>
-      {!config && (
-        <button className="secondary" disabled={busy} onClick={check}>
-          {busy ? "Checking…" : "Check event API"}
-        </button>
-      )}
       {error && (
         <p role="alert" className="error-box">
           {error}
         </p>
       )}
-      {config && (
-        <form onSubmit={connect} className="profile-form">
-          <fieldset disabled={busy}>
-            <label>
-              Organizer account email
-              <input
-                name="email"
-                type="email"
-                autoComplete="username"
-                required
-              />
-            </label>
-            <label>
-              Account password
-              <input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-              />
-            </label>
-          </fieldset>
-          <button className="secondary" disabled={busy}>
-            {busy ? "Connecting…" : "Connect existing workspace"}
-          </button>
-        </form>
-      )}
-      <p className="small muted">
-        No signup is required here. Session access stays in this tab and expires
-        automatically. A connected event list alone does not prove a Go write;
-        compare it with Go’s saved ID.
-      </p>
+      <button className="primary" disabled={busy} onClick={google}>
+        {busy ? "Opening Google…" : "Sign in with Google"}
+      </button>
     </section>
   );
 }
@@ -543,7 +473,9 @@ function Review({
   onReview,
   onDirty,
   onContinue,
+  inclusionElsewhere = false,
 }: {
+  inclusionElsewhere?: boolean;
   record: WorkspaceEvent;
   busy: boolean;
   onPrepare: () => void;
@@ -727,7 +659,7 @@ function Review({
             })}
           </div>
         </section>
-        <section className="panel">
+        <section className="panel" hidden={inclusionElsewhere}>
           <h2>A quick inclusion check.</h2>
           {record.live?.factsReadOnly && (
             <p className="notice">
@@ -1045,7 +977,7 @@ function Distribution({
   return (
     <>
       {approval && (
-        <section className="panel" role="status">
+        <section className="panel">
           <h2>
             {executed
               ? "Gmail send confirmed by provider receipt."
@@ -1342,11 +1274,12 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   const [message, setMessage] = useState("");
   const [dirty, setDirty] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
-  const [backend, setBackend] = useState("Not checked");
-  const [profile, setProfile] = useState({ name: "Organizer", email: "" });
   const heading = useRef<HTMLHeadingElement>(null);
   const publishKeys = useRef(new Map<string, string>());
   const epoch = useRef(0);
+  // Provider actions need the organizer's own session on a full (not read-only) live gateway.
+  const providerSession =
+    gateway.mode === "live" && !gateway.readOnly ? session : undefined;
   const pendingLinkedEvent = useRef(
     new URLSearchParams(location.search).get("event"),
   );
@@ -1431,12 +1364,50 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
         setEditing(false);
         setStarting(false);
         setDirty(false);
-        setMessage("The workspace session expired. Reconnect in Settings.");
+        setMessage("You were signed out. Sign in again in Settings.");
       },
       Math.max(0, session.expires_at - Date.now()),
     );
     return () => clearTimeout(timer);
   }, [session]);
+  function connectWorkspace(next: EventGateway, activeSession: Session) {
+    if (!canLeave()) return;
+    epoch.current++;
+    setEvents([]);
+    setBusy(false);
+    setGateway(next);
+    setSession(activeSession);
+    setRecord(null);
+    setEditing(false);
+    setStarting(false);
+    setDirty(false);
+    setMessage("Signed in. Your events are on the Your events page.");
+  }
+  const googleSignInResult = useEffectEvent(
+    (result: { gateway: EventGateway; session: Session } | Error) => {
+      if (!(result instanceof Error))
+        return connectWorkspace(result.gateway, result.session);
+      setPage("settings");
+      setError(result.message);
+    },
+  );
+  useEffect(() => {
+    if (eventGateway) return;
+    completeGoogleSignIn()
+      .then(async (activeSession) => {
+        if (!activeSession) return;
+        const next = createOrganizerGateway(activeSession.access_token);
+        await next.list();
+        googleSignInResult({ gateway: next, session: activeSession });
+      })
+      .catch((err: unknown) =>
+        googleSignInResult(
+          err instanceof Error
+            ? err
+            : new Error("Google sign-in did not finish."),
+        ),
+      );
+  }, [eventGateway]);
   async function run<T>(action: () => Promise<T>, done: (value: T) => void) {
     const requestEpoch = epoch.current;
     setBusy(true);
@@ -1538,30 +1509,24 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
       },
     );
   }
-  async function checkBackend() {
-    setBackend("Checking…");
-    try {
-      const status = await loadProjectStatus(AbortSignal.timeout(8000));
-      setBackend(
-        `Backend online · MCP ${status.superhuman.configured ? "configured" : "not configured"} · Go unverified`,
-      );
-    } catch {
-      setBackend("Backend unavailable. Try again.");
-    }
-  }
   const recordVersion = record
     ? `${record.event.id}:${record.event.revision}:${record.content.map((item) => `${item.id}:${item.state}`).join(",")}:${JSON.stringify(record.facts)}`
     : "new";
   const title =
     page === "settings"
       ? "Settings"
-      : page === "profile"
-        ? "Profile"
-        : starting
-          ? "Start your event with Go"
-          : editing
-            ? (record?.event.title ?? "New event")
-            : "Your events";
+      : starting
+        ? "Start your event with Go"
+        : editing
+          ? (record?.event.title ?? "New event")
+          : "Your events";
+  useEffect(() => {
+    const stage =
+      editing && page === "events"
+        ? ` · ${steps.find((item) => item.id === step)?.name}`
+        : "";
+    document.title = `${title}${stage} · Event Workspace · Superhuman Go`;
+  }, [title, editing, page, step]);
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main">
@@ -1596,7 +1561,6 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
             [
               { id: "events", name: "Your events", icon: "▦" },
               { id: "settings", name: "Settings", icon: "⚙" },
-              { id: "profile", name: "Profile", icon: "○" },
             ] as const
           ).map((item) => (
             <button
@@ -1620,20 +1584,18 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
         </div>
         <div className="sidebar-profile">
           <span className="avatar" aria-hidden="true">
-            {profile.name.charAt(0).toUpperCase()}
+            {(session?.email ?? "?").charAt(0).toUpperCase()}
           </span>
           <span>
-            {profile.name}
+            {session?.email ?? "Not signed in"}
             <small>
-              {gateway.mode === "live"
-                ? "Connected workspace"
-                : "Local workspace"}
+              {gateway.mode === "live" ? "Signed in" : "Viewing sample events"}
             </small>
           </span>
         </div>
       </aside>
       <div className="main-shell">
-        <main id="main">
+        <main id="main" tabIndex={-1}>
           <header className="page-heading">
             <div>
               {(editing || starting) && page === "events" && (
@@ -1645,19 +1607,23 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   ← Your events
                 </button>
               )}
-              <h1 ref={heading} tabIndex={-1}>
+              <h1
+                ref={heading}
+                tabIndex={-1}
+                aria-describedby={
+                  editing && page === "events" ? "page-description" : undefined
+                }
+              >
                 {title}
               </h1>
-              <p className="muted">
+              <p className="muted" id="page-description">
                 {page === "settings"
-                  ? "Connect Go to your workspace."
-                  : page === "profile"
-                    ? "A few details about you."
-                    : starting
-                      ? "Describe the plan in Go, then review it here."
-                      : editing
-                        ? "Details, design, then distribution."
-                        : "All your gatherings, in one place."}
+                  ? "Sign in and connect your accounts."
+                  : starting
+                    ? "Describe the plan in Go, then review it here."
+                    : editing
+                      ? `Step ${steps.findIndex((item) => item.id === step) + 1} of 3: ${steps.find((item) => item.id === step)?.name}.`
+                      : "All your gatherings, in one place."}
               </p>
             </div>
             {page === "events" && (
@@ -1669,29 +1635,30 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           {pendingLinkedEvent.current !== null &&
             gateway.mode === "preview" && (
               <section className="notice">
-                <p>Connect your organizer account to open the linked event.</p>
+                <p>Sign in to open this event.</p>
                 <button
                   className="secondary"
                   onClick={() => navigate("settings")}
                 >
-                  Connect to open event
+                  Sign in to open event
                 </button>
               </section>
             )}
           <p className="preview-note">
             {gateway.mode === "preview"
-              ? "Local preview · sample data · changes stay in this tab · no invitations send"
+              ? "You’re viewing sample events. Sign in with Google to plan your own."
               : gateway.readOnly
                 ? "Connected event-details test · checks every 10 seconds · read-only · materials and distribution are not loaded"
-                : "Connected organizer workspace · review changes before sending"}
+                : "Nothing is sent until you approve it."}
           </p>
           {(error || loadError) && (
             <p role="alert" className="error-box">
               {error || loadError}
             </p>
           )}
+          <ProviderCallbackNotice />
           <p className="status-message" role="status">
-            {busy ? "Saving your request…" : message}
+            {busy ? "Working…" : message}
           </p>
           {page === "events" && starting && (
             <>
@@ -1699,15 +1666,13 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
               <section className="panel">
                 <h2>After Go saves your event</h2>
                 <p className="muted">
-                  Come back to Your events and refresh. Open the saved event and
-                  compare its name, location, times, and guest list with your
-                  request.
+                  Come back here and check your events. Open the new event and
+                  make sure the details match what you asked for.
                 </p>
                 {gateway.mode === "preview" && (
                   <p className="notice">
-                    You are viewing local sample data. Go cannot write to this
-                    tab. Connect the hosted backend in Settings before testing a
-                    real transfer.
+                    You’re viewing sample events, so Go can’t save here yet.
+                    Sign in with Google in Settings first.
                   </p>
                 )}
                 <div className="action-row">
@@ -1726,7 +1691,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     disabled={busy}
                     onClick={() => navigate("settings")}
                   >
-                    Connection settings
+                    Settings
                   </button>
                 </div>
               </section>
@@ -1891,9 +1856,24 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   }
                 />
               )}
+              {record && step === "review" && providerSession && (
+                <FlyerApproval
+                  eventId={record.event.id}
+                  revision={record.event.revision}
+                  accessToken={providerSession.access_token}
+                />
+              )}
+              {record && step === "review" && providerSession && (
+                <InclusionEditor
+                  eventId={record.event.id}
+                  revision={record.event.revision}
+                  accessToken={providerSession.access_token}
+                />
+              )}
               {record && step === "review" && (
                 <Review
                   key={`${editorKey}:${recordVersion}`}
+                  inclusionElsewhere={Boolean(providerSession)}
                   record={record}
                   busy={busy}
                   onDirty={() => setDirty(true)}
@@ -1952,6 +1932,13 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                       Open Superhuman Go ↗
                     </a>
                   </div>
+                  {providerSession && (
+                    <DistributionPreview
+                      eventId={record.event.id}
+                      revision={record.event.revision}
+                      accessToken={providerSession.access_token}
+                    />
+                  )}
                   <Distribution
                     key={`${editorKey}:${recordVersion}`}
                     record={record}
@@ -1982,7 +1969,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                         (value) => {
                           update(value);
                           setMessage(
-                            "Request recorded. Check provider receipts for completion.",
+                            value.live?.approval
+                              ? "Approval recorded. Awaiting Go. Check provider receipts for completion."
+                              : "Request recorded. Check provider receipts for completion.",
                           );
                         },
                       );
@@ -1998,31 +1987,13 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           )}
           {page === "settings" && (
             <>
-              <GoHandoff expanded />
               {gateway.mode === "preview" ? (
-                <TransferConnection
-                  onConnected={(next, activeSession) => {
-                    if (!canLeave()) return;
-                    epoch.current++;
-                    setEvents([]);
-                    setBusy(false);
-                    setGateway(next);
-                    setSession(activeSession);
-                    setRecord(null);
-                    setEditing(false);
-                    setStarting(false);
-                    setDirty(false);
-                    setMessage(
-                      "Connected to real organizer events. Open Your events to compare Go’s saved ID.",
-                    );
-                  }}
-                />
+                <GoogleSignIn />
               ) : (
                 <section className="panel">
-                  <h2>Workspace connected</h2>
+                  <h2>Signed in</h2>
                   <p className="muted">
-                    {session?.email ?? "Authenticated organizer gateway"} ·
-                    organizer workspace
+                    {session?.email ?? "Event-details test connection"}
                   </p>
                   <button
                     className="secondary"
@@ -2038,75 +2009,22 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                       }
                     }}
                   >
-                    Disconnect workspace
+                    Sign out
                   </button>
                 </section>
               )}
+              <ConnectedServices
+                key={providerSession?.expires_at ?? "signed-out"}
+                accessToken={providerSession?.access_token}
+              />
+              <GoHandoff expanded />
               {session && (
                 <GoConnector
                   key={`${session.email}:${session.expires_at}`}
                   accessToken={session.access_token}
                 />
               )}
-              <section className="panel settings-connections">
-                <h2>Your connected tools</h2>
-                <p className="muted">
-                  Authorize Canva, Gmail, and Calendar in Go. Go uses the
-                  website’s custom MCP to save event changes back here.
-                </p>
-                {["Canva", "Gmail", "Google Calendar"].map((provider) => (
-                  <div className="connection-row" key={provider}>
-                    <strong>{provider}</strong>
-                    <span>Connection unverified</span>
-                    <a href={GO_URL} target="_blank" rel="noreferrer">
-                      Connect in Go ↗
-                    </a>
-                  </div>
-                ))}
-              </section>
-              <details className="panel">
-                <summary>Workspace connection status</summary>
-                <p className="small muted">{backend}</p>
-                <button className="secondary" onClick={checkBackend}>
-                  Check connection
-                </button>
-              </details>
             </>
-          )}
-          {page === "profile" && (
-            <form
-              className="panel profile-form"
-              onChange={() => setDirty(true)}
-              onSubmit={(e) => {
-                e.preventDefault();
-                const data = new FormData(e.currentTarget);
-                setProfile({
-                  name: String(data.get("name")).trim(),
-                  email: String(data.get("email")).trim(),
-                });
-                setDirty(false);
-                setMessage("Profile saved in this tab.");
-              }}
-            >
-              <label>
-                Your name
-                <input
-                  name="name"
-                  required
-                  maxLength={100}
-                  defaultValue={profile.name}
-                />
-              </label>
-              <label>
-                Email <span className="optional">optional</span>
-                <input name="email" type="email" defaultValue={profile.email} />
-              </label>
-              <p className="small muted">
-                These details stay in this tab. Account sign-in is skipped for
-                now.
-              </p>
-              <button className="primary">Save profile</button>
-            </form>
           )}
         </main>
       </div>

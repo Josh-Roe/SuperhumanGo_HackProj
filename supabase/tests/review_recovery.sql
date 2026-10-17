@@ -14,7 +14,9 @@ begin
     'producer','superhuman_go','state','ready'));
   a=public.organizer_approve(owner,(e->>'id')::uuid,1,(c->>'id')::uuid,'publish',true);
   same=public.organizer_approve(owner,(e->>'id')::uuid,1,(c->>'id')::uuid,'publish',true);
-  assert same=a, 'Approval timeout retry changed saved identity';
+  assert (same-'replayed')=(a-'replayed'), 'Approval timeout retry changed saved identity';
+  assert a->'replayed'='false'::jsonb and same->'replayed'='true'::jsonb,
+    'Approval retry did not report replay status';
   assert (select count(*) from public.approvals)=1, 'Approval was duplicated';
   same=public.organizer_approve(owner,(e->>'id')::uuid,1,(c->>'id')::uuid,'draft_only',true);
   assert same->>'id'<>a->>'id', 'Approval action silently changed';

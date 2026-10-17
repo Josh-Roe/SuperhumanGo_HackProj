@@ -73,6 +73,7 @@ export interface Finding {
   status: "recorded" | "attention" | "unknown" | "needs_review";
   reason: string;
   sources: { reference: string; checked_on: string }[];
+  conflicts?: string[];
 }
 export interface Operation {
   approval_id?: string;

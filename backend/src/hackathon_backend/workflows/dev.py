@@ -56,6 +56,7 @@ class DevWorkflow:
     connector_token: str
     oauth: GoogleOAuthConfig | None
     vault: MemoryVault
+    tokens: VaultTokenSource | None = None  # forgotten on reconnect so new grants apply at once
 
 
 def seed_event(invitees: list[str]) -> EventSnapshot:
@@ -92,12 +93,13 @@ def dev_workflow_from_env() -> DevWorkflow | None:
     oauth = GoogleOAuthConfig.from_env()
     vault = MemoryVault()
     deps = EventToolDeps(store=store, principals=principals)
+    tokens = None
     if oauth is not None:
         tokens = VaultTokenSource(oauth, vault)
         calendar, gmail = GoogleCalendarAPI(tokens), GoogleGmailAPI(tokens)
         deps.distributor = Distributor(store, calendar, gmail, tokens)
         deps.rsvp = RSVPTracker(store, calendar, gmail, tokens)
-    return DevWorkflow(deps, store, token, oauth, vault)
+    return DevWorkflow(deps, store, token, oauth, vault, tokens)
 
 
 class Revise(BaseModel):
@@ -222,6 +224,8 @@ def dev_router(dev: DevWorkflow) -> APIRouter:
             raise HTTPException(400, "Google returned no refresh token; revoke access and retry")
         email = id_token_claims(grant.id_token or "").get("email", "")
         await dev.vault.put_refresh_token(owner, email, grant.refresh_token, grant.scope)
+        if dev.tokens is not None:
+            dev.tokens.forget(owner)
         return {"connected": True, "account": email}
 
     return router

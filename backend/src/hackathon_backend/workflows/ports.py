@@ -58,6 +58,13 @@ class WorkflowStore(Protocol):
 
     async def list_operations(self, owner_id: str, event_id: str) -> list[Operation]: ...
 
+    async def reconcile_operation(
+        self, owner_id: str, key: str, attempt: int, outcome: str, receipt: dict[str, Any]
+    ) -> Operation:
+        """Server-only, after provider read-back: outcome "succeeded" records the receipt;
+        "not_applied" marks failed/confirmed_no_effect so one retry is allowed."""
+        ...
+
     async def get_calendar_binding(
         self, owner_id: str, event_id: str
     ) -> CalendarBinding | None: ...
@@ -140,6 +147,11 @@ class GmailAPI(Protocol):
 
     async def list_thread_messages(self, owner_id: str, thread_id: str) -> list[dict]:
         """Full messages (payload headers + text body) in the thread."""
+        ...
+
+    async def find_by_message_id(self, owner_id: str, rfc822_message_id: str) -> list[dict]:
+        """Non-trashed messages whose Message-ID header matches: [{id, threadId, labelIds,
+        draft_id}] with draft_id set when the message is still a draft."""
         ...
 
 

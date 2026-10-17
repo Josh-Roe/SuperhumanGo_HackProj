@@ -175,14 +175,17 @@ class SupabaseWorkflowStore:
         """
         if not self.db.admin:
             raise WorkflowError("forbidden", "Only the server can reconcile provider operations")
-        row = await self.db.rpc(
-            "organizer_reconcile_operation",
-            p_owner=uid(owner_id),
-            p_key=key,
-            p_attempt=attempt,
-            p_outcome=outcome,
-            p_receipt=receipt,
-        )
+        try:
+            row = await self.db.rpc(
+                "organizer_reconcile_operation",
+                p_owner=uid(owner_id),
+                p_key=key,
+                p_attempt=attempt,
+                p_outcome=outcome,
+                p_receipt=receipt,
+            )
+        except DomainError as error:  # same mapping as put_operation, for Distributor callers
+            raise WorkflowError(error.code, error.message) from None
         return Operation.model_validate(row)
 
     async def _binding(self, owner_id: str, event_id: str, provider: str) -> dict[str, Any] | None:

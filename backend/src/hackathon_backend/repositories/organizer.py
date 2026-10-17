@@ -130,6 +130,71 @@ class OrganizerRepository:
             p_acknowledged=acknowledged,
         )
 
+    async def list_work(self, event_id: str, states: set[str]) -> list[dict[str, Any]]:
+        await self.get("events", event_id)
+        rows = await self.db.rows(
+            "go_work",
+            owner_id=f"eq.{self.owner_id}",
+            event_id=f"eq.{UUID(event_id)}",
+            state=f"in.({','.join(sorted(states))})",
+            limit=200,
+        )
+        work = [row["data"] for row in rows]
+        return sorted(work, key=lambda w: str(w.get("created_at") or ""), reverse=True)
+
+    async def bindings(self, event_id: str) -> dict[str, Any]:
+        event = await self.get("events", event_id)
+        rows = await self.db.rows(
+            "provider_bindings",
+            owner_id=f"eq.{self.owner_id}",
+            event_id=f"eq.{UUID(event_id)}",
+            provider="in.(calendar,gmail)",
+        )
+        found = {row["provider"]: row["data"] for row in rows}
+        return {
+            "event_id": event["id"],
+            "event_revision": event["revision"],
+            **{
+                provider: (
+                    {**data, "stale": data["event_revision"] < event["revision"]}
+                    if (data := found.get(provider))
+                    else None
+                )
+                for provider in ("calendar", "gmail")
+            },
+        }
+
+    async def list_approvals(self, event_id: str, revision: int | None) -> list[dict[str, Any]]:
+        await self.get("events", event_id)
+        filters = {"event_revision": f"eq.{revision}"} if revision is not None else {}
+        return await self.db.rows(
+            "approvals",
+            owner_id=f"eq.{self.owner_id}",
+            event_id=f"eq.{UUID(event_id)}",
+            order="approved_at.desc,id.desc",
+            limit=100,
+            **filters,
+        )
+
+    async def inclusion_facts(self, event_id: str) -> dict[str, Any] | None:
+        rows = await self.db.rows(
+            "event_inclusion_facts",
+            owner_id=f"eq.{self.owner_id}",
+            event_id=f"eq.{UUID(event_id)}",
+        )
+        return rows[0] if rows else None
+
+    async def save_inclusion_facts(
+        self, event_id: str, expected_version: int, facts: dict[str, Any]
+    ) -> dict[str, Any]:
+        return await self.db.rpc(
+            "organizer_save_inclusion_facts",
+            p_owner=self.owner_id,
+            p_event=str(UUID(event_id)),
+            p_expected_version=expected_version,
+            p_facts=facts,
+        )
+
     async def event_children(self, event_id: str, table: str) -> list[dict[str, Any]]:
         if table not in {
             "generated_content",
