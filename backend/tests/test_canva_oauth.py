@@ -319,7 +319,9 @@ def test_failed_exchange_does_not_save_or_echo_provider_details(host, kind):
     assert "private-upstream-content" not in response.text and "evil.example" not in response.text
 
 
-@pytest.mark.parametrize("resource", [None, "https://api.canva.com"])
+@pytest.mark.parametrize(
+    "resource", [None, "https://api.canva.com", "https://mcp.canva.com/mcp"]
+)
 def test_existing_unknown_or_rest_grant_requires_reconnecting_to_mcp(host, resource):
     _, vault, requests, tokens, _, clock, _ = host
 
