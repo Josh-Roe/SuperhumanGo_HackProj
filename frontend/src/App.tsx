@@ -26,6 +26,7 @@ import { InclusionEditor } from "./InclusionEditor";
 import {
   DistributionPreview,
   FlyerApproval,
+  PipelineProgress,
   ProviderCallbackNotice,
   ConnectedServices,
 } from "./ProviderPanels";
@@ -129,8 +130,8 @@ function GoHandoff({
 }) {
   const [copyMessage, setCopyMessage] = useState("");
   const prompt = event
-    ? `Use the Event Workspace connector to open my event "${event.title}" (ID ${event.id}, revision ${event.revision}). Prepare its Canva flyer, event summary, and invitation email, and check for holiday conflicts, food options, and accessibility. If you don't know something, say so instead of guessing. Save everything to the website for me to review. Don't send anything until I approve it there.`
-    : "Use the Event Workspace connector to create my event from the details below. Then prepare its Canva flyer, event summary, and invitation email, and save everything to the website for me to review. If you don't know something, ask me. Don't send anything until I approve it there.\n\nMy event:";
+    ? `Use the Event Workspace connector to open my event "${event.title}" (ID ${event.id}, revision ${event.revision}). Check event_progress and walk me through the next steps one at a time: writing, my approval of the invitation, the access/food/sensory questions, an optional Canva flyer, and sending. If you don't know something, ask me instead of guessing. Don't send anything until I say "send".`
+    : "Use the Event Workspace connector to plan my event with me. Create it from the details below, then walk me through each step one at a time: writing, my approval of the invitation, the access/food/sensory questions, an optional Canva flyer, and sending. If you don't know something, ask me. Don't send anything until I say \"send\".\n\nMy event:";
   async function copy(value: string) {
     try {
       if (!navigator.clipboard) throw new Error();
@@ -149,8 +150,8 @@ function GoHandoff({
             {event ? "Let Go take it from here." : "Plan by chatting with Go."}
           </h2>
           <p>
-            Tell Go about your event in your own words. It fills in everything
-            here, and nothing is sent until you approve it.
+            Tell Go about your event in your own words. It walks you through
+            every step in one chat, and nothing is sent until you say so.
           </p>
         </div>
         <a className="primary" href={GO_URL} target="_blank" rel="noreferrer">
@@ -1830,6 +1831,13 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   </button>
                 ))}
               </nav>
+              {record && providerSession && (
+                <PipelineProgress
+                  eventId={record.event.id}
+                  revision={record.event.revision}
+                  accessToken={providerSession.access_token}
+                />
+              )}
               {step === "details" && (
                 <Details
                   key={`${editorKey}:${recordVersion}`}

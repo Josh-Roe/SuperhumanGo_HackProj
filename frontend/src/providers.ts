@@ -327,3 +327,48 @@ export async function loadDistributionPlan(
     }),
   };
 }
+
+// Guided Go pipeline progress (GET /api/events/{id}/progress, same shape as event_progress) ---
+
+export type StageStatus = "done" | "todo" | "optional" | "blocked";
+export interface PipelineStage {
+  stage: string;
+  status: StageStatus;
+  detail: string;
+}
+export interface PipelineProgress {
+  revision: number;
+  mode: "first_send" | "update";
+  next_stage: string;
+  stages: PipelineStage[];
+}
+const stageStatuses: StageStatus[] = ["done", "todo", "optional", "blocked"];
+
+export async function loadPipelineProgress(
+  eventId: string,
+  token: string,
+): Promise<PipelineProgress> {
+  const value = row(
+    await providerJson(
+      `/api/events/${encodeURIComponent(eventId)}/progress`,
+      token,
+    ),
+    "pipeline progress",
+  );
+  if (value.event_id !== eventId)
+    throw new Error("The server returned progress for another event.");
+  if (!Number.isInteger(value.revision) || !Array.isArray(value.stages))
+    throw new Error("The server returned invalid pipeline progress.");
+  return {
+    revision: value.revision as number,
+    mode: value.mode === "update" ? "update" : "first_send",
+    next_stage: text(value.next_stage),
+    stages: value.stages.map((item) => {
+      const stage = row(item, "pipeline stage");
+      const status = text(stage.status) as StageStatus;
+      if (!stageStatuses.includes(status))
+        throw new Error("The server returned an unknown stage status.");
+      return { stage: text(stage.stage), status, detail: text(stage.detail) };
+    }),
+  };
+}

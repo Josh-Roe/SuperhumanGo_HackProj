@@ -6,6 +6,7 @@ import {
   ConnectedServices,
   DistributionPreview,
   FlyerApproval,
+  PipelineProgress,
   ProviderConnection,
 } from "./ProviderPanels";
 
@@ -332,4 +333,58 @@ it.each([
     "unsafe Canva connection link",
   );
   expect(navigate).not.toHaveBeenCalled();
+});
+
+it("shows every pipeline stage status and marks the next step", async () => {
+  const stage = (name: string, status: string, detail: string) => ({
+    stage: name,
+    status,
+    detail,
+  });
+  server({
+    [`GET /api/events/${EVENT}/progress`]: [
+      [
+        200,
+        {
+          event_id: EVENT,
+          revision: 2,
+          title: "Picnic",
+          mode: "first_send",
+          next_stage: "review",
+          stages: [
+            stage("details", "done", "revision 2 saved"),
+            stage("writing", "done", "drafts saved"),
+            stage("review", "todo", "show the invitation for approval"),
+            stage("flyer", "optional", "optional: start_canva_flyer"),
+            stage(
+              "send",
+              "blocked",
+              "needs_review: invitation is not approved",
+            ),
+          ],
+        },
+      ],
+    ],
+  });
+  render(<PipelineProgress eventId={EVENT} revision={2} accessToken="tok" />);
+
+  const stages = await screen.findByRole("list", { name: "Pipeline stages" });
+  const items = within(stages).getAllByRole("listitem");
+  expect(items.map((item) => item.textContent)).toEqual([
+    expect.stringContaining("Done"),
+    expect.stringContaining("Done"),
+    expect.stringContaining("To do"),
+    expect.stringContaining("Optional"),
+    expect.stringContaining("Blocked"),
+  ]);
+  expect(items[2]).toHaveAttribute("aria-current", "step");
+  expect(items[4]).toHaveTextContent("invitation is not approved");
+});
+
+it("explains when the server has no progress route", async () => {
+  server({});
+  render(<PipelineProgress eventId={EVENT} revision={1} accessToken="tok" />);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "not available on this server",
+  );
 });

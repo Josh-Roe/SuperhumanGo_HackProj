@@ -6,6 +6,8 @@ Owner: Member 2. **Implemented core factories/composition; live deployment/accou
 
 **Agreed product/interface additions, 2026-10-16:** the Go-first workflow retains manual editing over the same canonical repository. Member 3 registers authenticated create/update event/task tools; Go creation remains separate from organizer publish approval. Members 3/4's matching asset-prose kinds and repository/Storage ports are integrated. Exact task and REST wire schemas export from `hackathon_backend.api.schema`; Member 1 maps the accepted core records in its adapter. Registration and local tests do not establish live hosted Go/account execution.
 
+**Guided pipeline (user decision 2026-10-16):** MCP `event_progress(event_id)` → `{event_id, revision, title, mode: first_send|update, stages: [{stage, status: done|todo|optional|blocked, detail}], next_stage}` over stages details, writing, review, inclusion, flyer, send, rsvps. `approve_draft(content_id, expected_revision, subject?, body?)` marks the send draft `ready` (edits saved as `producer: organizer`). `save_inclusion_facts(event_id, …yes|no|unknown, diet_options?)` merges organizer answers (unknown unsourced). `send_invitations(event_id, expected_revision)` records an `organizer_approve` approval for the current send content and runs distribution; a retry for a sent revision replays it. REST mirror: `GET /api/events/{id}/progress` (same shape).
+
 ## Canonical records
 
 | Record | Initial fields and invariants |
