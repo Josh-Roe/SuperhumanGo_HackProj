@@ -6,6 +6,7 @@ import {
   requestJson,
 } from "./api";
 import { normalizeContentKind } from "./content";
+import { parseInclusion } from "./inclusion";
 import { emptyFacts, safeUrl } from "./types";
 import type { EventGateway, WorkspaceEvent } from "./types";
 
@@ -43,7 +44,7 @@ export function createOrganizerGateway(token: string): EventGateway {
     const event = parseEvent(await requestJson(path(id), token));
     if (event.id !== id)
       throw new Error("The server returned a different event.");
-    const warnings = ["Inclusion answers are read-only here."];
+    const warnings: string[] = [];
     async function optional(
       url: string,
       label: string,
@@ -64,17 +65,24 @@ export function createOrganizerGateway(token: string): EventGateway {
         return undefined;
       }
     }
-    const [reviewRaw, operationRaw, rsvpRaw, flyerRaw, documentRaw] =
-      await Promise.all([
-        optional(`${path(id)}/review`, "Writing and inclusion"),
-        optional(`${path(id)}/operations`, "Provider receipts"),
-        optional(`${path(id)}/rsvps`, "Guest responses"),
-        optional(`${path(id)}/artifacts/flyer_png/current`, "Current flyer"),
-        optional(
-          `${path(id)}/artifacts/event_document/current`,
-          "Current document",
-        ),
-      ]);
+    const [
+      reviewRaw,
+      operationRaw,
+      rsvpRaw,
+      flyerRaw,
+      documentRaw,
+      inclusionRaw,
+    ] = await Promise.all([
+      optional(`${path(id)}/review`, "Writing and inclusion"),
+      optional(`${path(id)}/operations`, "Provider receipts"),
+      optional(`${path(id)}/rsvps`, "Guest responses"),
+      optional(`${path(id)}/artifacts/flyer_png/current`, "Current flyer"),
+      optional(
+        `${path(id)}/artifacts/event_document/current`,
+        "Current document",
+      ),
+      optional(`${path(id)}/inclusion`, "Inclusion check"),
+    ]);
     const review = reviewRaw === undefined ? undefined : row(reviewRaw);
     if (review) {
       const reviewedEvent = parseEvent(review.event);
@@ -226,6 +234,26 @@ export function createOrganizerGateway(token: string): EventGateway {
         source.loud_sound_strobes ?? "",
       );
     }
+    // Findings come from the saved inclusion facts (A10), checked against the current revision.
+    let findings: unknown[] = [];
+    if (inclusionRaw !== undefined) {
+      try {
+        findings = parseInclusion(inclusionRaw, id).findings.map((f) => ({
+          category: f.category,
+          status: f.status,
+          reason: f.reason,
+          conflicts: f.conflicts,
+          sources: f.sources.map((s) => ({
+            reference: `${s.label} · ${s.confirmed_by}`,
+            checked_on: s.observed_at.slice(0, 10),
+          })),
+        }));
+      } catch {
+        warnings.push(
+          "Inclusion check could not be loaded. Refresh before relying on this section.",
+        );
+      }
+    }
     const send = operations
       .filter((op) => op.kind === "gmail_send" && op.state === "succeeded")
       .at(-1);
@@ -235,7 +263,7 @@ export function createOrganizerGateway(token: string): EventGateway {
       (item) => item.event_revision === event.revision,
     );
     warnings.push(
-      "Preparation receipts are snapshots from this tab; live Go progress is unavailable. Inclusion findings and Gmail draft bindings are not available yet.",
+      "Preparation receipts are snapshots from this tab; live Go progress is unavailable. Gmail draft bindings are not available yet.",
     );
     const normalized = parseWorkspace({
       event,
@@ -244,7 +272,7 @@ export function createOrganizerGateway(token: string): EventGateway {
       operations,
       rsvps,
       facts,
-      findings: [],
+      findings,
       work: work && work.event_revision === event.revision ? [work] : [],
       gmail: send ? { sent: true, event_revision: send.event_revision } : null,
       review_revision:
