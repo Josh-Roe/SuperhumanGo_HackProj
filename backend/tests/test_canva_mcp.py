@@ -179,7 +179,7 @@ def test_quota_failure_is_returned_without_retry():
 
 def test_non_go_wrong_kind_and_other_owner_never_reach_canva():
     with pytest.raises(ValidationError):
-        go(event(), producer="gemini")
+        go(event(), producer="organizer")
     session = Session({})
     adapter = CanvaMCPAdapter(session, owner_id="another-owner")
     with pytest.raises(PermissionError):

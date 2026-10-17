@@ -118,7 +118,7 @@ def register_event_tools(mcp: FastMCP, deps: EventToolDeps) -> None:
         """Save prose you (Superhuman Go) wrote for an event revision, for organizer review.
 
         Kinds: description, summary (plain language), invitation, change_notice, document,
-        notion_note, and flyer assets: flyer_brief, flyer_copy, event_document,
+        and flyer assets: flyer_brief, flyer_copy, event_document,
         plain_language_summary, flyer_alt_text. Invitation and change_notice need a subject.
         Never include invitee emails or private dietary/accessibility details. Fails with
         revision_conflict if the event changed; re-read it and rewrite.

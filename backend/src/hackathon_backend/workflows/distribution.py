@@ -24,7 +24,6 @@ from hackathon_backend.workflows.models import (
     GmailBinding,
     Operation,
     OperationKind,
-    Producer,
     utcnow,
 )
 from hackathon_backend.workflows.ports import (
@@ -210,8 +209,6 @@ class Distributor:
             raise WorkflowError("revision_conflict", "approved content is for another revision")
         if content.state != "ready":
             raise WorkflowError("needs_review", "organizer has not approved this content")
-        if content.producer not in (Producer.SUPERHUMAN_GO, Producer.ORGANIZER):
-            raise WorkflowError("needs_review", "invitation prose must come from Go review")
         mail = await self.store.get_gmail_binding(owner_id, event.id)
         if mail and mail.sent and mail.content_id != content.id:
             if content.kind != ContentKind.CHANGE_NOTICE:

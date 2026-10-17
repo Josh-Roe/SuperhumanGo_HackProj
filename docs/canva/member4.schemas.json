@@ -1204,6 +1204,27 @@
         },
         "title": "Observances",
         "type": "array"
+      },
+      "traditions": {
+        "default": [
+          "christian",
+          "jewish",
+          "muslim",
+          "hindu",
+          "orthodox_christian"
+        ],
+        "items": {
+          "enum": [
+            "christian",
+            "jewish",
+            "muslim",
+            "hindu",
+            "orthodox_christian"
+          ],
+          "type": "string"
+        },
+        "title": "Traditions",
+        "type": "array"
       }
     },
     "title": "InclusionInput",

@@ -8,6 +8,10 @@ Earlier implementation [PR #1](https://github.com/Josh-Roe/SuperhumanGo_HackProj
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/04_CANVA_INCLUSION.md) before work. Write only this personal context. Preserve other members' files.
 
+## PR #8 merge integration — 2026-10-16
+
+**User authorized merging to main.** CI `38988152599` passed checks and database jobs on `b40aced`. Main advanced concurrently to `0d9ebf1`, adding religious-observance holiday feeds and removing Gemini/Notion; GitHub refused the merge due to a presentation-table conflict. Integrated that main commit, retaining Google's holiday-calendar wording, Go's built-in Grammarly policy and our accurate Canva version/export wording. No peer-owned file was edited during conflict resolution. Updated the owned acceptance fixture to mock holiday-feed failure, keeping its account/HTTP tests offline, and refreshed the owned inclusion schemas. Integrated local checks: **309 passed / 1 optional ML skipped**, uncached Ruff and whitespace pass. Fresh CI on the integrated revision is required before merging; the earlier green run does not cover this new merge.
+
 ## Asset wiring acceptance — 2026-10-16
 
 **Source: user requested wiring Member 4 assets, then explicitly chose “Keep main.py for Member 3; prepare the handoff.” Implemented/tested on this branch.** During final upstream sync, main advanced from `1752141` to `973bdb9`, including Member 3's `d5ce546` registered coordinator and Member 1's live adapter. Fast-forwarded without touching peer files. Dropped overlapping uncommitted registration work and adopted the existing single coordinator; no second tool/provider writer was committed. Earlier statements that main lacks asset/REST/organizer registration are superseded.

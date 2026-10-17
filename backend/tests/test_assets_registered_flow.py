@@ -27,6 +27,7 @@ from hackathon_backend.repositories import transport as database_module
 from hackathon_backend.repositories.assets import SupabaseAssetStorage
 from hackathon_backend.repositories.vault import SupabaseCredentialVault
 from hackathon_backend.services.assets.requests import ASSET_PROSE_KINDS
+from hackathon_backend.services.inclusion import HolidayCalendar
 from hackathon_backend.workflows import asset_wiring
 from hackathon_backend.workflows.distribution import Distributor
 from hackathon_backend.workflows.memory import InMemoryPrincipalResolver, InMemoryWorkflowStore
@@ -121,6 +122,12 @@ def registered(monkeypatch):
         asset_wiring,
         "_download_client",
         lambda: httpx.AsyncClient(transport=transport, trust_env=False),
+    )
+    # Preserve the new production holiday lookup while keeping this acceptance test offline.
+    monkeypatch.setattr(
+        asset_wiring,
+        "HolidayCalendar",
+        lambda: HolidayCalendar(transport=httpx.MockTransport(lambda request: httpx.Response(503))),
     )
     canva = FakeCanva()
 

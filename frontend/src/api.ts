@@ -188,7 +188,7 @@ export function parseWorkspace(raw: unknown): WorkspaceEvent {
       (c) =>
         isRecord(c) &&
         typeof c.body === "string" &&
-        ["superhuman_go", "organizer", "gemini"].includes(String(c.producer)) &&
+        ["superhuman_go", "organizer"].includes(String(c.producer)) &&
         (c.subject === undefined ||
           c.subject === null ||
           typeof c.subject === "string"),
