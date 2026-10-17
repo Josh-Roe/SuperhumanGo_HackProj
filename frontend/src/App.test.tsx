@@ -17,7 +17,7 @@ async function sample() {
   return user;
 }
 describe("simplified event workspace", () => {
-  it("opens directly to events with only the three requested sidebar destinations", async () => {
+  it("opens directly to events with only two sidebar destinations", async () => {
     await workspace();
     expect(screen.getByRole("heading", { name: "Your events" })).toBeVisible();
     expect(
@@ -28,7 +28,7 @@ describe("simplified event workspace", () => {
       within(nav)
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toEqual(["▦Your events", "⚙Settings", "○Profile"]);
+    ).toEqual(["▦Your events", "⚙Settings"]);
     expect(screen.getByRole("button", { name: "Add event" })).toBeVisible();
     expect(
       screen.queryByText("A little planning. A great gathering."),
@@ -47,16 +47,11 @@ describe("simplified event workspace", () => {
     expect(
       screen.getByRole("link", { name: /Connect Canva in Go/ }),
     ).toHaveAttribute("href", "https://go.superhuman.com/");
-    await user.click(
-      screen.getByText("Connect the custom MCP & get your prompt"),
-    );
+    await user.click(screen.getByText("How to set up Go (one time)"));
     expect(
-      (screen.getByLabelText("Prompt for Go") as HTMLTextAreaElement).value,
+      (screen.getByLabelText("Message for Go") as HTMLTextAreaElement).value,
     ).toContain("preview-gathering");
-    expect(
-      screen.getByText(/hosted MCP address is awaiting setup/),
-    ).toBeVisible();
-    expect(screen.getByText(/does not install the connector/)).toBeVisible();
+    expect(screen.getByText(/isn’t ready to connect to Go yet/)).toBeVisible();
   });
   it("adds an event and advances through design to distribution without making up Go output", async () => {
     const user = await workspace();
@@ -172,7 +167,7 @@ describe("simplified event workspace", () => {
       "Invited people and response evidence",
     );
   });
-  it("provides Go setup in settings and saves a local profile without sign-up", async () => {
+  it("offers only Google sign-in and Go setup in settings", async () => {
     const user = await workspace();
     await user.click(screen.getByRole("button", { name: "Settings" }));
     const services = screen.getByRole("region", {
@@ -185,25 +180,11 @@ describe("simplified event workspace", () => {
     expect(
       screen.getByRole("button", { name: "Connect Canva" }),
     ).toBeDisabled();
-    expect(screen.getByLabelText("Prompt for Go")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Profile" }));
-    await user.clear(screen.getByLabelText("Your name"));
-    await user.type(screen.getByLabelText("Your name"), "Alex");
-    await user.click(screen.getByRole("button", { name: "Save profile" }));
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Profile saved in this tab.",
-    );
-    expect(screen.getByText("Alex")).toBeVisible();
-  });
-  it("handles a backend error in settings without claiming Go is connected", async () => {
-    const user = await workspace();
-    await user.click(screen.getByRole("button", { name: "Settings" }));
-    await user.click(screen.getByText("Workspace connection status"));
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
-    await user.click(screen.getByRole("button", { name: "Check connection" }));
+    expect(screen.getByLabelText("Message for Go")).toBeVisible();
     expect(
-      await screen.findByText("Backend unavailable. Try again."),
+      screen.getByRole("button", { name: "Sign in with Google" }),
     ).toBeVisible();
+    expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
   });
 });
 
@@ -296,7 +277,7 @@ describe("Go-first event transfer test", () => {
     expect(
       screen.getByRole("button", { name: "Check Your events" }),
     ).toBeDisabled();
-    expect(screen.getByText(/Go cannot write to this tab/)).toBeVisible();
+    expect(screen.getByText(/Go can’t save here yet/)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "← Your events" }));
     expect(
       screen.getAllByRole("button", { name: /A neighborhood, together/ }),
@@ -359,19 +340,19 @@ describe("Go-first event transfer test", () => {
 });
 
 describe("event API readiness", () => {
-  it("checks registration before requesting account credentials", async () => {
+  it("reports an unregistered event API instead of leaving for Google", async () => {
     const user = await workspace();
     await user.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.queryByLabelText("Account password")).not.toBeInTheDocument();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(new Response("{}", { status: 404 })),
     );
-    await user.click(screen.getByRole("button", { name: "Check event API" }));
+    await user.click(
+      screen.getByRole("button", { name: "Sign in with Google" }),
+    );
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "not registered",
     );
-    expect(screen.queryByLabelText("Account password")).not.toBeInTheDocument();
   });
 });
 
