@@ -1178,8 +1178,12 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
         if (!active) return;
         setEvents(list);
         if (item) {
-          setRecord(item);
-          setEditorKey((key) => key + 1);
+          setRecord((current) =>
+            current?.event.id === item.event.id &&
+            current.event.revision === item.event.revision
+              ? current
+              : item,
+          );
         }
         setError("");
       } catch (err) {
@@ -1596,7 +1600,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
               </nav>
               {step === "details" && (
                 <Details
-                  key={editorKey}
+                  key={`${editorKey}:${record?.event.id ?? "new"}:${record?.event.revision ?? 0}`}
                   record={record}
                   busy={busy}
                   readOnly={gateway.readOnly}
@@ -1622,7 +1626,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
               )}
               {record && step === "review" && (
                 <Review
-                  key={editorKey}
+                  key={`${editorKey}:${record?.event.id ?? "new"}:${record?.event.revision ?? 0}`}
                   record={record}
                   busy={busy}
                   onDirty={() => setDirty(true)}
@@ -1678,7 +1682,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     </a>
                   </div>
                   <Distribution
-                    key={editorKey}
+                    key={`${editorKey}:${record?.event.id ?? "new"}:${record?.event.revision ?? 0}`}
                     record={record}
                     preview={gateway.mode === "preview"}
                     busy={busy}

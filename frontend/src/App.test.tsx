@@ -430,3 +430,34 @@ it("checks the connected list every ten seconds and stops after unmount", async 
     vi.useRealTimers();
   }
 });
+
+it("keeps focus on unchanged connected details and shows a newer revision on the same event", async () => {
+  const { createPreviewGateway } = await import("./preview");
+  const { fireEvent, waitFor } = await import("@testing-library/react");
+  const base = createPreviewGateway();
+  let current = await base.get("preview-gathering");
+  const get = vi.fn().mockImplementation(async () => structuredClone(current));
+  const user = userEvent.setup();
+  render(<App eventGateway={{ ...base, mode: "live", readOnly: true, get }} />);
+  await user.click(
+    await screen.findByRole("button", { name: /A neighborhood, together/ }),
+  );
+  await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+  const input = screen.getByLabelText("Event title");
+  const refreshButton = screen.getByRole("button", { name: "↻ Refresh" });
+  refreshButton.focus();
+  fireEvent.focus(window);
+  await waitFor(() => expect(get).toHaveBeenCalledTimes(3));
+  expect(screen.getByLabelText("Event title")).toBe(input);
+  expect(refreshButton).toHaveFocus();
+  current = {
+    ...current,
+    event: { ...current.event, revision: 3, location: "Updated by Go" },
+  };
+  fireEvent.focus(window);
+  await waitFor(() =>
+    expect(
+      screen.getByLabelText("Location or online meeting link"),
+    ).toHaveValue("Updated by Go"),
+  );
+});
