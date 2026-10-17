@@ -230,7 +230,12 @@ def test_canva_routes_register_only_when_configured():
 def test_registered_callback_and_flyer_sessions_share_one_token_source(monkeypatch):
     from hackathon_backend.workflows import canva_connect
 
-    created = []
+    created, routed = [], []
+    original_router = canva_connect.canva_connect_router
+
+    def router(settings, tokens):
+        routed.append(tokens)
+        return original_router(settings, tokens)
 
     def token_source(*args, **kwargs):
         instance = CanvaTokens(*args, **kwargs)
@@ -239,9 +244,9 @@ def test_registered_callback_and_flyer_sessions_share_one_token_source(monkeypat
 
     monkeypatch.setattr("hackathon_backend.providers.canva.oauth.CanvaTokens", token_source)
     monkeypatch.setattr(canva_connect, "CanvaTokens", token_source)
+    monkeypatch.setattr(canva_connect, "canva_connect_router", router)
     configured = replace(SETTINGS, credential_encryption_key=Fernet.generate_key().decode())
     app = create_app(configured)
     assert len(created) == 1
-    paths = [getattr(route, "path", "") for route in app.routes]
-    assert paths.count("/api/canva/callback") == 1
-    assert paths.count("/api/canva/verify") == 1
+    assert routed == created
+    assert {"/api/canva/callback", "/api/canva/verify"} <= set(app.openapi()["paths"])

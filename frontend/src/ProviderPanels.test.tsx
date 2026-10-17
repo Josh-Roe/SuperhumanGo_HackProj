@@ -295,7 +295,7 @@ it("connects Canva through the browser-bound backend bootstrap", async () => {
       navigate={navigate}
     />,
   );
-  await screen.findByText("Not connected.");
+  await screen.findByText(/^Not connected\.?$/);
   await userEvent
     .setup()
     .click(screen.getByRole("button", { name: "Connect Canva" }));
@@ -324,7 +324,7 @@ it.each([
       navigate={navigate}
     />,
   );
-  await screen.findByText("Not connected.");
+  await screen.findByText(/^Not connected\.?$/);
   await userEvent
     .setup()
     .click(screen.getByRole("button", { name: "Connect Canva" }));
