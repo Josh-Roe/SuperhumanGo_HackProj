@@ -1,6 +1,8 @@
 # Registered asset workflow handoff
 
-Member 4, 2026-10-16. Verified against main `973bdb9`, including Member 3 composition `d5ce546`. This is the single existing coordinator in `workflows/asset_wiring.py`; do not register a second set of asset tools or provider writers. Member 4 did not edit `main.py` or other members' modules.
+Member 4, 2026-10-16. **OAuth follow-up:** portal/client setup and tested connection implementation are documented in [OAUTH_SETUP.md](OAUTH_SETUP.md); deployment and live consent are still pending service-owner access. Older missing-flow notes below describe the original main baseline.
+
+Verified against main `973bdb9`, including Member 3 composition `d5ce546`. This is the single existing coordinator in `workflows/asset_wiring.py`; do not register a second set of asset tools or provider writers. Member 4 did not edit `main.py` or other members' modules.
 
 ## What is wired
 
