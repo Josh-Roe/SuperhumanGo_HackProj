@@ -1,4 +1,4 @@
-"""A11 Canva part: per-organizer Canva Connect OAuth (PKCE) and token refresh. HTTP is mocked."""
+"""A11 Canva part: per-organizer Canva MCP OAuth (PKCE) and token refresh. HTTP is mocked."""
 
 import asyncio
 import base64
@@ -46,7 +46,7 @@ class FakeVault:
 
 
 class CanvaTokenEndpoint:
-    """Fake `POST /rest/v1/oauth/token`; issues numbered tokens and enforces one-use refresh."""
+    """Fake `POST /token`; issues numbered tokens and enforces one-use refresh."""
 
     def __init__(self):
         self.forms, self.auth, self.used_refresh, self.issued = [], [], set(), 0
@@ -57,7 +57,7 @@ class CanvaTokenEndpoint:
             if token not in SESSIONS:
                 return httpx.Response(401, json={"msg": "invalid"})
             return httpx.Response(200, json={"id": SESSIONS[token]})
-        assert (request.url.host, request.url.path) == ("api.canva.com", "/rest/v1/oauth/token")
+        assert (request.url.host, request.url.path) == ("mcp.canva.com", "/token")
         form = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
         self.forms.append(form)
         self.auth.append(request.headers["authorization"])
@@ -88,7 +88,7 @@ def env():
     app.include_router(
         canva_connect_router(settings, tokens, states=PkceStates(now=Clock()), transport=transport)
     )
-    with TestClient(app, base_url="http://localhost") as client:
+    with TestClient(app, base_url="https://demo.example") as client:
         yield SimpleNamespace(
             client=client, vault=vault, endpoint=endpoint, tokens=tokens, wall=wall
         )
@@ -97,8 +97,13 @@ def env():
 def start(client, session="session-a"):
     response = client.post("/api/canva/connect", headers={"Authorization": f"Bearer {session}"})
     assert response.status_code == 200, response.text
-    url = urlsplit(response.json()["authorization_url"])
-    assert (url.hostname, url.path) == ("www.canva.com", "/api/oauth/authorize")
+    bootstrap = response.json()["authorization_url"]
+    response = client.get(
+        bootstrap, headers={"Referer": "https://app.example/"}, follow_redirects=False
+    )
+    assert response.status_code == 302
+    url = urlsplit(response.headers["location"])
+    assert (url.hostname, url.path) == ("mcp.canva.com", "/authorize")
     return {k: v[0] for k, v in parse_qs(url.query).items()}
 
 
@@ -132,8 +137,8 @@ def test_connect_callback_stores_tokens_for_state_owner_with_pkce(env):
         headers = {"Authorization": f"Bearer {session}"}
         return env.client.get("/api/canva/status", headers=headers).json()
 
-    assert connected("session-a") == {"connected": True}
-    assert connected("session-b") == {"connected": False}
+    assert connected("session-a")["connected"] is True
+    assert connected("session-b")["connected"] is False
 
     replay = env.client.get(
         "/api/canva/callback",
@@ -189,11 +194,20 @@ def test_sessions_use_fresh_token_keep_legacy_record_and_ask_reconnect_on_reject
     sessions = VaultCanvaSessions(env.vault, connect=connect, tokens=env.tokens)
 
     async def flow():
-        await env.vault.put_secret(OWNER_A, "canva", {"access_token": "legacy"})
+        await env.tokens.save_grant(
+            OWNER_A, {"access_token": "fresh", "expires_at": env.wall.now + 3600}
+        )
         async with sessions.open(OWNER_A):
             pass
         await env.vault.put_secret(
-            OWNER_B, "canva", {"access_token": "x", "refresh_token": "revoked", "expires_at": 0}
+            OWNER_B,
+            "canva",
+            {
+                "access_token": "x",
+                "refresh_token": "revoked",
+                "expires_at": 0,
+                "resource": "https://mcp.canva.com/mcp",
+            },
         )
         env.endpoint.used_refresh.add("revoked")
         with pytest.raises(WorkflowError, match="integration_not_connected"):
@@ -201,7 +215,7 @@ def test_sessions_use_fresh_token_keep_legacy_record_and_ask_reconnect_on_reject
                 pass
 
     asyncio.run(flow())
-    assert opened == ["legacy"]
+    assert opened == ["fresh"]
 
 
 def test_canva_routes_register_only_when_configured():
@@ -211,3 +225,28 @@ def test_canva_routes_register_only_when_configured():
     assert "/api/canva/connect" not in paths(Settings())
     configured = replace(SETTINGS, credential_encryption_key=Fernet.generate_key().decode())
     assert {"/api/canva/connect", "/api/canva/callback", "/api/canva/status"} <= paths(configured)
+
+
+def test_registered_callback_and_flyer_sessions_share_one_token_source(monkeypatch):
+    from hackathon_backend.workflows import canva_connect
+
+    created, routed = [], []
+    original_router = canva_connect.canva_connect_router
+
+    def router(settings, tokens):
+        routed.append(tokens)
+        return original_router(settings, tokens)
+
+    def token_source(*args, **kwargs):
+        instance = CanvaTokens(*args, **kwargs)
+        created.append(instance)
+        return instance
+
+    monkeypatch.setattr("hackathon_backend.providers.canva.oauth.CanvaTokens", token_source)
+    monkeypatch.setattr(canva_connect, "CanvaTokens", token_source)
+    monkeypatch.setattr(canva_connect, "canva_connect_router", router)
+    configured = replace(SETTINGS, credential_encryption_key=Fernet.generate_key().decode())
+    app = create_app(configured)
+    assert len(created) == 1
+    assert routed == created
+    assert {"/api/canva/callback", "/api/canva/verify"} <= set(app.openapi()["paths"])
