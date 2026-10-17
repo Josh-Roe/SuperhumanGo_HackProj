@@ -8,7 +8,7 @@ Every provider step is an Operation keyed by event/revision(/content), so a retr
 reuses the recorded result or reconciles provider state instead of repeating the write.
 """
 
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
@@ -24,7 +24,6 @@ from hackathon_backend.workflows.models import (
     GmailBinding,
     Operation,
     OperationKind,
-    Producer,
     utcnow,
 )
 from hackathon_backend.workflows.ports import (
@@ -40,6 +39,12 @@ from hackathon_backend.workflows.ports import (
 CALENDAR_ID = "primary"
 SENDING_ACTIONS = {"publish", "update"}
 APPROVAL_ACTIONS = SENDING_ACTIONS | {"draft_only"}
+
+
+class AttachmentPolicy(Protocol):
+    """Decides whether an event's invitation must carry its current reviewed flyer/document."""
+
+    async def requires_attachments(self, owner_id: str, event: EventSnapshot) -> bool: ...
 
 
 class DistributionPlan(BaseModel):
@@ -69,12 +74,15 @@ class Distributor:
         gmail: GmailAPI,
         tokens: GoogleTokenSource,
         attachments: AttachmentSource | None = None,
+        attachment_policy: AttachmentPolicy | None = None,
     ) -> None:
         self.store = store
         self.calendar = calendar
         self.gmail = gmail
         self.tokens = tokens
         self.attachments = attachments
+        # None keeps the original behavior: attach whatever the source returns, never block.
+        self.attachment_policy = attachment_policy
 
     async def preview(self, owner_id: str, event_id: str) -> DistributionPlan:
         event = await require_event(self.store, owner_id, event_id)
@@ -95,6 +103,10 @@ class Distributor:
             blockers.append(f"needs_review: organizer has not approved the {kind.value}")
         if not event.invitees:
             blockers.append("needs_review: no invitees")
+        try:
+            await self._required_attachments(owner_id, event)
+        except WorkflowError as missing:
+            blockers.append(str(missing))
         return DistributionPlan(
             event_id=event_id,
             event_revision=event.revision,
@@ -118,6 +130,9 @@ class Distributor:
                 "revision_conflict",
                 f"approval is for revision {approval.event_revision}; event is {event.revision}",
             )
+        # Required flyer/document must exist and be deliverable before any Calendar invitation:
+        # learning it is missing inside Gmail MIME construction would leave invites already sent.
+        await self._required_attachments(owner_id, event)
         try:
             # Reconcile first: a draft the organizer sent by hand in Gmail changes what is allowed.
             await self._reconcile_gmail(
@@ -147,6 +162,43 @@ class Distributor:
             sent=bool(binding and binding.sent and binding.content_id == content.id),
         )
 
+    async def _requires_attachments(self, owner_id: str, event: EventSnapshot) -> bool:
+        if self.attachment_policy is None:
+            return False
+        return await self.attachment_policy.requires_attachments(owner_id, event)
+
+    async def _required_attachments(
+        self, owner_id: str, event: EventSnapshot
+    ) -> list[tuple[str, str, bytes]]:
+        """Load required current-revision attachments or raise a WorkflowError blocker.
+
+        Read-only: no provider or store writes, so preview and the execute preflight are safe.
+        """
+        if not await self._requires_attachments(owner_id, event):
+            return []
+        if self.attachments is None:
+            raise WorkflowError(
+                "integration_not_connected",
+                "this event requires its flyer, but asset Storage is not configured",
+            )
+        try:
+            files = await self.attachments.current_attachments(owner_id, event)
+        except WorkflowError:
+            raise
+        except Exception as failure:
+            code = getattr(failure, "code", None)
+            if code in {"forbidden", "revision_conflict", "needs_review", "provider_failed"}:
+                raise WorkflowError(code, str(failure)) from None
+            raise WorkflowError(
+                "provider_failed", "unable to load the required event attachments"
+            ) from None
+        if not files:
+            raise WorkflowError(
+                "needs_review",
+                f"a reviewed flyer for revision {event.revision} is required before invitations",
+            )
+        return files
+
     async def _approved_content(
         self, owner_id: str, event: EventSnapshot, approval: Approval
     ) -> GeneratedContent:
@@ -157,8 +209,6 @@ class Distributor:
             raise WorkflowError("revision_conflict", "approved content is for another revision")
         if content.state != "ready":
             raise WorkflowError("needs_review", "organizer has not approved this content")
-        if content.producer not in (Producer.SUPERHUMAN_GO, Producer.ORGANIZER):
-            raise WorkflowError("needs_review", "invitation prose must come from Go review")
         mail = await self.store.get_gmail_binding(owner_id, event.id)
         if mail and mail.sent and mail.content_id != content.id:
             if content.kind != ContentKind.CHANGE_NOTICE:
@@ -210,6 +260,11 @@ class Distributor:
             raise WorkflowError("provider_failed", f"{op.kind.value}: {failure}") from None
         except IntegrationNotConnected:
             await self._finish(owner_id, op, None, "integration_not_connected")
+            raise
+        except WorkflowError:
+            # Only raised by our own checks (e.g. required attachments) before any provider
+            # write in this step, so a retry is safe without provider reconciliation.
+            await self._finish(owner_id, op, None, "confirmed_no_effect")
             raise
 
     # Calendar -----------------------------------------------------------------------------
@@ -383,9 +438,16 @@ class Distributor:
             details.append(f"Calendar invitation: {calendar_link}")
         details += [f"Link: {link}" for link in event.links]
         details += ["", f"Questions? Contact the organizer: {event.organizer_contact}"]
-        files = (
-            await self.attachments.current_attachments(owner_id, event) if self.attachments else []
-        )
+        if self.attachment_policy is not None:
+            # Policy-governed: required files are rechecked here (event may have moved since
+            # preflight); events that do not require them carry none.
+            files = await self._required_attachments(owner_id, event)
+        else:
+            files = (
+                await self.attachments.current_attachments(owner_id, event)
+                if self.attachments
+                else []
+            )
         return build_message(
             sender=sender,
             to=[sender],  # invitees are Bcc so addresses are not exposed to each other

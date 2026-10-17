@@ -4,7 +4,7 @@ You are Member 1, frontend owner for our event organizer website. The website na
 
 Own `frontend/**`. Build React/TypeScript TSX screens for Supabase login, organizer event list/detail, and the creation flow: (1) event details and invitee emails, (2) Canva flyer/event document plus inclusion review, (3) invitation preview and distribution. Include name/location/start/end/timezone/links/description/contact; editable Go-generated descriptions, summaries and emails; flyer preview/Canva edit link; plain-language, access, diet, observance and sensory questions; clear publish/update actions; and a private RSVP dashboard. Recipient-facing pages show only approved public material.
 
-Make **Superhuman Go** central and visible: show generation requested, awaiting Go, review required, synced, stale and failed states based on backend evidence. Do not fake a Go response or label Gemini output as Go. Show revision and per-provider receipts, including the distinction between updating an unsent draft and creating a new notification after send. Already sent attachments cannot change.
+Make **Superhuman Go** central and visible: show generation requested, awaiting Go, review required, synced, stale and failed states based on backend evidence. Do not fake a Go response. Show revision and per-provider receipts, including the distinction between updating an unsent draft and creating a new notification after send. Already sent attachments cannot change.
 
 Agree typed API/auth schemas with Member 2; get workflow status from 3 and inclusion/artifact metadata from 4. Use an adapter and clearly labeled fixtures until endpoints exist. Do not edit backend/migrations/main composition. Request contract changes in your own context.
 

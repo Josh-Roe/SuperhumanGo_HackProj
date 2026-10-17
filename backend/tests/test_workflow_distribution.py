@@ -5,7 +5,7 @@ import pytest
 from workflow_fakes import OWNER, World
 
 from hackathon_backend.workflows.go_work import WorkflowError
-from hackathon_backend.workflows.models import ContentKind, Producer
+from hackathon_backend.workflows.models import ContentKind
 
 
 def run(coro):
@@ -148,19 +148,9 @@ def test_draft_sent_manually_in_gmail_is_detected():
             ),
             "needs_review",
         ),
-        (
-            lambda w, a: w.store.content.update(
-                {
-                    a.invitation_content_id: w.store.content[a.invitation_content_id].model_copy(
-                        update={"producer": Producer.GEMINI}
-                    )
-                }
-            ),
-            "needs_review",
-        ),
     ],
 )
-def test_execute_refuses_stale_unreviewed_or_non_go_content(mutate, code):
+def test_execute_refuses_stale_or_unreviewed_content(mutate, code):
     world = World()
     approval = world.approve()
     mutate(world, approval)

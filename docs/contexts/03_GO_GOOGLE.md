@@ -70,7 +70,42 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
   - Retrying reused all receipts with attempts=1.
   - `sync_rsvps`/`list_rsvps` run live and return `no_response`; no guest reply had arrived yet. Reply classification is not yet live-verified.
 
+- **2026-10-16 | main | implemented, tested (local/mocked; 300 backend tests pass, `npm run check` green) | integration:**
+  - **Composition** (`main.py`):
+    - `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` turn on Member 2's REST router at `/api`.
+    - Adding `SUPABASE_SERVICE_ROLE_KEY` builds `create_tool_dependencies`, so MCP tools, organizer tools and asset services all share one Supabase store with the website.
+    - Dev mode is unchanged, and an unconfigured app still starts.
+  - **Production Google connect** (`workflows/google_connect.py`):
+    - `POST /api/google/connect` (Supabase session) → `GET /api/google/callback` → `SupabaseCredentialVault`; `GET /api/google/status`.
+    - The OAuth state is random, single-use, owner-bound, valid for 10 minutes, and kept in memory (single instance only).
+  - **Go organizer tools** (`mcp_tools/organizer_tools.py`):
+    - `list_events`, `create_event`, `list_tasks`, `create_task`: creates take an idempotency key.
+    - `update_event`, `update_task`: take `expected_revision` and apply partial updates that keep invitees.
+    - All return the saved id and revision; the owner comes only from the token.
+    - An event update does not queue Go preparation; the organizer re-prepares and approves in the website.
+  - **Assets** (`workflows/asset_wiring.py`):
+    - Member 4's preparation service, Go queue and Canva session are composed.
+    - Go MCP tools: `get_event_assets`, `request_asset_prose`, `prepare_event_document`, `start/poll/preview/export_canva_flyer`.
+    - Organizer routes under `/api/events/{id}/assets`, including `/flyer/approve` (exact preview digest) and `/flyer/abandon`.
+    - Without a Canva token, these report `integration_not_connected`.
+    - `Distributor` gets an `attachment_policy`: a started flyer must be stored and deliverable for the current revision before any Calendar or Gmail call. Preview shows a blocker and execute refuses with no side effects.
+  - **Not live-verified:** the Supabase REST round trip, connector-token resolution in the database, the production Google consent → vault path, and Canva export → Storage → attachment.
+  - **Deploy steps:** `docs/SUPERHUMAN.md#deploy`.
+
 ## Handoffs (proposed, awaiting recipient agreement)
+
+- **Member 2 (from integration, 2026-10-16):**
+  - **Deployment:**
+    - The `backend/Dockerfile` start command must honour `$PORT`, turn on proxy headers, and default `APP_DOMAIN` from `RENDER_EXTERNAL_HOSTNAME`.
+    - `.dockerignore`: add `.env.*`, `!.env.example`, `tests/`.
+    - Add a `render.yaml` blueprint (see SUPERHUMAN.md).
+  - **Canva:**
+    - A Canva OAuth connect/refresh flow that writes vault provider `canva` as `{access_token}`.
+    - A durable table and lease for flyer job state, replacing the vault-held state and the in-process lock.
+  - **Google:** expose a token-cache forget hook so a Google reconnect takes effect immediately.
+  - **Contract:** add the `/api/google/*` and `/api/events/{id}/assets/*` routes.
+  - **Tenancy:** confirm that owner filtering in the `organizer_write_record` RPC (admin DB) is acceptable tenancy for Go's organizer tools.
+- **Member 1:** add UI for flyer preview, approve and abandon; distribution blockers; and the Connect Google button (`POST /api/google/connect` → open `authorization_url`). The callback returns JSON today; agree on a redirect page.
 
 - **Member 2:**
   - Implement the `WorkflowStore` Protocol (`workflows/ports.py`) on Supabase: owner-scoped, `save_content` CAS on the event revision, and an atomic work-item insert per `payload.idempotency_key`.

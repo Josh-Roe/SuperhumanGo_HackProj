@@ -1,6 +1,6 @@
 # Agent instructions: event organizer website
 
-The approved product is the event organizer website in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md). Its name is undecided. **Superhuman Go is the central writing and coordination agent**, with Grammarly writing assistance. Gemini may support explicitly identified subtasks; it must not silently replace Go.
+The approved product is the event organizer website in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md). Its name is undecided. **Superhuman Go is the central writing and coordination agent**; its Grammarly writing assistance comes built in. Gemini and Notion are not used.
 
 ## Required reading before every task
 
@@ -39,12 +39,12 @@ Backend path fragments above are relative to `backend/src/hackathon_backend/`. T
 - Use a canonical, versioned event in Supabase. Every document, flyer/export, email, and Calendar operation records its event revision. Show pending/failed/stale states instead of claiming everything synchronized.
 - Follow event details → design and inclusion review → distribution → updates/RSVP. Retain organizer review of generated writing and publish/update actions.
 - Go reads event data through authenticated MCP tools, reasons/drafts/coordinates using its available connectors or backend tools, and records outputs/receipts in Supabase. Do not invent a public `Go.chat()` or OpenAI-compatible Go completion API. Prove account/trigger capabilities first. If automatic website-to-Go triggering is unavailable, show a truthful Go-assisted queue and manual invocation; record the gap.
-- Route prose generation through Go: descriptions, plain-language summaries, invitation/change emails, event documents, and optional Notion notes. Demonstrate Grammarly assistance through an available supported client/integration. Label any explicit Gemini-assisted portion; do not claim it was Go/Grammarly.
+- Route prose generation through Go: descriptions, plain-language summaries, invitation/change emails, and event documents. Grammarly writing assistance is part of Superhuman Go; it is not integrated separately.
 - Publish creates Calendar invites and sends the reviewed Gmail invitation only after the organizer's app action. Retries must not duplicate events, drafts, or sent messages. Approved changes update the existing Calendar ID and current Canva artifact, replace an unsent Gmail draft, or create a new change-notification draft if the prior message was sent. Send that draft only through the authorized publish/update flow.
 - Delivered email bodies and attached flyer bytes are immutable snapshots. Provide a current event/flyer link plus a new notification/export; do not promise old attachments will change.
 - Supabase Auth and ownership/RLS scope events, assets, jobs, and RSVPs. A global development MCP token is not adequate multiuser authorization. Keep OAuth/refresh tokens and Supabase service-role credentials on the server.
 - RSVP uses Calendar response statuses and/or Go-classified replies matched to the invited sender and event thread. Ambiguous replies remain `needs_review`; quoted/forwarded text cannot change someone else's response. Dietary/accessibility details stay private and out of shared invitations.
-- Inclusion uses organizer facts and dated sources, preserving `unknown`. Check plain language, step-free entrance/elevator, diet, religious-observance conflicts, captions, and loud sound/strobes. Do not infer needs from ethnicity/diagnosis or certify an unknown venue. Parking/restrooms and Forms are stretch scope.
+- Inclusion uses organizer facts and dated sources, preserving `unknown`. Check plain language, step-free entrance/elevator, diet, religious-observance conflicts (Google's public holiday calendars, see [inclusion contract](docs/inclusion/CONTRACT.md)), captions, and loud sound/strobes. Do not infer needs from ethnicity/diagnosis or certify an unknown venue. Parking/restrooms and Forms are stretch scope.
 
 ## Working and completion
 

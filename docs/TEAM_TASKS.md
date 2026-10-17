@@ -23,14 +23,14 @@ Send **one** prompt to each member's agent. Each prompt includes the read-all/wr
 
 **Core:** login, event details/timezone/invitees, Go-generated editable prose, Canva flyer and event document, inclusion review, Gmail draft/Calendar invite distribution, versioned updates across artifacts, visible receipts/errors, RSVP tracking.
 
-**After the core works:** live Notion note connector, Google Forms for extra/private RSVP data, parking/restroom expansion, additional personalization. Plain-language, ramp/elevator, dietary, religious-observance and sensory questions remain in the core inclusion review, even when the truthful result is unknown or organizer input is needed.
+**After the core works:** Google Forms for extra/private RSVP data, parking/restroom expansion, additional personalization. Plain-language, ramp/elevator, dietary, religious-observance and sensory questions remain in the core inclusion review, even when the truthful result is unknown or organizer input is needed.
 
 **Defer:** custom training, ONNX/C++ optimization, broad unrelated event-platform features. Keep the existing optional scaffolds available without spending the demo window on them.
 
 ## Shared definition of done
 
 - A logged-in organizer creates an event with explicit timezone; another account cannot access its private event/RSVP state.
-- A real Go session generates and stores event prose through our supported integration; the demo distinguishes Go generation from Python execution and any separately identified Gemini assistance.
+- A real Go session generates and stores event prose through our supported integration; the demo distinguishes Go generation from Python execution.
 - Canva flyer/document and invitation represent the reviewed canonical event revision; inclusion answers/unknowns are visible before publishing.
 - Approved publishing creates one intended Calendar event and sends the intended Gmail invitation with actual links/current material. Test only with authorized demo recipients.
 - Changing time/location updates that Calendar ID, updates or versions the Canva flyer and document, updates an unsent draft or creates a new notification after send, and records read-back evidence. Retries do not duplicate sends.
