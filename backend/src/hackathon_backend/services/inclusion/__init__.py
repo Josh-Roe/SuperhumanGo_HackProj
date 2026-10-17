@@ -1,5 +1,10 @@
-"""Sourced organizer review; no inferred diagnoses, holidays, or venue guarantees."""
+"""Sourced organizer review; no inferred diagnoses or venue guarantees.
 
+Religious observances come from organizer-supplied intervals plus Google's public holiday
+calendars (`holidays.py`) for the traditions the organizer keeps selected.
+"""
+
+from datetime import datetime
 from typing import Literal
 
 from pydantic import AwareDatetime, Field, HttpUrl, model_validator
@@ -10,6 +15,26 @@ from hackathon_backend.services.assets.models import (
     GoContent,
     require_scope,
 )
+from hackathon_backend.services.inclusion.holidays import (
+    ALL_TRADITIONS,
+    CalendarCheck,
+    HolidayCalendar,
+    Tradition,
+)
+
+__all__ = [
+    "ALL_TRADITIONS",
+    "CalendarCheck",
+    "Fact",
+    "Finding",
+    "HolidayCalendar",
+    "InclusionInput",
+    "InclusionReport",
+    "Observance",
+    "Source",
+    "Tradition",
+    "check_inclusion",
+]
 
 
 class Source(BoundaryModel):
@@ -54,6 +79,8 @@ class InclusionInput(BoundaryModel):
     strobes: Fact = Field(default_factory=Fact)
     observances_selected: bool = False
     observances: tuple[Observance, ...] = ()
+    # Public holiday calendars to check automatically; an empty tuple opts out.
+    traditions: tuple[Tradition, ...] = ALL_TRADITIONS
 
 
 class Finding(BoundaryModel):
@@ -80,8 +107,12 @@ def check_inclusion(
     *,
     owner_id: str,
     summary: GoContent | None = None,
+    calendar: CalendarCheck | None = None,
 ) -> InclusionReport:
-    """Evaluate explicit facts. Even a fully recorded report is not certification."""
+    """Evaluate explicit facts. Even a fully recorded report is not certification.
+
+    `calendar` is the holiday-feed lookup for `facts.traditions`; None means it was not run.
+    """
     require_scope(event, owner_id, *((summary,) if summary else ()))
     findings: list[Finding] = []
 
@@ -165,35 +196,60 @@ def check_inclusion(
         )
     )
 
-    conflicts = tuple(
-        observance.name
-        for observance in facts.observances
-        if event.starts_at < observance.ends_at and observance.starts_at < event.ends_at
-    )
-    findings.append(
-        Finding(
-            category="religious_observances",
-            status="unknown"
-            if not facts.observances_selected or not facts.observances
-            else ("attention" if conflicts else "recorded"),
-            reason="select_relevant_observances"
-            if not facts.observances_selected
-            else (
-                "supply_sourced_observance_intervals"
-                if not facts.observances
-                else (
-                    "overlap_with_supplied_observance"
-                    if conflicts
-                    else "no_overlap_in_supplied_intervals"
-                )
-            ),
-            sources=tuple(observance.source for observance in facts.observances),
-            conflicts=conflicts,
-        )
-    )
+    findings.append(_observance_finding(event, facts, calendar))
     return InclusionReport(
         event_id=event.id,
         event_revision=event.revision,
         findings=tuple(findings),
         requires_review=any(f.status != "recorded" for f in findings),
+    )
+
+
+def _observance_finding(
+    event: EventSnapshot, facts: InclusionInput, calendar: CalendarCheck | None
+) -> Finding:
+    def overlaps(starts: datetime, ends: datetime) -> bool:
+        return event.starts_at < ends and starts < event.ends_at
+
+    manual = facts.observances if facts.observances_selected else ()
+    conflicts = [o.name for o in manual if overlaps(o.starts_at, o.ends_at)]
+    sources = [o.source for o in manual]
+    missing: tuple[str, ...] = ()
+    if facts.traditions:
+        if calendar is None:
+            missing = tuple(facts.traditions)
+        else:
+            missing = tuple(t for t in facts.traditions if t in calendar.unavailable)
+            conflicts += [
+                o.name
+                for o in calendar.observances
+                if o.tradition in facts.traditions and overlaps(o.starts_at, o.ends_at)
+            ]
+            sources += [
+                Source(
+                    label=f"Google Calendar public holidays: {feed.calendar_name}",
+                    observed_at=feed.fetched_at,
+                    confirmed_by="Google Calendar public holiday feed",
+                    url=feed.url,
+                )
+                for feed in calendar.feeds
+                if feed.tradition in facts.traditions
+            ]
+    checked = bool(manual) or (bool(facts.traditions) and len(missing) < len(facts.traditions))
+    if conflicts:
+        status, reason = "attention", "overlap_with_observance"
+    elif missing:
+        status, reason = "unknown", "holiday_calendar_unavailable"
+    elif checked:
+        status, reason = "recorded", "no_overlap_in_checked_observances"
+    elif facts.observances_selected:
+        status, reason = "unknown", "supply_sourced_observance_intervals"
+    else:
+        status, reason = "unknown", "select_relevant_observances"
+    return Finding(
+        category="religious_observances",
+        status=status,
+        reason=reason,
+        sources=tuple(sources),
+        conflicts=tuple(dict.fromkeys(conflicts)),
     )

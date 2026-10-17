@@ -860,9 +860,7 @@ function Review({
                         <span className="small muted">
                           {c.producer === "superhuman_go"
                             ? "Superhuman Go"
-                            : c.producer === "gemini"
-                              ? "Gemini-assisted portion"
-                              : "Edited by organizer"}{" "}
+                            : "Edited by organizer"}{" "}
                           · revision {c.event_revision}
                         </span>
                         <textarea

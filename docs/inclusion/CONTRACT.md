@@ -1,10 +1,10 @@
 # Inclusion review contract
 
-Member 4, 2026-10-16. Callable: `services.inclusion.check_inclusion(event, facts, owner_id=validated_owner, summary=go_summary)` → `InclusionReport`. Pure local rules; no hidden LLM, holiday database or external venue lookup. Member 2 persists owner-scoped inputs/reports by revision. Member 3 obtains the summary through Superhuman Go; Member 1 supplies the organizer review UI.
+Member 4, 2026-10-16. Callable: `services.inclusion.check_inclusion(event, facts, owner_id=validated_owner, summary=go_summary, calendar=check)` → `InclusionReport`. Local rules plus one external lookup: `HolidayCalendar.check(event, facts.traditions)` (`services/inclusion/holidays.py`) reads Google's public holiday iCal feeds. No hidden LLM or external venue lookup. Member 2 persists owner-scoped inputs/reports by revision. Member 3 obtains the summary through Superhuman Go; Member 1 supplies the organizer review UI.
 
 `Fact` is `{value: "yes" | "no" | "unknown", source?: Source}`. Source has `label`, timezone-aware `observed_at`, `confirmed_by`, optional HTTPS/HTTP `url`. Unsourced yes/no remains operationally unknown. Store the original fact as entered; the checker never fills unknowns with invented guarantees. A dated source is a traceable assertion, not independent proof. Ask again when facts become stale or the venue changes.
 
-`InclusionInput` fields: `step_free_entrance`, `above_ground_floor`, `elevator`, `food_served`, `diet_options`, `diet_source`, private `required_diets`, `captions`, `loud_sound`, `strobes`, `observances_selected`, `observances`.
+`InclusionInput` fields: `step_free_entrance`, `above_ground_floor`, `elevator`, `food_served`, `diet_options`, `diet_source`, private `required_diets`, `captions`, `loud_sound`, `strobes`, `observances_selected`, `observances`, `traditions` (default all of `christian`, `jewish`, `muslim`, `hindu`, `orthodox_christian`; `()` opts out).
 
 | Category | Finding behavior |
 | --- | --- |
@@ -12,7 +12,7 @@ Member 4, 2026-10-16. Callable: `services.inclusion.check_inclusion(event, facts
 | Step-free entrance | Sourced yes recorded, no attention, unknown/unsourced unknown. Organizer must confirm the actual route. |
 | Elevator | Sourced ground-floor answer records that fact; unknown floor remains unknown. For upper floors, sourced elevator yes/no yields recorded/attention and preserves both sources. Ground floor does not prove step-free access. |
 | Diet | Unknown if food/options are unconfirmed. Sourced no-food recorded. Missing required option yields attention. Matching option labels still needs attendee confirmation; no allergy/cross-contamination guarantee. Individual restrictions never appear in findings/public assets. |
-| Religious observances | Ask which observances to check. Accept explicitly supplied, sourced start/end instants covering the applicable local interval, including any sunset boundaries. Check actual interval overlap in aware timestamps. Empty/unselected coverage remains visible; no overlap means only no overlap in the supplied intervals. Never infer religion or claim a comprehensive holiday scan. |
+| Religious observances | Check Google's public holiday calendars for the selected traditions (feeds cover 2021–2031, no account needed, cached 12 h). Each all-day entry spans its local date in the event's timezone; Jewish feeds list eves separately, and Muslim entries start at noon the previous day because days begin at sundown. Tentative dates are labeled. Organizer-supplied sourced intervals are also accepted. Any overlap → `attention`; a failed feed → `unknown` (`holiday_calendar_unavailable`); no overlap means only no overlap in the checked calendars. Never infer religion or claim a comprehensive holiday scan. |
 | Captions | Sourced yes recorded, no attention, unknown preserved. Organizer checks whether captions cover the actual program. |
 | Loud sound / strobes | Sourced yes attention, no recorded, unknown preserved. A warning is for organizer action/disclosure, not automatic event rejection. |
 
