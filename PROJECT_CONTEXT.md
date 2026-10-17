@@ -19,6 +19,8 @@ The team lead has selected an event organizer website. Organizers create an even
 
 The distinctive demo is a real change of time/location causing a visible, versioned update across Calendar, Gmail, and Canva. Keep the latest event accessible through one stable link while clearly identifying older snapshots.
 
+**User decision, 2026-10-16 — guided Go pipeline:** one Go conversation walks the organizer through details → writing → review → inclusion → optional flyer → send → RSVPs (`event_progress`, `approve_draft`, `save_inclusion_facts`, `send_invitations`). Approval may happen in the Go chat: the organizer's explicit "send" plus Go's per-call confirmation records the same exact-content approval (`organizer_approve`) and runs the same idempotent distribution. Website approval stays available; the website shows pipeline progress. Flyer preview approval remains a website action.
+
 **Agreed workflow update, 2026-10-16:** the organizer primarily prompts Superhuman Go. Go connects to the website's custom authenticated MCP server, creates/edits canonical tasks/events, prepares writing and coordinates approved provider work, then records IDs/revisions/results for the website to display. Manual website creation/editing remains available. This follows the team lead's Member 2 instruction and the matching Member 1/4 context handoffs. Connecting MCP does not itself prove an automatic website-to-Go trigger or authorize publication. A separate standalone-task schema and the frontend wire mapping are published as implementation proposals in Member 2's context pending consumer agreement.
 
 ## Organizer flow
