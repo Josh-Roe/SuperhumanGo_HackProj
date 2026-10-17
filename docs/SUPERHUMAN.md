@@ -33,6 +33,17 @@ The MCP server rejects requests without a valid bearer token. `MCP_AUTH_TOKEN` i
 | `execute_distribution` | Runs an organizer-made approval; idempotent Calendar upsert + Gmail send |
 | `sync_rsvps` / `get_reply` / `record_rsvp_classification` / `list_rsvps` | Calendar statuses plus Go-classified replies |
 
+### Guided pipeline tools (Member 3)
+
+One Go conversation walks the organizer through every step; approval happens in chat (decision 2026-10-16).
+
+| Tool | Effect |
+| --- | --- |
+| `event_progress` | Stage list (details, writing, review, inclusion, flyer, send, rsvps) with `next_stage`; read-only |
+| `approve_draft` | Marks the invitation/change notice the organizer approved in chat `ready`; edited text is saved as `producer: organizer` |
+| `save_inclusion_facts` | Organizer's yes/no/unknown answers, merged with saved facts; unknown stays unsourced |
+| `send_invitations` | Records the exact-content approval and runs the same idempotent distribution; retries never resend |
+
 The backend is the only writer to Calendar and Gmail. Go agent instructions: [`integrations/superhuman/agent/INSTRUCTIONS.md`](../integrations/superhuman/agent/INSTRUCTIONS.md).
 
 ### Dev mode (before Supabase)
