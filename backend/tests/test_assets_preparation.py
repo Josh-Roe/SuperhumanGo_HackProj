@@ -83,8 +83,7 @@ def test_read_uses_current_trusted_content_and_exposes_body_free_prose_readiness
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("producer", [Producer.GEMINI, Producer.ORGANIZER])
-def test_non_go_latest_content_does_not_fall_back_to_an_older_go_version(producer):
+def test_non_go_latest_content_does_not_fall_back_to_an_older_go_version():
     async def run():
         store, _, service = setup()
         await put_prose(store)
@@ -92,7 +91,7 @@ def test_non_go_latest_content_does_not_fall_back_to_an_older_go_version(produce
         alternate = original.model_copy(
             update={
                 "id": "alternate-output",
-                "producer": producer,
+                "producer": Producer.ORGANIZER,
                 "created_at": original.created_at + timedelta(seconds=1),
             }
         )

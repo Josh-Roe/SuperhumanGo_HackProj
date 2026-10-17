@@ -15,7 +15,7 @@ Write only your own personal context. Propose cross-team changes there for the r
 
 ## Accepted product decision
 
-The team lead has selected an event organizer website. Organizers create an event once, use **Superhuman Go and Grammarly writing assistance** to prepare clear material, review design/inclusion, distribute invitations, and propagate approved changes across Gmail, Google Calendar, Canva, and stored event material. Productivity is the working primary-track recommendation; inclusion is a core capability. Confirm the final Devpost track with the team lead.
+The team lead has selected an event organizer website. Organizers create an event once, use **Superhuman Go (with its built-in Grammarly writing assistance)** to prepare clear material, review design/inclusion, distribute invitations, and propagate approved changes across Gmail, Google Calendar, Canva, and stored event material. Productivity is the working primary-track recommendation; inclusion is a core capability. Confirm the final Devpost track with the team lead.
 
 The distinctive demo is a real change of time/location causing a visible, versioned update across Calendar, Gmail, and Canva. Keep the latest event accessible through one stable link while clearly identifying older snapshots.
 
@@ -40,19 +40,19 @@ The distinctive demo is a real change of time/location causing a visible, versio
 - Plain-language summary and actionable event instructions.
 - Organizer-confirmed step-free entrance/ramp and elevator facts.
 - Dietary accommodations and private collection of restrictions where required.
-- Potential conflicts with significant religious observances, using dates, location/timezone, and cited sources; ask the organizer which observances to consider, never infer religion from ethnicity/name.
+- Potential conflicts with significant religious observances, checked automatically against Google's public Christian, Jewish, Muslim, Hindu and Orthodox Christian holiday calendars in the event's timezone. All five are checked by default; the organizer can narrow them or add sourced observances. Never infer religion from ethnicity/name.
 - Captioning availability and clear loud-sound/strobe notices.
 - Parking, restrooms, and Google Forms are stretch features from the team brief. Unknown accommodations remain unknown; do not invent guarantees.
 
 ## Superhuman Go is central
 
-Go is responsible for event descriptions, plain-language summaries, invitations, change summaries, event-document prose, optional Notion-note prose, and RSVP interpretation. Grammarly assistance is demonstrated through an actually available supported writing surface. The website requests and displays generation work; Python supplies durable state and reliable tool execution.
+Go is responsible for event descriptions, plain-language summaries, invitations, change summaries, event-document prose, and RSVP interpretation. Grammarly writing assistance is part of Superhuman Go; it is not integrated separately. The website requests and displays generation work; Python supplies durable state and reliable tool execution.
 
 Supported starting architecture: **Go → authenticated hosted MCP tools → Python → Supabase/provider operations**. The website may enqueue work for Go. Member 3 must verify a supported account-side trigger before promising automatic website-to-Go execution; a manual Go command or verified schedule is the explicit MVP fallback, displayed as awaiting Go rather than fake completion. No general Go inference endpoint has been established. See [official MCP guidance](https://coda.io/packs/build/latest/guides/blocks/mcp/) and [agent builder](https://support.grammarly.com/hc/en-us/articles/47453002811021-Create-and-configure-agents-with-the-agent-builder).
 
 Gmail/Calendar writes may use Go's verified native connectors or backend OAuth tools called by Go. Member 3 chooses **one writer per provider operation**, records its IDs/results, and prevents duplicated native-connector plus API execution. No secrets are passed as model prose. Each organizer's access must be enforced at the tool boundary.
 
-Gemini is available for explicitly approved supporting subtasks or separately labeled fallback experimentation. It does not fulfill the requirement for Go-powered writing on its own. A live Go operation and returned provider receipt must appear in the final demo.
+Gemini is not used; all generated prose comes from Go. A live Go operation and returned provider receipt must appear in the final demo.
 
 ## Stack and synchronization plan
 
@@ -67,7 +67,7 @@ Gemini is available for explicitly approved supporting subtasks or separately la
 - Earlier React/Python, GitHub/Live Share, and supported Go MCP choices remain in effect.
 - The previous three-agent split is **superseded** by the team lead's four-member request, 2026-10-16. Single-file progress editing is superseded by the four owner-specific contexts; only global agreed requirements remain here.
 - Earlier brainstorming ideas are not the product specification. This event-management brief is the approved direction.
-- Notion note generation is requested; a live Notion connector is a follow-on integration unless the core Gmail/Calendar/Canva flow is already working. Forms/parking/restrooms are explicit stretch scope. Final sequencing can change by team decision.
+- Notion is out of scope. Forms/parking/restrooms are explicit stretch scope. Final sequencing can change by team decision.
 
 ## Current evidence and blockers
 

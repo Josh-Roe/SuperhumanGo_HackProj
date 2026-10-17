@@ -15,8 +15,7 @@ export type ContentKind =
   | "event_document"
   | "flyer_brief"
   | "flyer_copy"
-  | "flyer_alt_text"
-  | "notion_note";
+  | "flyer_alt_text";
 export interface EventInput {
   title: string;
   description: string;
@@ -39,7 +38,7 @@ export interface Content {
   kind: ContentKind;
   body: string;
   subject?: string | null;
-  producer: "superhuman_go" | "organizer" | "gemini";
+  producer: "superhuman_go" | "organizer";
   event_revision: number;
   state: WorkState;
 }

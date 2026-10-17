@@ -67,7 +67,6 @@ class ContentKind(StrEnum):
     INVITATION = "invitation"
     CHANGE_NOTICE = "change_notice"
     DOCUMENT = "document"
-    NOTION_NOTE = "notion_note"
     # Member 4 asset prose (Canva flyer + event document); see docs/canva/MEMBER4_INTEGRATION.md
     FLYER_BRIEF = "flyer_brief"
     FLYER_COPY = "flyer_copy"
@@ -79,7 +78,6 @@ class ContentKind(StrEnum):
 class Producer(StrEnum):
     SUPERHUMAN_GO = "superhuman_go"
     ORGANIZER = "organizer"  # organizer edited Go output in the website
-    GEMINI = "gemini"  # explicitly labeled supporting subtask only
 
 
 class GeneratedContent(BaseModel):

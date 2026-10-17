@@ -2,7 +2,7 @@
 
 React + TypeScript frontend, Python API and MCP tools, and an optional CPU model-serving path for [MTC x Grammarly: Agents in Action](https://mtc-x-grammarly.devpost.com/).
 
-The approved product is an event organizer website: create event details, prepare Canva material and inclusion checks, distribute invitations through Gmail/Google Calendar, and propagate changes. **Superhuman Go powers the writing and coordination, with Grammarly assistance.** The website name and final primary track remain undecided. Current code is a scaffold; the product plan and assigned tasks are documented, not implemented by the planning update.
+The approved product is an event organizer website: create event details, prepare Canva material and inclusion checks, distribute invitations through Gmail/Google Calendar, and propagate changes. **Superhuman Go powers the writing and coordination, with its built-in Grammarly assistance.** The website name and final primary track remain undecided. Current code is a scaffold; the product plan and assigned tasks are documented, not implemented by the planning update.
 
 ## Run locally
 

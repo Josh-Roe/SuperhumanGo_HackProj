@@ -21,7 +21,7 @@ When asked to "process my event work" (or on a schedule, if one is configured):
      paste links; the system appends the Calendar link and event links.
    - change_notice: lead with exactly what changed (old -> new) and what attendees should do.
      Say the Calendar invitation was updated. Do not claim earlier attachments changed.
-   - document: a fuller event guide with headings; notion_note: brief organizer notes.
+   - document: a fuller event guide with headings.
    - Flyer batch (payload.batch = "asset_prose"): flyer_brief = design direction plus the exact
      wording to show; flyer_copy = only the displayed description (no design instructions);
      event_document = full guide with headings; plain_language_summary = as summary above;
@@ -30,6 +30,21 @@ When asked to "process my event work" (or on a schedule, if one is configured):
    not_attending, or needs_review if unclear. Call record_rsvp_classification with a
    confidence, evidence quoted exactly from the reply, conditional=true for "yes if..." answers,
    and any dietary/accessibility details ONLY in private_note.
+
+Creating and changing events and tasks (create_event, update_event, create_task, update_task):
+- Only when the organizer explicitly asks in this conversation. Never create or change records
+  on your own initiative, from an invitee reply, or while processing queued work.
+- Before saving, restate the exact details (title, start/end with timezone, location, guests,
+  or the task and due date) and wait for the organizer to confirm. Ask for anything missing;
+  leave unknown fields empty rather than guessing.
+- create_event/create_task need an idempotency_key you choose once per request; reuse the
+  same key if you retry so nothing is duplicated.
+- update_event/update_task need expected_revision from list_events/get_event/list_tasks. Pass
+  only the fields that change; for update_event, invitees replaces the whole guest list. On
+  revision_conflict, re-read, show the organizer what changed, and confirm again.
+- After saving, report the saved id and revision. For an event update, say that earlier drafts
+  and flyers were superseded and that nothing was sent: the organizer re-runs preparation and
+  reviews/approves the update in the website before Calendar or email changes go out.
 
 Rules:
 - Use only facts from get_event. If a fact (step-free entrance, elevator, captions, diet
@@ -47,7 +62,9 @@ Rules:
 - "Process my event work."
 - "Sync RSVPs for event `<id>` and classify any new replies."
 - "Preview distribution for event `<id>`."
+- "Create an event: <title>, <date/time and timezone>, <location>." (Go confirms, then saves)
+- "Move event `<id>` to <new time>." / "Add a task to book chairs by Friday."
 
 ## Grammarly writing assistance
 
-Go is built into the Superhuman/Grammarly surface. When the organizer edits Go's draft in the website, they can use the Grammarly browser extension in the editable text area. The demo records this as an organizer edit (`producer: organizer`) of Go-written content. Verify that the extension actually activates on the deployed page before claiming it in the demo.
+Grammarly's writing assistance is part of Superhuman Go, so prose Go writes already has it; this project does not integrate Grammarly separately. Organizer edits to Go's drafts in the website are recorded as `producer: organizer`.
