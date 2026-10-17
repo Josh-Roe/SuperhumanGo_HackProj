@@ -133,3 +133,28 @@ If time runs short, cut in this order. Each cut must be stated honestly in the d
 3. Reply classification: Calendar RSVP statuses only.
 
 Never cut: live Go writing plus a provider receipt, organizer approval before sending, and the same-ID Calendar update.
+
+## 5. Code first, docs last: coding assignments
+
+User decision, 2026-10-16: finish every coding task below before writing any documentation (A3, A12, PRESENTATION, context write-ups beyond one-line evidence). The user's own agent (the **lead coder**, on the stronger agentic plan) takes most of the coding, across owner boundaries. This is the explicit user authorization AGENTS.md requires for working outside your own paths. Other members still claim items per rule 2 before starting; the lead coder claims one queue item at a time, not the whole queue.
+
+**Lead coder (user), in this order:**
+
+1. **A14**: finish unknown-effect reconciliation. Partial work is already in the working tree on the user's machine.
+2. **A1**: Render-compatible Dockerfile and `render.yaml`. This replaces the M1 `PORT` stopgap.
+3. **A10**: owner-scoped reads, idempotent approvals and the inclusion-fact save endpoint. Member 2 reviews any migration or `config.py` change before it is applied.
+4. **A16**: provider UI (flyer approve/abandon, distribution blockers, Connect Google and the A13 callback page).
+5. **A17**: inclusion fact editing in the UI, using the server's fact shape (see the note on A17).
+6. **A11**: Canva OAuth connect (per-organizer, see M6), a durable flyer-job table and lease, and Google token-cache forget.
+7. **A19**: Canva pending-export poll.
+8. **A9**: inclusion report and Canva preview transport to the UI.
+9. **A8**: Canva revision on event change. This is cut first if time runs short (§4).
+10. **A18**: organizer-tenancy check for the Go tools, with a two-organizer RPC isolation test.
+
+**Other members (small, isolated, or need their own accounts):**
+
+- **Member 1: A15** `?event=<id>` deep link (frontend only, no dependencies). Then review the UI from A16 and A17.
+- **Member 2: A2** live Supabase check, which needs project credentials. Also review and apply migrations from A10 and A11, plus M1 and M11.
+- **Member 4: A7** live Canva export, after M6 provides the OAuth client and at least one organizer has connected their own Canva. Then verify A8 live.
+
+**Docs, only after the coding above is done or cut:** A3 (contract docs), A12 (pitch), and README/PROJECT_CONTEXT evidence.
