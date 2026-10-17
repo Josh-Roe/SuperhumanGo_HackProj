@@ -76,6 +76,51 @@ The [official tutorial](https://coda.io/packs/build/latest/tutorials/build/mcp/)
 
 Until step 5 succeeds, record the state as **locally tested; live Go connection unverified**. Backend `verified` remains false deliberately: the server cannot infer remote installation from configuration.
 
+## Deploy
+
+Go needs a stable public HTTPS `/mcp`. Quick tunnels (`*.trycloudflare.com`) change hostname on restart, so the connector breaks. These steps assume Member 2's deployment artifacts (see handoff below) exist. Until they do, use the [VPS guide](DEPLOYMENT.md).
+
+1. **Backend host.** Render: New → Blueprint → this repo (or Web Service → Docker, context `backend`, Dockerfile `backend/Dockerfile`). Any Docker host works. Health check path: `/api/health`. The free tier sleeps when idle, so wake it (`curl https://HOST/api/health`) before a demo.
+2. **Env vars** (host dashboard, never in Git): `MCP_AUTH_TOKEN`, `APP_DOMAIN`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CREDENTIAL_ENCRYPTION_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`. Optional: `ONNX_MODEL_PATH`. Dev mode only: `WORKFLOW_DEV_MODE=1`, `DEV_CONNECTOR_TOKEN`, `DEV_INVITEES`, `DEV_ORGANIZER_CONTACT`. Leave `WORKFLOW_DEV_MODE` unset in production.
+3. **`APP_DOMAIN`** = the bare public hostname, e.g. `your-app.onrender.com`. Don't include a scheme, path or trailing slash. `/mcp` rejects other `Host` headers (DNS-rebinding protection), and CORS allows `https://APP_DOMAIN`.
+4. **Google OAuth.** Set `GOOGLE_REDIRECT_URI=https://HOST/api/google/callback` (the production route), and add the same URI under the OAuth client's Authorized redirect URIs in Google Cloud Console. Dev mode uses `https://HOST/api/dev/google/callback` instead.
+5. **Verify:** `curl -fsS https://HOST/api/health` returns `{"status":"ok",...}`, and `/api/status` reports `superhuman.configured: true`.
+6. **Point the connector at the host and upload:**
+
+   ```sh
+   npm --prefix integrations/superhuman run configure -- https://HOST/mcp
+   npm --prefix integrations/superhuman run check
+   npm --prefix integrations/superhuman run upload
+   ```
+
+   Commit the updated `config.ts`, which holds only the public endpoint.
+7. **Release from the Pack Studio web UI** (the Pack's page → Release). `npx packs release` refuses while the working tree has uncommitted changes.
+8. **Re-sign in the Go connector** (Connectors → this Pack → sign in again), because the endpoint changed. Copy the token with no trailing newline. A trailing newline produced `<no HTTP response>` tool failures:
+
+   ```sh
+   printf %s "$TOKEN" | tr -d '\n' | pbcopy
+   ```
+
+   Then ask Go to run `workspace_status`.
+9. **Vercel.** In the frontend project (Root Directory `frontend`), set the server-only `BACKEND_ORIGIN=https://HOST` (origin only, without `/api`) and the public `VITE_PUBLIC_MCP_URL=https://HOST/mcp`. Redeploy, because `VITE_*` values are baked in at build time. `frontend/vercel.json` already rewrites `/api/*` to `frontend/api/proxy.ts`, which forwards to `BACKEND_ORIGIN`. Check with `curl https://YOUR-VERCEL-APP/api/health`.
+
+### Handoff to Member 2 (proposed)
+
+Status: **proposed**, 2026-10-16. Member 2 owns these files. Member 3 has not edited them.
+
+- **`backend/Dockerfile` CMD.** Bind to the host's `PORT`, trust the TLS proxy, and default `APP_DOMAIN` from Render:
+
+  ```dockerfile
+  ENV PORT=8000 FORWARDED_ALLOW_IPS="*"
+  CMD ["sh", "-c", "export APP_DOMAIN=\"${APP_DOMAIN:-${RENDER_EXTERNAL_HOSTNAME:-}}\"; exec python -m uvicorn hackathon_backend.main:app --host 0.0.0.0 --port \"${PORT:-8000}\" --proxy-headers"]
+  ```
+
+  The current CMD hardcodes port 8000 and `--no-proxy-headers`. Render injects `PORT` (default 10000), so health checks fail there. Make `HEALTHCHECK` read `PORT` too. `PORT=8000` keeps Compose/Caddy unchanged. `FORWARDED_ALLOW_IPS="*"` is safe only when the container is reachable solely through the host proxy (Render edge or Caddy).
+- **`backend/.dockerignore`.** Add `.env.*`, `!.env.example`, and `tests/`. The current file excludes only `.env`, although the Dockerfile copies only `pyproject.toml`, `uv.lock` and `src`.
+- **`render.yaml`** (repo root). Use `type: web`, `runtime: docker`, `plan: free`, `dockerfilePath: ./backend/Dockerfile`, `dockerContext: ./backend`, and `healthCheckPath: /api/health`. Under `envVars`, list every name from step 2 with `sync: false`. `GOOGLE_REDIRECT_URI` is `https://HOST/api/google/callback`.
+- **Vercel API base.** No change is needed. `BACKEND_ORIGIN` (server-only) is already read by `frontend/server/proxy.ts`. Add `BACKEND_ORIGIN` and `VITE_PUBLIC_MCP_URL` to the Vercel env-var docs/README deploy steps.
+- **Evidence.** HEAD (`1752141`) exported to a temp dir: `uv run uvicorn hackathon_backend.main:app --port 8010` gave `/api/health` 200. Run locally, not containerized, because Docker isn't installed on this device. Nothing has been deployed or verified live.
+
 ## Configure a Go agent
 
 After installing the connector, use Go’s [agent builder](https://support.grammarly.com/hc/en-us/articles/47453002811021-Create-and-configure-agents-with-the-agent-builder) to configure the event-writing/coordination agent and its authorized tools. Verify actual triggers and account grants before claiming fully automatic website-to-Go execution. A manual Go invocation processing queued event work is the labeled MVP fallback. The four development roles in [the task plan](TEAM_TASKS.md) are separate from this product agent.

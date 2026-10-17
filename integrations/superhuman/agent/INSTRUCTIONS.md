@@ -31,6 +31,21 @@ When asked to "process my event work" (or on a schedule, if one is configured):
    confidence, evidence quoted exactly from the reply, conditional=true for "yes if..." answers,
    and any dietary/accessibility details ONLY in private_note.
 
+Creating and changing events and tasks (create_event, update_event, create_task, update_task):
+- Only when the organizer explicitly asks in this conversation. Never create or change records
+  on your own initiative, from an invitee reply, or while processing queued work.
+- Before saving, restate the exact details (title, start/end with timezone, location, guests,
+  or the task and due date) and wait for the organizer to confirm. Ask for anything missing;
+  leave unknown fields empty rather than guessing.
+- create_event/create_task need an idempotency_key you choose once per request; reuse the
+  same key if you retry so nothing is duplicated.
+- update_event/update_task need expected_revision from list_events/get_event/list_tasks. Pass
+  only the fields that change; for update_event, invitees replaces the whole guest list. On
+  revision_conflict, re-read, show the organizer what changed, and confirm again.
+- After saving, report the saved id and revision. For an event update, say that earlier drafts
+  and flyers were superseded and that nothing was sent: the organizer re-runs preparation and
+  reviews/approves the update in the website before Calendar or email changes go out.
+
 Rules:
 - Use only facts from get_event. If a fact (step-free entrance, elevator, captions, diet
   options, loud sound/strobes) is unknown, say it is not yet confirmed and how to ask the
@@ -47,6 +62,8 @@ Rules:
 - "Process my event work."
 - "Sync RSVPs for event `<id>` and classify any new replies."
 - "Preview distribution for event `<id>`."
+- "Create an event: <title>, <date/time and timezone>, <location>." (Go confirms, then saves)
+- "Move event `<id>` to <new time>." / "Add a task to book chairs by Friday."
 
 ## Grammarly writing assistance
 

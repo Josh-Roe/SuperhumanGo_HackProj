@@ -5,6 +5,7 @@
   "engines": { "node": ">=24 <27" },
   "scripts": {
     "configure": "node configure.mjs",
+    "tunnel": "node tunnel.mjs",
     "validate": "packs validate pack.ts",
     "check": "tsc --noEmit && packs validate pack.ts",
     "build": "packs build pack.ts",
