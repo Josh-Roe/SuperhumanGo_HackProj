@@ -9,6 +9,40 @@ Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), [all
 
 Own Python event domain/API/auth/repositories, `supabase/**` schema/migrations/RLS/Storage setup, shared backend dependencies/config, root tooling/CI/VPS, and canonical architecture/contracts. Member 3 owns `main.py` composition and Google/Go workflows; Member 4 owns Canva/inclusion/assets services. Integrate their factories through explicit handoffs.
 
+## Latest integration after Render connection — 2026-10-16
+
+**Implemented:** merged new main `0d9ebf1`, including Member 3 composition `d5ce546`.
+REST, authenticated create/update event/task MCP tools, Google callback and Member 4
+asset/preview routes are now registered. This supersedes the older registration blocker
+below. No peer-owned source was hand-edited. Core admin RPC tenancy is acceptable:
+the principal supplies owner_id, invoker RPCs lock/filter the actual event/task by owner,
+and cross-owner linked records are rejected even when the worker uses service role.
+
+**Implemented/tested:** REST execution reuses Go's exact middleware service instance;
+Member 3 asset-policy registration preserves pinned immutable preflight MIME bytes.
+Google reconnect through a different vault instance now invalidates only that owner's
+same-process access-token cache (weak listeners; one-instance Render path). Docker
+startup honors PORT/proxy headers; Docker context excludes all secret `.env.*` files
+and tests. Native readiness test covers the real Member 3 application composition.
+
+**Applied:** upstream removal of Gemini/Notion kinds from `0d9ebf1`, hosted migration
+`20261017005831`; filename mirrors actual remote history. Existing data was empty;
+no producer/content rows were deleted or relabeled. New prose remains Go/organizer only.
+
+**Activation:** browser dashboard redirects to Supabase sign-in; no service-role key
+was accessible there. Render's encryption key is configured; add only the missing
+SUPABASE_SERVICE_ROLE_KEY to the existing service, then redeploy this integration
+branch. The native registration blocker is resolved by this merge. No credentials were
+copied into chat/Git; no real invitations/provider assets were created in this continuation.
+The service remains reserved at https://superhuman-go-event-backend.onrender.com.
+
+**Validation:** combined backend **329 passed / 1 optional ML skipped**, uncached Ruff
+and whitespace checks pass; frontend **51 tests**/lint/build pass. The real application
+composition passes configuration readiness with synthetic server settings (no network
+grant claimed). All three rollback SQL suites pass after the scope migration; security
+advisor still has no findings. Earlier PR head `944558a` finished both CI jobs green;
+this new integration receives another run before promotion.
+
 ## Continued Member 2 delivery — 2026-10-16
 
 **User | agreed:** finish Member 2's remaining responsibilities, keep working through

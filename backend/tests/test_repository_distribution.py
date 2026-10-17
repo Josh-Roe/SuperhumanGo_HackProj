@@ -72,3 +72,30 @@ def test_concurrent_attachment_contexts_cannot_mix_organizers_or_revisions():
 
     asyncio.run(concurrent())
     assert source.prepared.get() is None
+
+
+def test_member3_asset_policy_registration_keeps_preflight_bytes_through_mime():
+    class Files:
+        calls = 0
+
+        async def current_attachments(self, owner_id, event):
+            self.calls += 1
+            return [("reviewed.html", "text/html", b"Preflight snapshot")]
+
+    class Replacement:
+        async def current_attachments(self, owner_id, event):
+            raise AssertionError("Must use the pinned preflight snapshot")
+
+    class Policy:
+        async def requires_attachments(self, owner_id, event):
+            return True
+
+    world, source = World(), Files()
+    distributor = persistent(world, source)
+    # These are the exact attributes Member 3's register_assets composes.
+    distributor.attachments = Replacement()
+    distributor.attachment_policy = Policy()
+    result = asyncio.run(distributor.execute(OWNER, "event-1", world.approve().id))
+    assert result.sent and source.calls == 1
+    attachment = next(world.gmail.sent[0]["parsed"].iter_attachments())
+    assert attachment.get_payload(decode=True) == b"Preflight snapshot"

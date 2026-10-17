@@ -5,7 +5,7 @@ from hackathon_backend.api import create_router
 from hackathon_backend.api.dependencies import create_tool_dependencies
 from hackathon_backend.api.readiness import report
 from hackathon_backend.config import Settings
-from hackathon_backend.main import MCPBearerAuth
+from hackathon_backend.main import MCPBearerAuth, create_app
 
 
 def settings(**overrides):
@@ -68,3 +68,11 @@ def test_rest_registration_alone_cannot_claim_persistent_go_is_ready(monkeypatch
     app.include_router(create_router(config))
     result = report(config, app)
     assert "persistent_mcp_dependencies_not_registered" in result["blockers"]
+
+
+def test_member3_actual_composition_passes_native_readiness_with_server_configuration(monkeypatch):
+    monkeypatch.setenv("WORKFLOW_DEV_MODE", "0")
+    config = settings()
+    result = report(config, create_app(config))
+    assert result["configuration_ready"], result["blockers"]
+    assert result["live_provider_connections_verified"] is False

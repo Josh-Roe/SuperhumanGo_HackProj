@@ -1,8 +1,10 @@
-# Initial event integration contract
+# Event integration contract
 
-Owner: Member 2. Status: **planning baseline, not implemented API**. Members 1/3/4 read this and propose adjustments in their own contexts; agree changes before relying on them. Existing `/api/health`, `/api/status`, and MCP scaffold behavior must stay functional during integration.
+Owner: Member 2. **Implemented core factories/composition; live deployment/account proof pending.** Exact v0.3 schemas and additions are in [BACKEND_API.md](BACKEND_API.md) and `hackathon_backend.api.schema`. Member 1 PR #6 accepts the canonical CRUD/content/approval contract; its UI translates these records rather than requiring a different server `WorkspaceEvent`. New aggregate/inclusion/recovery mappings await consumer adoption. Preserve `/api/health`, `/api/status`, and authenticated MCP behavior.
 
-**Agreed product/interface additions, 2026-10-16:** the team lead's Go-first workflow retains manual editing and requires authorized create/update task/event MCP tools over the same canonical repository. Member 3 owns their registration. Go creation is separate from organizer publish approval. Members 3/4 proposed matching asset-prose kinds below; Member 2 accepts and implements those names and their supplied repository/Storage ports. The exact standalone-task and REST wire schemas are exported from `hackathon_backend.api.schema` and recorded in [Member 2's context](contexts/02_BACKEND_SUPABASE.md); the frontend's different proposed `WorkspaceEvent` wire model is **not yet agreed or enabled**. This document does not imply those factories are registered in the running scaffold.
+**2026-10-16 integration handoff:** Member 3 `d5ce546` registers REST, organizer create/update MCP tools, Google `/api/google/connect|callback|status`, and organizer `/api/events/{id}/assets/*` preparation/Canva preview/approval routes. See [Superhuman setup](SUPERHUMAN.md). REST and Go use the same Supabase project and provider-service instances; provider actions remain review-bound. Production attachment composition requires current reviewed flyer/document bytes before Calendar/Gmail writes. Stable Render address and exact remaining secrets: [deployment](DEPLOYMENT.md). Configuration is not live account evidence.
+
+**Agreed product/interface additions, 2026-10-16:** the Go-first workflow retains manual editing over the same canonical repository. Member 3 registers authenticated create/update event/task tools; Go creation remains separate from organizer publish approval. Members 3/4's matching asset-prose kinds and repository/Storage ports are integrated. Exact task and REST wire schemas export from `hackathon_backend.api.schema`; Member 1 maps the accepted core records in its adapter. Registration and local tests do not establish live hosted Go/account execution.
 
 ## Canonical records
 
@@ -21,9 +23,9 @@ Owner: Member 2. Status: **planning baseline, not implemented API**. Members 1/3
 
 The agreed Go asset-prose kinds are `flyer_brief`, `flyer_copy`, `event_document`, `plain_language_summary`, and `flyer_alt_text`, in addition to the original kinds. `producer=superhuman_go` is asserted only through the authenticated server workflow; browser edits retain `producer=organizer`. A producer label does not establish a real Go run without execution evidence. See Members 3/4's concrete adapters and [the Storage/registration handoff](../supabase/README.md).
 
-## REST surface to agree first
+## REST surface
 
-Proposed `/api/events` create/list; `/api/events/{id}` read/update with expected revision; `/api/events/{id}/prepare` queue Go/content work; `/api/events/{id}/review` inspect material/inclusion; `/api/events/{id}/publish` execute a reviewed plan; `/api/events/{id}/sync` request approved update/retry; `/api/events/{id}/operations` inspect status; `/api/events/{id}/rsvps` list private organizer responses.
+Implemented `/api/events` create/list; `/api/events/{id}` GET/full PUT with expected revision; `/prepare` queues Go work; `/review` reads material; `/approvals` records the organizer's exact revision/content action; `/distribution/preview|execute` reads or executes that approved plan; `/operations` and `/rsvps` read private receipts/responses. There are no `/publish` or `/sync` aliases. New workspace/inclusion/recovery reads are specified in [the API handoff](BACKEND_API.md).
 
 Use consistent typed errors: `unauthenticated`, `forbidden`, `revision_conflict`, `integration_not_connected`, `awaiting_go`, `needs_review`, `provider_failed`. Include operation ID for asynchronous work and server-known event revision; never return credential values. Member 2 publishes exact schemas/examples and Member 1 uses an adapter until those are agreed.
 
