@@ -93,13 +93,13 @@ def test_actual_member2_storage_write_read_bridge_and_member3_attachment_contrac
     import json
 
     import httpx
-    from hackathon_backend.repositories.assets import SupabaseAssetStorage
-    from hackathon_backend.repositories.transport import Database
     from test_assets_support import go
     from test_canva_mcp import design
 
     from hackathon_backend.config import Settings
     from hackathon_backend.providers.canva import VerifiedDesign
+    from hackathon_backend.repositories.assets import SupabaseAssetStorage
+    from hackathon_backend.repositories.transport import Database
     from hackathon_backend.services.assets.storage import AssetService
     from hackathon_backend.services.assets.supabase_read import SupabaseAttachmentRepository
 
