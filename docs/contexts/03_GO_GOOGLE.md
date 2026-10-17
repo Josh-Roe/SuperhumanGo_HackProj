@@ -59,7 +59,11 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
   - Server state: the work item is `succeeded`; `invitation` (with subject), `description` and `summary` are saved as `producer: superhuman_go`, `needs_review`.
   - The drafts keep unknowns ("not yet confirmed" for entry, step-free access, captions, diet). They contain no invitee emails, only the organizer contact.
   - This is in-memory dev mode, not Supabase. Nothing was sent.
-  - Next: organizer approve → publish to the test inbox only → revise → change notice → RSVP.
+- **2026-10-16 | live, tested | publish:** the organizer approved the invitation via the dev approve route, with the user's explicit send confirmation in chat. `execute_distribution` over MCP, revision 1:
+  - Operations: `calendar_upsert` created a real Google Calendar event (deterministic ID), then `gmail_draft`, then `gmail_send`, all `succeeded` with attempts=1.
+  - It was sent to the single authorized test inbox only.
+  - Retrying with the same approval reused all three receipts. Attempts stayed at 1, and the server log shows exactly one Gmail send call. Retry idempotency is verified live.
+  - Next: revise time/location → change notice → RSVP.
 
 ## Handoffs (proposed, awaiting recipient agreement)
 
