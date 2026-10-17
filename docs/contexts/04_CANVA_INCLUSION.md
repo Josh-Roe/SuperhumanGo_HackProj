@@ -1,11 +1,30 @@
 # Member 4 context: Canva, inclusion, documents, presentation
 
 Owner: Member 4 (human name/GitHub pending). Updated 2026-10-16.
-Status: **Member 4 implementation and callable Go/asset handoff integrated and locally tested; live asset generation/delivery gates remain**.
-Branch: `codex/member-4-canva-inclusion`; merged latest main through `341b09e` on 2026-10-16.
-Implementation commit: `cdf08bc`. Draft [PR #1](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/1) awaits cross-member integration and live proof.
+Status: **Member 3 asset registration accepted and verified locally through actual main/app composition; live Canva account/export/Storage gates remain**.
+Branch: `codex/member-4-canva-inclusion`; fast-forwarded main through `973bdb9` on 2026-10-16.
+Current follow-up: [PR #8](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/8), ready for peer review; not merged.
+Earlier implementation [PR #1](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/1) merged at `30029f7`; its corrected CI run `38986042015` passed both jobs. Current follow-up preserves peer-owned composition.
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/04_CANVA_INCLUSION.md) before work. Write only this personal context. Preserve other members' files.
+
+## PR #8 merge integration — 2026-10-16
+
+**User authorized merging to main.** CI `38988152599` passed checks and database jobs on `b40aced`. Main advanced concurrently to `0d9ebf1`, adding religious-observance holiday feeds and removing Gemini/Notion; GitHub refused the merge due to a presentation-table conflict. Integrated that main commit, retaining Google's holiday-calendar wording, Go's built-in Grammarly policy and our accurate Canva version/export wording. No peer-owned file was edited during conflict resolution. Updated the owned acceptance fixture to mock holiday-feed failure, keeping its account/HTTP tests offline, and refreshed the owned inclusion schemas. Integrated local checks: **309 passed / 1 optional ML skipped**, uncached Ruff and whitespace pass. Fresh CI on the integrated revision is required before merging; the earlier green run does not cover this new merge.
+
+## Asset wiring acceptance — 2026-10-16
+
+**Source: user requested wiring Member 4 assets, then explicitly chose “Keep main.py for Member 3; prepare the handoff.” Implemented/tested on this branch.** During final upstream sync, main advanced from `1752141` to `973bdb9`, including Member 3's `d5ce546` registered coordinator and Member 1's live adapter. Fast-forwarded without touching peer files. Dropped overlapping uncommitted registration work and adopted the existing single coordinator; no second tool/provider writer was committed. Earlier statements that main lacks asset/REST/organizer registration are superseded.
+
+**Verified:** actual `main.create_app` now registers asset MCP/REST in Supabase server mode. The registered coordinator composes our trusted Go preparation/queue, Canva session/adapter, private document/export Storage and guarded flyer attachment reader. New Member 4 acceptance tests exercise the actual host and registration, actual encrypted vault and actual Supabase Storage/signing classes over mocked HTTP, actual Canva adapter/session doubles and actual Gmail MIME with Google fakes. Five-kind queue/Go save completion → document → Canva create/poll/read-back → organizer exact-preview approval → export/Storage → PNG MIME delivery passes, including completed retries without a second fake creation/export/send. Auth separation, private inclusion unknowns, missing required flyer blocking before Calendar, and revised document/current-pointer/old-byte preservation also pass. In-memory workflow state and simulated organizer approvals remain explicit; no hosted provider writes, live Go generation, token provisioning or real send was performed.
+
+**Member 4 code:** added typed `AssetPreviewMetadata` and source generation/export IDs plus creation time to safe preview output; updated schema bundle. Owner IDs, object keys, continuation/transaction tokens and provider download URLs remain absent. Member 1 can trace displayed versions without treating provenance labels as proof of live execution.
+
+**Checks:** full backend **304 passed / 1 optional ML skipped**, uncached Ruff passes; existing Starlette/httpx warning remains. Only owned asset model/tests, Canva docs/presentation and this context changed. The earlier temporary standalone registration tests are not the final suite; evidence here refers to the adopted upstream path.
+
+**Exact handoff:** [registered workflow, tool names, REST payloads, preview schema, remaining owners](../canva/ASSET_WIRING_HANDOFF.md). Main registration is complete and was not edited by Member 4. Member 1 still needs the distinct flyer approval/abandon and inclusion-report UI. Member 2/3 need actual Canva account OAuth/refresh, durable cross-process leases and hosted Storage proof. The current coordinator attaches the flyer only; Member 3 can opt into our existing document attachment kind too. It creates a new design/version for each event revision; our staged same-design update adapter remains unregistered. Pending export retries and cached-state revision checks need Member 3 recovery/recheck handling before stronger synchronization claims. The handoff describes these limits rather than changing peer workflow policy.
+
+**Latest peer evidence read:** main `1752141` reports live revision-2 time/location change, same Calendar ID, new sent change notice in the same Gmail thread, retry attempts staying 1, and RSVP sync returning `no_response`; reply classification remains unverified. These are Member 3-reported dev-mode results, not independently replayed here. Member 1 PR #6 adds the real REST/UI adapter with 51 mocked tests and reports deployed `/api/config` still missing BACKEND_ORIGIN. Actual five-kind Go/Canva/export/Storage/browser rehearsal remains separate.
 
 ## Merge validation follow-up — 2026-10-16
 

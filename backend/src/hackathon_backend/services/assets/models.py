@@ -97,6 +97,23 @@ class StorageReceipt(BoundaryModel):
     byte_length: int = Field(ge=1)
 
 
+class AssetPreviewMetadata(BoundaryModel):
+    """Authenticated preview DTO; provider/source IDs are references, never credentials."""
+
+    event_id: Identifier
+    event_revision: int = Field(ge=1)
+    kind: Literal["event_document", "flyer_png"]
+    content_type: str
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    byte_length: int = Field(ge=1, le=10_000_000)
+    canva_design_id: str | None
+    canva_export_id: str | None
+    canva_generation_id: str | None
+    go_generation_id: Identifier
+    created_at: AwareDatetime
+    review_state: Literal["needs_review", "reviewed"]
+
+
 class AssetRecord(BoundaryModel):
     owner_id: Identifier
     event_id: Identifier
@@ -115,13 +132,6 @@ class AssetRecord(BoundaryModel):
 
     def preview_metadata(self) -> dict[str, str | int | None]:
         """Frontend adds a scoped, short-lived URL via Member 2; no CDN secrets here."""
-        return {
-            "event_id": self.event_id,
-            "event_revision": self.event_revision,
-            "kind": self.kind,
-            "content_type": self.content_type,
-            "sha256": self.sha256,
-            "byte_length": self.byte_length,
-            "canva_design_id": self.canva_design_id,
-            "review_state": self.review_state,
-        }
+        return AssetPreviewMetadata.model_validate(
+            {name: getattr(self, name) for name in AssetPreviewMetadata.model_fields}
+        ).model_dump(mode="json")
