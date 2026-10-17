@@ -10,6 +10,8 @@ from pathlib import Path
 class Settings:
     mcp_auth_token: str = field(default="", repr=False)
     app_domain: str = ""
+    # Organizer dashboard origin (may differ from app_domain when the website is hosted apart).
+    app_url: str = ""
     onnx_model_path: Path | None = None
     supabase_url: str = ""
     supabase_publishable_key: str = field(default="", repr=False)
@@ -27,6 +29,11 @@ class Settings:
             raise ValueError(
                 "APP_DOMAIN must be a hostname with optional port, without scheme/path"
             )
+        if self.app_url and not re.fullmatch(
+            r"https://[a-zA-Z0-9.-]+(?::[0-9]{1,5})?|http://(?:localhost|127\.0\.0\.1)(?::[0-9]{1,5})?",
+            self.app_url,
+        ):
+            raise ValueError("APP_URL must be an https origin (or local http), without path")
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -34,6 +41,7 @@ class Settings:
         return cls(
             mcp_auth_token=os.getenv("MCP_AUTH_TOKEN", "").strip(),
             app_domain=os.getenv("APP_DOMAIN", "").strip(),
+            app_url=os.getenv("APP_URL", "").strip().rstrip("/"),
             onnx_model_path=Path(model_path) if model_path else None,
             supabase_url=os.getenv("SUPABASE_URL", "").strip().rstrip("/"),
             supabase_publishable_key=os.getenv("SUPABASE_PUBLISHABLE_KEY", "").strip(),
