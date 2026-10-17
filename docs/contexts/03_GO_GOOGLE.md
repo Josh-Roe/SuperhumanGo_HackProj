@@ -63,7 +63,12 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
   - Operations: `calendar_upsert` created a real Google Calendar event (deterministic ID), then `gmail_draft`, then `gmail_send`, all `succeeded` with attempts=1.
   - It was sent to the single authorized test inbox only.
   - Retrying with the same approval reused all three receipts. Attempts stayed at 1, and the server log shows exactly one Gmail send call. Retry idempotency is verified live.
-  - Next: revise time/location → change notice → RSVP.
+- **2026-10-16 | live, tested | change:**
+  - Revision 2 moved the event to 7–9 PM at Golden Gate Park.
+  - Go wrote rev-2 description, summary, invitation and `change_notice` through MCP after the organizer's in-chat approvals.
+  - The `update` approval went through `execute_distribution`: the Calendar was patched on the **same event ID**, and a new change-notice draft was created and sent in the **same Gmail thread** (the prior message was already sent, so `new_change_notice`).
+  - Retrying reused all receipts with attempts=1.
+  - `sync_rsvps`/`list_rsvps` run live and return `no_response`; no guest reply had arrived yet. Reply classification is not yet live-verified.
 
 ## Handoffs (proposed, awaiting recipient agreement)
 
