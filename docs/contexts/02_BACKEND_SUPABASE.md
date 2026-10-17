@@ -1,13 +1,31 @@
 # Member 2 context: backend, Supabase, integration lead
 
 Owner: Member 2 (this checkout). Updated 2026-10-16. Branch: `codex/member-2-backend-supabase`.
-Status: **implemented and locally tested; live Supabase SQL/RLS checks pass; UI mapping, MCP registration and real provider proof remain pending**.
+Status: **backend deployed to Render; live public health/config and unauthenticated route protection pass; authenticated persistence and real provider proof remain pending**.
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), [all four member contexts](../TEAM_TASKS.md), and [contract](../INTEGRATION_CONTRACT.md) before work. Write only this personal context; you also coordinate canonical global docs/contracts. [Copy-ready prompt](../prompts/02_BACKEND_SUPABASE.md).
 
 ## Scope
 
 Own Python event domain/API/auth/repositories, `supabase/**` schema/migrations/RLS/Storage setup, shared backend dependencies/config, root tooling/CI/VPS, and canonical architecture/contracts. Member 3 owns `main.py` composition and Google/Go workflows; Member 4 owns Canva/inclusion/assets services. Integrate their factories through explicit handoffs.
+
+## Live Render activation — 2026-10-16
+
+**Tested live:** after the user saved the service-role credential directly in Render,
+deployment `dep-db9cldijnfac73bptnog` of `5d1595a` reports `live`. Application startup
+and MCP session-manager startup completed. HTTPS `/api/health` returns 200 with
+`status=ok`; `/api/config` returns 200 with `configured=true` and only public Supabase
+configuration. Anonymous `/api/events`, `/api/tasks` and `/mcp` return 401. Stable
+backend: https://superhuman-go-event-backend.onrender.com; MCP path: `/mcp`.
+This supersedes earlier activation/missing-service-key blockers below. No credential
+was read back or copied into chat/Git. These checks do not establish authenticated
+CRUD/Storage, provider grants, or a real Go/Canva/Google rehearsal.
+
+**Next handoff:** Vercel server `BACKEND_ORIGIN` uses that backend origin; public
+`VITE_PUBLIC_MCP_URL` uses its `/mcp` URL. Connect an organizer session and scoped
+Go connector, then validate saved IDs/revisions and Storage before provider delivery.
+Fetched main through `96658c8` and read updated peer contexts; that newer main is
+not part of this deployed revision. This check changes only this personal context.
 
 ## Latest integration after Render connection — 2026-10-16
 
