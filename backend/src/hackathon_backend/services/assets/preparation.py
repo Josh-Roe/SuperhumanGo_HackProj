@@ -30,7 +30,12 @@ from hackathon_backend.services.assets.requests import (
     request_event_prose,
 )
 from hackathon_backend.services.assets.storage import AssetService, AssetStorage, ExportDownloader
-from hackathon_backend.services.inclusion import InclusionInput, InclusionReport, check_inclusion
+from hackathon_backend.services.inclusion import (
+    HolidayCalendar,
+    InclusionInput,
+    InclusionReport,
+    check_inclusion,
+)
 from hackathon_backend.workflows.asset_queue import load_go_content
 from hackathon_backend.workflows.go_work import WorkflowError
 from hackathon_backend.workflows.models import ContentKind
@@ -85,9 +90,15 @@ class FlyerCreationPreparation(BoundaryModel):
 class EventAssetPreparationService:
     """Thin callable handoff; owner_id must come from the server's authenticated principal."""
 
-    def __init__(self, store: WorkflowStore, storage: AssetStorage | None = None) -> None:
+    def __init__(
+        self,
+        store: WorkflowStore,
+        storage: AssetStorage | None = None,
+        holidays: HolidayCalendar | None = None,
+    ) -> None:
         self.store = store
         self.storage = storage
+        self.holidays = holidays
 
     async def _event(self, owner_id: str, event_id: str, expected_revision: int) -> EventSnapshot:
         saved = await self.store.get_event(owner_id, event_id)
@@ -190,11 +201,17 @@ class EventAssetPreparationService:
         self, owner_id: str, event_id: str, expected_revision: int, facts: InclusionInput
     ) -> InclusionReport:
         batch = await self.read(owner_id, event_id, expected_revision)
+        calendar = (
+            await self.holidays.check(batch.event, facts.traditions)
+            if self.holidays and facts.traditions
+            else None
+        )
         return check_inclusion(
             batch.event,
             facts,
             owner_id=owner_id,
             summary=batch.content_for("plain_language_summary"),
+            calendar=calendar,
         )
 
     async def start_flyer(

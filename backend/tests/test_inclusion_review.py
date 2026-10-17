@@ -32,7 +32,7 @@ def test_missing_and_unsourced_answers_stay_unknown():
     )
     found = findings(report)
     assert found["step_free_entrance"].status == "unknown"
-    assert found["religious_observances"].reason == "select_relevant_observances"
+    assert found["religious_observances"].reason == "holiday_calendar_unavailable"
     assert report.requires_review and report.certification is False
     assert report.audience == "organizer_private"
 

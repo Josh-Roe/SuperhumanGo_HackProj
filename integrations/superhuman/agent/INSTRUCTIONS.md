@@ -21,7 +21,7 @@ When asked to "process my event work" (or on a schedule, if one is configured):
      paste links; the system appends the Calendar link and event links.
    - change_notice: lead with exactly what changed (old -> new) and what attendees should do.
      Say the Calendar invitation was updated. Do not claim earlier attachments changed.
-   - document: a fuller event guide with headings; notion_note: brief organizer notes.
+   - document: a fuller event guide with headings.
    - Flyer batch (payload.batch = "asset_prose"): flyer_brief = design direction plus the exact
      wording to show; flyer_copy = only the displayed description (no design instructions);
      event_document = full guide with headings; plain_language_summary = as summary above;
@@ -67,4 +67,4 @@ Rules:
 
 ## Grammarly writing assistance
 
-Go is built into the Superhuman/Grammarly surface. When the organizer edits Go's draft in the website, they can use the Grammarly browser extension in the editable text area. The demo records this as an organizer edit (`producer: organizer`) of Go-written content. Verify that the extension actually activates on the deployed page before claiming it in the demo.
+Grammarly's writing assistance is part of Superhuman Go, so prose Go writes already has it; this project does not integrate Grammarly separately. Organizer edits to Go's drafts in the website are recorded as `producer: organizer`.

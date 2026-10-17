@@ -11,7 +11,6 @@ export const contentDefinitions = {
   flyer_copy: { label: "Flyer text", destination: "design" },
   flyer_alt_text: { label: "Flyer accessible text", destination: "design" },
   event_document: { label: "Event document", destination: "documents" },
-  notion_note: { label: "Notion note", destination: "documents" },
   invitation: { label: "Invitation", destination: "distribution" },
   change_notice: { label: "Change notice", destination: "distribution" },
 } as const satisfies Record<
