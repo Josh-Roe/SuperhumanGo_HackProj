@@ -38,16 +38,18 @@ export function GoConnector({
             />
           </label>
           <p className="small muted">
-            Copy it now: it’s hidden when you leave this page. It works until{" "}
+            Copy it now: it disappears when you leave this page. It works until{" "}
             {new Date(credential.expires_at).toLocaleDateString()}.
           </p>
           <div className="action-row">
             <button
-              className="secondary"
+              className="primary"
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(credential.token);
-                  setCopyMessage("Key copied. Paste it only into Onrender’s API token field.");
+                  setCopyMessage(
+                    "Key copied. Now paste it into Go (step 3).",
+                  );
                 } catch {
                   setRevealed(true);
                   tokenField.current?.focus();
@@ -80,7 +82,7 @@ export function GoConnector({
         </>
       ) : (
         <button
-          className="secondary"
+          className="primary"
           ref={createButton}
           disabled={busy}
           onClick={async () => {

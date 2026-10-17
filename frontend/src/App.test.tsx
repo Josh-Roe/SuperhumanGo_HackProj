@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -377,4 +377,23 @@ it("checks the connected list every ten seconds and stops after unmount", async 
   } finally {
     vi.useRealTimers();
   }
+});
+
+describe("setup guide", () => {
+  it("stays open across reloads until the organizer closes it", async () => {
+    localStorage.clear();
+    const first = render(<App />);
+    const guide = () =>
+      screen.getByText("How to get started").closest("details")!;
+    expect(guide()).toHaveAttribute("open");
+    first.unmount();
+    render(<App />);
+    expect(guide()).toHaveAttribute("open");
+    await userEvent.setup().click(screen.getByText("How to get started"));
+    expect(guide()).not.toHaveAttribute("open");
+    cleanup();
+    render(<App />);
+    expect(guide()).not.toHaveAttribute("open");
+    localStorage.clear();
+  });
 });

@@ -41,7 +41,6 @@ const steps: { id: Step; name: string }[] = [
   { id: "distribution", name: "Distribution" },
 ];
 const GO_URL = "https://go.superhuman.com/";
-const MCP_URL = safeUrl(import.meta.env.VITE_PUBLIC_MCP_URL);
 // Name of the Pack installed in Go (integrations/superhuman, pack 72744).
 const CONNECTOR_NAME = "Hackathon Workspace";
 function GatheringIllustration() {
@@ -185,39 +184,64 @@ function GoHandoff({ event }: { event: EventRecord }) {
     </section>
   );
 }
+// The guide stays open until the organizer closes it; that choice is remembered.
+const SETUP_GUIDE_CLOSED = "setup-guide-closed";
+function guideClosed() {
+  try {
+    return localStorage.getItem(SETUP_GUIDE_CLOSED) === "1";
+  } catch {
+    return false;
+  }
+}
+function rememberGuide(open: boolean) {
+  try {
+    if (open) localStorage.removeItem(SETUP_GUIDE_CLOSED);
+    else localStorage.setItem(SETUP_GUIDE_CLOSED, "1");
+  } catch {
+    // Storage unavailable: the guide just opens again next time.
+  }
+}
 function SetupGuide({
   session,
   goKeyCreated,
   onKeyCreated,
-  collapsible = false,
 }: {
   session?: Session;
   goKeyCreated: boolean;
   onKeyCreated: () => void;
-  collapsible?: boolean;
 }) {
   const signIn = useGoogleSignIn();
+  const [open, setOpen] = useState(() => !guideClosed());
   const done = Boolean(session) && goKeyCreated;
   return (
     <details
       className="panel setup-guide"
-      open={!collapsible || !done || undefined}
+      open={open}
+      onToggle={(event) => {
+        const next = event.currentTarget.open;
+        if (next === open) return;
+        setOpen(next);
+        rememberGuide(next);
+      }}
     >
       <summary>
         <h2>How to get started{done ? " ✓" : ""}</h2>
       </summary>
+      <p className="muted">
+        Four steps, about five minutes. You only do steps 1–3 once.
+      </p>
       <ol className="setup-steps">
         <li>
-          <strong>Sign in with Google.</strong>{" "}
+          <strong>Sign in{session ? " ✓" : ""}</strong>
           {session ? (
-            <span className="muted">Signed in as {session.email}.</span>
+            <p className="muted">You’re signed in as {session.email}.</p>
           ) : (
             <>
-              Use the account you use for email and calendar.
+              <p>Use the Google account you use for email and calendar.</p>
               {signIn.error && (
-                <span role="alert" className="error-box">
+                <p role="alert" className="error-box">
                   {signIn.error}
-                </span>
+                </p>
               )}
               <button
                 className="primary"
@@ -230,7 +254,12 @@ function SetupGuide({
           )}
         </li>
         <li>
-          <strong>Create your Go key.</strong>{" "}
+          <strong>Get your Go key{goKeyCreated ? " ✓" : ""}</strong>
+          <p>
+            The key is like a password that lets Superhuman Go see your events.
+            Click <em>Create Go key</em>, then <em>Copy key</em>. Keep it
+            private.
+          </p>
           {session ? (
             <GoConnector
               key={`${session.email}:${session.expires_at}`}
@@ -238,24 +267,46 @@ function SetupGuide({
               onCreated={onKeyCreated}
             />
           ) : (
-            <span className="muted">Available after you sign in.</span>
+            <p className="muted">Sign in first (step 1).</p>
           )}
         </li>
         <li>
-          <strong>Connect it in Go.</strong> In Superhuman Go, open Connectors →{" "}
-          <em>{CONNECTOR_NAME}</em> → Sign in, and paste your key there (not
-          into a chat message).
-          {MCP_URL && (
-            <span className="small muted">
-              {" "}
-              Not listed? Add a custom connector with the address{" "}
-              <code>{MCP_URL}</code>.
-            </span>
-          )}
+          <strong>Connect Go to this website</strong>
+          <a
+            className="primary"
+            href={GO_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open Superhuman Go ↗
+          </a>
+          <ol className="substeps">
+            <li>
+              In the Go tab that opens, click <em>Connectors</em>.
+            </li>
+            <li>
+              Find <strong>{CONNECTOR_NAME}</strong> and click{" "}
+              <em>Connect</em> (or <em>Sign in</em>).
+            </li>
+            <li>
+              Paste your key into the box it shows, then click{" "}
+              <em>Continue</em>.
+            </li>
+          </ol>
+          <p className="small muted">
+            Don’t see {CONNECTOR_NAME}? Ask the person who gave you this
+            website to share it with you. Never paste your key into a chat
+            message.
+          </p>
         </li>
         <li>
-          <strong>Plan your event in Go.</strong> Paste this message into Go and
-          add your details. Your event appears here when Go saves it.
+          <strong>Plan your event</strong>
+          <p>
+            Copy this message, paste it into a new Go chat, and add your event
+            in your own words: what it is, when, where, and who’s invited. Go
+            asks about anything missing and sends nothing until you say
+            “send”. Your event then shows up here under Your events.
+          </p>
           <GoMessage
             prompt={`Use the ${CONNECTOR_NAME} connector to plan my event with me. Create it from the details below, then walk me through each step one at a time: writing, my approval of the invitation, the access/food/sensory questions, an optional Canva flyer, and sending. If you don't know something, ask me. Don't send anything until I say "send".\n\nMy event:`}
           />
@@ -1780,7 +1831,6 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   rememberGoKey();
                   setGoKeyCreated(true);
                 }}
-                collapsible
               />
               <section
                 className="workspace-hero"

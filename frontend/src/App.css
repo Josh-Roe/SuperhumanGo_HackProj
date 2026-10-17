@@ -787,13 +787,33 @@ main#main {
   display: inline;
 }
 .setup-steps li > button,
+.setup-steps li > a.primary,
 .setup-steps li > .error-box,
 .setup-steps .go-key {
   display: block;
   margin-top: 10px;
 }
+.setup-steps li > a.primary {
+  width: fit-content;
+}
 .setup-steps .go-key label {
   margin: 0 0 8px;
+}
+.setup-steps > li > strong {
+  display: block;
+  color: #2f2d2b;
+  font-size: 14px;
+}
+.setup-steps li p {
+  margin: 6px 0 0;
+}
+.setup-steps .substeps {
+  padding-left: 20px;
+  margin: 8px 0 0;
+  list-style: lower-alpha;
+}
+.setup-steps .substeps li {
+  padding: 3px 0;
 }
 .setup-steps code {
   overflow-wrap: anywhere;
