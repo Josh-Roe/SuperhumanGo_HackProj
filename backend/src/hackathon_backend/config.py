@@ -20,6 +20,10 @@ class Settings:
     google_client_id: str = ""
     google_client_secret: str = field(default="", repr=False)
     google_redirect_uri: str = ""
+    # Canva Connect OAuth client (each organizer connects their own Canva account).
+    canva_client_id: str = ""
+    canva_client_secret: str = field(default="", repr=False)
+    canva_redirect_uri: str = ""
 
     def __post_init__(self) -> None:
         if self.app_domain and not re.fullmatch(
@@ -50,6 +54,9 @@ class Settings:
             google_client_id=os.getenv("GOOGLE_CLIENT_ID", "").strip(),
             google_client_secret=os.getenv("GOOGLE_CLIENT_SECRET", "").strip(),
             google_redirect_uri=os.getenv("GOOGLE_REDIRECT_URI", "").strip(),
+            canva_client_id=os.getenv("CANVA_CLIENT_ID", "").strip(),
+            canva_client_secret=os.getenv("CANVA_CLIENT_SECRET", "").strip(),
+            canva_redirect_uri=os.getenv("CANVA_REDIRECT_URI", "").strip(),
         )
 
     @property
