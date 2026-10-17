@@ -3,6 +3,7 @@
 Owner: Member 4 (human name/GitHub pending). Updated 2026-10-16.
 Status: **Member 3 asset registration accepted and verified locally through actual main/app composition; live Canva account/export/Storage gates remain**.
 Branch: `codex/member-4-canva-inclusion`; fast-forwarded main through `973bdb9` on 2026-10-16.
+Current follow-up: [PR #8](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/8), ready for peer review; not merged.
 Earlier implementation [PR #1](https://github.com/Josh-Roe/SuperhumanGo_HackProj/pull/1) merged at `30029f7`; its corrected CI run `38986042015` passed both jobs. Current follow-up preserves peer-owned composition.
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/04_CANVA_INCLUSION.md) before work. Write only this personal context. Preserve other members' files.
