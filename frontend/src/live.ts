@@ -43,9 +43,7 @@ export function createOrganizerGateway(token: string): EventGateway {
     const event = parseEvent(await requestJson(path(id), token));
     if (event.id !== id)
       throw new Error("The server returned a different event.");
-    const warnings = [
-      "Inclusion answers are read-only here. Canva preview approval is not connected yet.",
-    ];
+    const warnings = ["Inclusion answers are read-only here."];
     async function optional(
       url: string,
       label: string,
