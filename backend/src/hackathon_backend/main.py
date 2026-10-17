@@ -15,10 +15,18 @@ from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from hackathon_backend.api import create_router
+from hackathon_backend.api.dependencies import create_tool_dependencies
 from hackathon_backend.config import Settings
 from hackathon_backend.inference import OnnxRunner
 from hackathon_backend.mcp_tools.event_tools import EventToolDeps, register_event_tools
+from hackathon_backend.mcp_tools.organizer_tools import register_organizer_tools
+from hackathon_backend.workflows.asset_wiring import register_asset_services
 from hackathon_backend.workflows.dev import DevWorkflow, dev_router, dev_workflow_from_env
+from hackathon_backend.workflows.google_connect import (
+    google_connect_configured,
+    google_connect_router,
+)
 
 
 class SuperhumanStatus(BaseModel):
@@ -36,6 +44,16 @@ class ModelStatus(BaseModel):
 class WorkspaceStatus(BaseModel):
     superhuman: SuperhumanStatus
     model: ModelStatus
+
+
+def supabase_rest_configured(settings: Settings) -> bool:
+    """REST runs with each organizer's own Supabase session; no service key is needed."""
+    return bool(settings.supabase_url and settings.supabase_publishable_key)
+
+
+def supabase_server_configured(settings: Settings) -> bool:
+    """MCP principals, tools and provider workers need the server-only service role key."""
+    return bool(settings.supabase_url and settings.supabase_service_role_key)
 
 
 class MCPBearerAuth:
@@ -79,8 +97,12 @@ def create_app(
     dev: DevWorkflow | None = None,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
+    # Dev mode keeps its in-memory store; otherwise REST and Go share one Supabase store.
+    supabase = dev is None and supabase_server_configured(settings)
     if dev is not None:
         events = dev.deps
+    elif events is None and supabase:
+        events = create_tool_dependencies(settings)
     runner = OnnxRunner(settings.onnx_model_path)
     mcp = FastMCP(
         "Superhuman Go Hackathon",
@@ -121,6 +143,8 @@ def create_app(
 
     if events is not None:
         register_event_tools(mcp, events)
+    if supabase and events is not None:
+        register_organizer_tools(mcp, settings, events.principals)
 
     mcp_app = mcp.streamable_http_app()
 
@@ -133,6 +157,13 @@ def create_app(
     app.add_middleware(MCPBearerAuth, token=settings.mcp_auth_token, deps=events)
     if dev is not None:
         app.include_router(dev_router(dev))
+    else:
+        if supabase_rest_configured(settings):
+            app.include_router(create_router(settings))
+        if google_connect_configured(settings):
+            app.include_router(google_connect_router(settings))
+        if supabase and events is not None:
+            register_asset_services(app, mcp, settings, events)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
