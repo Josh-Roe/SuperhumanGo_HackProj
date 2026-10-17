@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   ApiError,
-  createEventTransferGateway,
   loadPublicAuthConfig,
   loadProjectStatus,
   signIn,
@@ -21,6 +20,8 @@ import type {
 } from "./types";
 import { eventDate, localTime, toInstant } from "./dates";
 import "./App.css";
+import { createOrganizerGateway } from "./live";
+import { GoConnector } from "./GoConnector";
 
 type Page = "events" | "settings" | "profile";
 type Step = "details" | "review" | "distribution";
@@ -260,7 +261,7 @@ function TransferConnection({
         String(data.get("password")),
         config,
       );
-      const gateway = createEventTransferGateway(session.access_token);
+      const gateway = createOrganizerGateway(session.access_token);
       await gateway.list();
       form.reset();
       onConnected(gateway, session);
@@ -275,8 +276,8 @@ function TransferConnection({
       <h2>Test Go → website.</h2>
       <p className="muted">
         Once the backend and Go connector are hosted, connect an existing
-        organizer account here to read its real events. This test loads event
-        details only.
+        organizer account here to edit events, review Go’s material, and
+        authorize distribution. Go executes approved provider work.
       </p>
       <ol className="setup-steps">
         <li>Connect Go to the public HTTPS MCP endpoint.</li>
@@ -391,6 +392,8 @@ function Details({
             event?.invitees.find((i) => i.email === email)?.id ??
             crypto.randomUUID(),
           email,
+          display_name: event?.invitees.find((person) => person.email === email)
+            ?.display_name,
         })),
       });
     } catch (err) {
@@ -585,7 +588,11 @@ function Review({
   function fact(key: FactKey) {
     const label = factLabels[key];
     return (
-      <fieldset className="fact" key={key} disabled={busy}>
+      <fieldset
+        className="fact"
+        key={key}
+        disabled={busy || record.live?.factsReadOnly}
+      >
         <legend>{label}</legend>
         <label>
           What do you know?
@@ -722,6 +729,13 @@ function Review({
         </section>
         <section className="panel">
           <h2>A quick inclusion check.</h2>
+          {record.live?.factsReadOnly && (
+            <p className="notice">
+              Server inclusion facts are read-only until the inclusion save API
+              is connected. Unknown remains unknown; reviewing writing does not
+              certify venue access or dietary accommodations.
+            </p>
+          )}
           <p className="muted">
             Check holidays and food options before you send. Leave unconfirmed
             details unknown.
@@ -887,6 +901,11 @@ function Review({
             I reviewed this revision’s writing, design, and inclusion questions,
             including unknowns.
           </label>
+          {record?.live?.warnings.map((warning) => (
+            <p className="notice" key={warning}>
+              {warning}
+            </p>
+          ))}
           {error && (
             <p role="alert" className="error-box">
               {error}
@@ -903,7 +922,12 @@ function Review({
             </button>
             <button
               className="primary"
-              disabled={busy || !ack || !current.length}
+              disabled={
+                busy ||
+                !ack ||
+                !current.length ||
+                record.live?.reviewAvailable === false
+              }
             >
               Save review & continue
             </button>
@@ -984,10 +1008,24 @@ function Distribution({
   record: WorkspaceEvent;
   busy: boolean;
   preview: boolean;
-  onPublish: () => void;
+  onPublish: (action: "publish" | "update") => void;
 }) {
   const [confirmed, setConfirmed] = useState(false);
-  const sent = Boolean(record.gmail?.sent);
+  const [action, setAction] = useState<"publish" | "update" | null>(
+    record.gmail?.sent ? "update" : record.live ? null : "publish",
+  );
+  const sent = action === "update";
+  const approval = record.live?.approval;
+  const executed = Boolean(
+    approval &&
+    record.operations.some(
+      (op) =>
+        op.approval_id === approval.id &&
+        op.event_revision === approval.event_revision &&
+        op.kind === "gmail_send" &&
+        op.state === "succeeded",
+    ),
+  );
   const kind = sent ? "change_notice" : "invitation";
   const mail = record.content.find(
     (c) =>
@@ -1000,13 +1038,38 @@ function Distribution({
       (a) =>
         a.kind === kind &&
         a.event_revision === record.event.revision &&
-        ["ready", "succeeded"].includes(a.state),
+        ["ready", "succeeded"].includes(a.state) &&
+        (!record.live || Boolean(a.current_url)),
     ),
   );
   const reviewed =
     record.review_revision === record.event.revision && !!mail && readyAssets;
   return (
     <>
+      {approval && (
+        <section className="panel" role="status">
+          <h2>
+            {executed
+              ? "Gmail send confirmed by provider receipt."
+              : "Approval recorded. Awaiting Go."}
+          </h2>
+          <p>
+            {executed
+              ? "The reviewed message was sent. Delivered email and attachments are immutable snapshots."
+              : "This approval does not prove an invitation was sent. Ask Go to execute it, then refresh provider receipts."}
+          </p>
+          {!executed && (
+            <label>
+              Approved distribution prompt
+              <textarea
+                readOnly
+                rows={4}
+                value={`For event ${record.event.id}, revision ${approval.event_revision}, preview distribution and execute_distribution using approval_id ${approval.id}. Use only this approved revision. Reconcile existing provider state; do not create duplicate invitations. Report receipts or blockers.`}
+              />
+            </label>
+          )}
+        </section>
+      )}
       <div className="two-column">
         <section className="panel">
           <p className="eyebrow">03 / BRING PEOPLE TOGETHER</p>
@@ -1047,10 +1110,46 @@ function Distribution({
         <section className="panel">
           <p className="eyebrow">PUBLISH CHECKLIST</p>
           <h2>Your call to send.</h2>
+          {record.live && !record.gmail?.sent && (
+            <fieldset disabled={busy || Boolean(approval)}>
+              <legend>Which message are you authorizing?</legend>
+              <p className="small muted">
+                The API does not expose the Gmail draft binding. Confirm the
+                message type; Go must reconcile Gmail before execution.
+              </p>
+              <label>
+                <input
+                  type="radio"
+                  name="distribution-action"
+                  checked={action === "publish"}
+                  onChange={() => {
+                    setAction("publish");
+                    setConfirmed(false);
+                  }}
+                />{" "}
+                First invitation — I confirm none was sent
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="distribution-action"
+                  checked={action === "update"}
+                  onChange={() => {
+                    setAction("update");
+                    setConfirmed(false);
+                  }}
+                />{" "}
+                Change notice — an invitation was already sent
+              </label>
+            </fieldset>
+          )}
           <ul className="checklist">
             <li>
               {record.review_revision === record.event.revision ? "✓" : "○"}{" "}
-              Writing and inclusion reviewed for r{record.event.revision}
+              {record.live
+                ? "Current writing reviewed for"
+                : "Writing and inclusion reviewed for"}{" "}
+              r{record.event.revision}
             </li>
             <li>
               {mail ? "✓" : "○"} Current {sent ? "change notice" : "invitation"}{" "}
@@ -1065,14 +1164,23 @@ function Distribution({
           <p className="notice">
             {preview
               ? "Local preview: publish is disabled. No provider is connected and no email can be sent."
-              : "This action authorizes Calendar invitations and Gmail delivery for the exact reviewed revision. Partial failures remain visible below."}
+              : record.live
+                ? "This records an approval for Go to execute. Nothing sends until Go calls the approved distribution tool. Review all inclusion unknowns before approving."
+                : "This action authorizes Calendar invitations and Gmail delivery for the exact reviewed revision. Partial failures remain visible below."}
           </p>
           <label className="checkbox">
             <input
               type="checkbox"
               checked={confirmed}
               onChange={(e) => setConfirmed(e.target.checked)}
-              disabled={preview || !reviewed || busy}
+              disabled={
+                preview ||
+                !reviewed ||
+                busy ||
+                !action ||
+                Boolean(approval) ||
+                record.live?.receiptsAvailable === false
+              }
             />
             I confirm the current event, recipients, and material, and authorize{" "}
             {sent ? "sending this update" : "publishing this invitation"}.
@@ -1084,15 +1192,24 @@ function Distribution({
               preview ||
               !reviewed ||
               !confirmed ||
-              !record.event.invitees.length
+              !record.event.invitees.length ||
+              !action ||
+              Boolean(approval) ||
+              record.live?.receiptsAvailable === false
             }
-            onClick={onPublish}
+            onClick={() => {
+              if (action) onPublish(action);
+            }}
           >
             {busy
               ? "Requesting…"
-              : sent
-                ? "Confirm & send update"
-                : "Confirm & publish"}
+              : approval
+                ? "Approval recorded · awaiting Go"
+                : record.live
+                  ? "Confirm & authorize Go"
+                  : sent
+                    ? "Confirm & send update"
+                    : "Confirm & publish"}
           </button>
           {!reviewed && (
             <p className="small muted">
@@ -1112,30 +1229,37 @@ function Distribution({
 function Rsvps({ record }: { record: WorkspaceEvent }) {
   return (
     <section className="panel">
+      {record.live?.rsvpsAvailable === false && (
+        <p role="status">
+          Guest responses are unavailable. No attendance totals are confirmed.
+        </p>
+      )}
       <p className="eyebrow">PRIVATE / ORGANIZER ONLY</p>
       <h2>Who’s coming along?</h2>
       <p className="muted">
         Calendar responses and Go-classified replies retain their source.
         Ambiguous or conflicting replies need organizer review.
       </p>
-      <div className="metric-grid">
-        {["attending", "maybe", "not_attending", "needs_review"].map(
-          (state) => (
-            <article key={state}>
-              <strong>
-                {
-                  record.rsvps.filter(
-                    (r) =>
-                      r.status === state ||
-                      (state === "needs_review" && r.conflict),
-                  ).length
-                }
-              </strong>
-              <span>{friendlyState(state)}</span>
-            </article>
-          ),
-        )}
-      </div>
+      {record.live?.rsvpsAvailable !== false && (
+        <div className="metric-grid">
+          {["attending", "maybe", "not_attending", "needs_review"].map(
+            (state) => (
+              <article key={state}>
+                <strong>
+                  {
+                    record.rsvps.filter(
+                      (r) =>
+                        r.status === state ||
+                        (state === "needs_review" && r.conflict),
+                    ).length
+                  }
+                </strong>
+                <span>{friendlyState(state)}</span>
+              </article>
+            ),
+          )}
+        </div>
+      )}
       <div className="table-wrap">
         <table>
           <caption>Invited people and response evidence</caption>
@@ -1171,7 +1295,9 @@ function Rsvps({ record }: { record: WorkspaceEvent }) {
                             </Badge>
                           </div>
                         ))
-                      : "No response"}
+                      : record.live?.rsvpsAvailable === false
+                        ? "Unavailable"
+                        : "No response"}
                   </td>
                   <td>
                     {observations.map((r, i) => (
@@ -1214,6 +1340,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   const [record, setRecord] = useState<WorkspaceEvent | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [message, setMessage] = useState("");
   const [dirty, setDirty] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
@@ -1222,8 +1349,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   const heading = useRef<HTMLHeadingElement>(null);
   const publishKeys = useRef(new Map<string, string>());
   const epoch = useRef(0);
-  const watchedId = gateway.readOnly && editing ? record?.event.id : undefined;
-  const watchPaused = Boolean(gateway.readOnly && (busy || dirty));
+  const watchedId =
+    gateway.mode === "live" && editing ? record?.event.id : undefined;
+  const watchPaused = Boolean(gateway.mode === "live" && (busy || dirty));
   useEffect(() => {
     let active = true;
     let inFlight = false;
@@ -1236,10 +1364,11 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
         if (!active) return;
         setEvents(list);
         if (item) {
-          setRecord(item);
-          setEditorKey((key) => key + 1);
+          setRecord((current) =>
+            JSON.stringify(current) === JSON.stringify(item) ? current : item,
+          );
         }
-        setError("");
+        setLoadError("");
       } catch (err) {
         if (!active) return;
         if (err instanceof ApiError && err.code === "unauthenticated") {
@@ -1247,7 +1376,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           setRecord(null);
           setEditing(false);
         }
-        setError(
+        setLoadError(
           err instanceof Error
             ? err.message
             : "Could not load events. Try refreshing.",
@@ -1257,7 +1386,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
       }
     }
     void load();
-    if (!gateway.readOnly)
+    if (gateway.mode !== "live")
       return () => {
         active = false;
       };
@@ -1304,6 +1433,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
     const requestEpoch = epoch.current;
     setBusy(true);
     setError("");
+    setLoadError("");
     setMessage("");
     try {
       const result = await action();
@@ -1395,6 +1525,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
       setBackend("Backend unavailable. Try again.");
     }
   }
+  const recordVersion = record
+    ? `${record.event.id}:${record.event.revision}:${record.content.map((item) => `${item.id}:${item.state}`).join(",")}:${JSON.stringify(record.facts)}`
+    : "new";
   const title =
     page === "settings"
       ? "Settings"
@@ -1516,9 +1649,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                 ? "Connected event-details test · checks every 10 seconds · read-only · materials and distribution are not loaded"
                 : "Connected organizer workspace · review changes before sending"}
           </p>
-          {error && (
+          {(error || loadError) && (
             <p role="alert" className="error-box">
-              {error}
+              {error || loadError}
             </p>
           )}
           <p className="status-message" role="status">
@@ -1698,7 +1831,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
               </nav>
               {step === "details" && (
                 <Details
-                  key={editorKey}
+                  key={`${editorKey}:${recordVersion}`}
                   record={record}
                   busy={busy}
                   readOnly={gateway.readOnly}
@@ -1724,7 +1857,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
               )}
               {record && step === "review" && (
                 <Review
-                  key={editorKey}
+                  key={`${editorKey}:${recordVersion}`}
                   record={record}
                   busy={busy}
                   onDirty={() => setDirty(true)}
@@ -1757,7 +1890,11 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                       (value) => {
                         update(value);
                         setStep("distribution");
-                        setMessage("Review saved for this revision.");
+                        setMessage(
+                          value.live
+                            ? "Writing review saved for this revision. Inclusion facts remain as reported by the server."
+                            : "Review saved for this revision.",
+                        );
                       },
                     )
                   }
@@ -1780,12 +1917,11 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     </a>
                   </div>
                   <Distribution
-                    key={editorKey}
+                    key={`${editorKey}:${recordVersion}`}
                     record={record}
                     preview={gateway.mode === "preview"}
                     busy={busy}
-                    onPublish={() => {
-                      const action = record.gmail?.sent ? "update" : "publish";
+                    onPublish={(action) => {
                       const keyId = `${record.event.id}:${record.event.revision}:${action}`;
                       const key =
                         publishKeys.current.get(keyId) ?? crypto.randomUUID();
@@ -1797,6 +1933,15 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                             record.event.revision,
                             action,
                             key,
+                            record.content.find(
+                              (item) =>
+                                item.kind ===
+                                  (action === "update"
+                                    ? "change_notice"
+                                    : "invitation") &&
+                                item.event_revision === record.event.revision &&
+                                item.state === "ready",
+                            )?.id,
                           ),
                         (value) => {
                           update(value);
@@ -1841,7 +1986,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   <h2>Workspace connected</h2>
                   <p className="muted">
                     {session?.email ?? "Authenticated organizer gateway"} ·
-                    event-details test
+                    organizer workspace
                   </p>
                   <button
                     className="secondary"
@@ -1860,6 +2005,12 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     Disconnect workspace
                   </button>
                 </section>
+              )}
+              {session && (
+                <GoConnector
+                  key={`${session.email}:${session.expires_at}`}
+                  accessToken={session.access_token}
+                />
               )}
               <section className="panel settings-connections">
                 <h2>Your connected tools</h2>
