@@ -42,6 +42,8 @@ const steps: { id: Step; name: string }[] = [
 ];
 const GO_URL = "https://go.superhuman.com/";
 const MCP_URL = safeUrl(import.meta.env.VITE_PUBLIC_MCP_URL);
+// Name of the Pack installed in Go (integrations/superhuman, pack 72744).
+const CONNECTOR_NAME = "Hackathon Workspace";
 function GatheringIllustration() {
   return (
     <div className="hero-art" aria-hidden="true">
@@ -123,17 +125,8 @@ function ExternalLink({
     </a>
   ) : null;
 }
-function GoHandoff({
-  event,
-  expanded = false,
-}: {
-  event?: EventRecord;
-  expanded?: boolean;
-}) {
+function useCopy() {
   const [copyMessage, setCopyMessage] = useState("");
-  const prompt = event
-    ? `Use the Event Workspace connector to open my event "${event.title}" (ID ${event.id}, revision ${event.revision}). Check event_progress and walk me through the next steps one at a time: writing, my approval of the invitation, the access/food/sensory questions, an optional Canva flyer, and sending. If you don't know something, ask me instead of guessing. Don't send anything until I say "send".`
-    : "Use the Event Workspace connector to plan my event with me. Create it from the details below, then walk me through each step one at a time: writing, my approval of the invitation, the access/food/sensory questions, an optional Canva flyer, and sending. If you don't know something, ask me. Don't send anything until I say \"send\".\n\nMy event:";
   async function copy(value: string) {
     try {
       if (!navigator.clipboard) throw new Error();
@@ -143,94 +136,132 @@ function GoHandoff({
       setCopyMessage("Select the text above and copy it.");
     }
   }
+  return { copyMessage, copy };
+}
+function GoMessage({ prompt }: { prompt: string }) {
+  const { copyMessage, copy } = useCopy();
   return (
-    <section className="go-handoff" aria-label="Superhuman Go connection">
-      <div className="go-handoff-top">
-        <div>
-          <span className="eyebrow">SUPERHUMAN GO</span>
-          <h2>
-            {event ? "Let Go take it from here." : "Plan by chatting with Go."}
-          </h2>
-          <p>
-            Tell Go about your event in your own words. It walks you through
-            every step in one chat, and nothing is sent until you say so.
-          </p>
-        </div>
+    <>
+      <label>
+        Message for Go
+        <textarea
+          readOnly
+          rows={5}
+          value={prompt}
+          onFocus={(e) => e.currentTarget.select()}
+        />
+      </label>
+      <div className="action-row">
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => copy(prompt)}
+        >
+          Copy message
+        </button>
         <a className="primary" href={GO_URL} target="_blank" rel="noreferrer">
           Continue in Superhuman Go ↗
         </a>
       </div>
-      <details open={expanded || undefined}>
-        <summary>How to set up Go (one time)</summary>
-        <ol className="setup-steps">
-          <li>
-            <strong>Sign in here with Google</strong> on the Settings page.
-          </li>
-          <li>
-            <strong>Add this website to Go.</strong> In Superhuman Go, open
-            Connectors, add a custom connector, and paste this address.{" "}
-            {MCP_URL ? (
-              <>
-                <label>
-                  Connector address
-                  <input
-                    readOnly
-                    value={MCP_URL}
-                    onFocus={(e) => e.currentTarget.select()}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() => copy(MCP_URL)}
-                >
-                  Copy address
-                </button>
-              </>
-            ) : (
-              <p className="connection-note">
-                This website isn’t ready to connect to Go yet. Ask the person
-                who set it up for the connector address.
-              </p>
-            )}
-            When Go asks for a key, create one under “Connect Go” in Settings.
-          </li>
-          <li>
-            <strong>Tell Go what you want.</strong> Copy this message into Go
-            and add your event details. Then come back here to check the
-            results.
-            <label>
-              Message for Go
-              <textarea
-                readOnly
-                rows={5}
-                value={prompt}
-                onFocus={(e) => e.currentTarget.select()}
-              />
-            </label>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => copy(prompt)}
-            >
-              Copy message
-            </button>
-          </li>
-        </ol>
-        <p className="small muted">
-          <a
-            href="https://support.grammarly.com/hc/en-us/articles/40642362241293-About-Superhuman-Go-agents-and-connectors"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Help with Go connectors ↗
-          </a>
-        </p>
-        <p className="small" role="status">
-          {copyMessage}
-        </p>
-      </details>
+      <p className="small" role="status">
+        {copyMessage}
+      </p>
+    </>
+  );
+}
+function GoHandoff({ event }: { event: EventRecord }) {
+  return (
+    <section className="go-handoff" aria-label="Superhuman Go connection">
+      <span className="eyebrow">SUPERHUMAN GO</span>
+      <h2>Let Go take it from here.</h2>
+      <p>
+        Paste this into Go. It walks you through every step in one chat, and
+        nothing is sent until you say so. First time? See How to get started on
+        Your events.
+      </p>
+      <GoMessage
+        prompt={`Use the ${CONNECTOR_NAME} connector to open my event "${event.title}" (ID ${event.id}, revision ${event.revision}). Check event_progress and walk me through the next steps one at a time: writing, my approval of the invitation, the access/food/sensory questions, an optional Canva flyer, and sending. If you don't know something, ask me instead of guessing. Don't send anything until I say "send".`}
+      />
     </section>
+  );
+}
+function SetupGuide({
+  session,
+  goKeyCreated,
+  onKeyCreated,
+  collapsible = false,
+}: {
+  session?: Session;
+  goKeyCreated: boolean;
+  onKeyCreated: () => void;
+  collapsible?: boolean;
+}) {
+  const signIn = useGoogleSignIn();
+  const done = Boolean(session) && goKeyCreated;
+  return (
+    <details
+      className="panel setup-guide"
+      open={!collapsible || !done || undefined}
+    >
+      <summary>
+        <h2>How to get started{done ? " ✓" : ""}</h2>
+      </summary>
+      <ol className="setup-steps">
+        <li>
+          <strong>Sign in with Google.</strong>{" "}
+          {session ? (
+            <span className="muted">Signed in as {session.email}.</span>
+          ) : (
+            <>
+              Use the account you use for email and calendar.
+              {signIn.error && (
+                <span role="alert" className="error-box">
+                  {signIn.error}
+                </span>
+              )}
+              <button
+                className="primary"
+                disabled={signIn.busy}
+                onClick={signIn.google}
+              >
+                {signIn.busy ? "Opening Google…" : "Sign in with Google"}
+              </button>
+            </>
+          )}
+        </li>
+        <li>
+          <strong>Create your Go key.</strong>{" "}
+          {session ? (
+            <GoConnector
+              key={`${session.email}:${session.expires_at}`}
+              accessToken={session.access_token}
+              onCreated={onKeyCreated}
+            />
+          ) : (
+            <span className="muted">Available after you sign in.</span>
+          )}
+        </li>
+        <li>
+          <strong>Connect it in Go.</strong> In Superhuman Go, open Connectors →{" "}
+          <em>{CONNECTOR_NAME}</em> → Sign in, and paste your key there (not
+          into a chat message).
+          {MCP_URL && (
+            <span className="small muted">
+              {" "}
+              Not listed? Add a custom connector with the address{" "}
+              <code>{MCP_URL}</code>.
+            </span>
+          )}
+        </li>
+        <li>
+          <strong>Plan your event in Go.</strong> Paste this message into Go and
+          add your details. Your event appears here when Go saves it.
+          <GoMessage
+            prompt={`Use the ${CONNECTOR_NAME} connector to plan my event with me. Create it from the details below, then walk me through each step one at a time: writing, my approval of the invitation, the access/food/sensory questions, an optional Canva flyer, and sending. If you don't know something, ask me. Don't send anything until I say "send".\n\nMy event:`}
+          />
+        </li>
+      </ol>
+    </details>
   );
 }
 // Per-browser hint only: hides the "connect Go" banner once a key was made here.
@@ -267,45 +298,6 @@ function useGoogleSignIn() {
     }
   }
   return { busy, error, google };
-}
-function SignInBanner() {
-  const { busy, error, google } = useGoogleSignIn();
-  return (
-    <section className="notice next-step">
-      <p>
-        <strong>You’re viewing sample events.</strong> Sign in with Google to
-        plan your own and connect Superhuman Go.
-      </p>
-      {error && (
-        <p role="alert" className="error-box">
-          {error}
-        </p>
-      )}
-      <button className="primary" disabled={busy} onClick={google}>
-        {busy ? "Opening Google…" : "Sign in with Google"}
-      </button>
-    </section>
-  );
-}
-function GoogleSignIn() {
-  const { busy, error, google } = useGoogleSignIn();
-  return (
-    <section className="panel">
-      <h2>Sign in</h2>
-      <p className="muted">
-        Sign in with the Google account you use for email and calendar. Your
-        first sign-in creates your account.
-      </p>
-      {error && (
-        <p role="alert" className="error-box">
-          {error}
-        </p>
-      )}
-      <button className="primary" disabled={busy} onClick={google}>
-        {busy ? "Opening Google…" : "Sign in with Google"}
-      </button>
-    </section>
-  );
 }
 function Details({
   record,
@@ -1719,27 +1711,6 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                 </button>
               </section>
             )}
-          {gateway.mode === "preview" && page !== "settings" && (
-            <SignInBanner />
-          )}
-          {providerSession &&
-            page === "events" &&
-            !editing &&
-            !starting &&
-            !goKeyCreated && (
-              <section className="notice next-step">
-                <p>
-                  <strong>Next: connect Superhuman Go.</strong> Create your Go
-                  key in Settings and paste it into Go’s connector sign-in.
-                </p>
-                <button
-                  className="primary"
-                  onClick={() => navigate("settings")}
-                >
-                  Get your Go key
-                </button>
-              </section>
-            )}
           <p className="preview-note">
             {gateway.mode === "preview"
               ? "You’re viewing sample events."
@@ -1758,7 +1729,14 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           </p>
           {page === "events" && starting && (
             <>
-              <GoHandoff expanded />
+              <SetupGuide
+                  session={session}
+                  goKeyCreated={goKeyCreated}
+                  onKeyCreated={() => {
+                    rememberGoKey();
+                    setGoKeyCreated(true);
+                  }}
+              />
               <section className="panel">
                 <h2>After Go saves your event</h2>
                 <p className="muted">
@@ -1795,6 +1773,15 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           )}
           {page === "events" && !editing && !starting && (
             <>
+              <SetupGuide
+                session={session}
+                goKeyCreated={goKeyCreated}
+                onKeyCreated={() => {
+                  rememberGoKey();
+                  setGoKeyCreated(true);
+                }}
+                collapsible
+              />
               <section
                 className="workspace-hero"
                 aria-labelledby="gathering-heading"
@@ -2080,9 +2067,15 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           )}
           {page === "settings" && (
             <>
-              {gateway.mode === "preview" ? (
-                <GoogleSignIn />
-              ) : (
+              <SetupGuide
+                session={session}
+                goKeyCreated={goKeyCreated}
+                onKeyCreated={() => {
+                  rememberGoKey();
+                  setGoKeyCreated(true);
+                }}
+              />
+              {gateway.mode !== "preview" && (
                 <section className="panel">
                   <h2>Signed in</h2>
                   <p className="muted">
@@ -2107,21 +2100,10 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   </button>
                 </section>
               )}
-              {session && (
-                <GoConnector
-                  key={`${session.email}:${session.expires_at}`}
-                  accessToken={session.access_token}
-                  onCreated={() => {
-                    rememberGoKey();
-                    setGoKeyCreated(true);
-                  }}
-                />
-              )}
               <ConnectedServices
                 key={providerSession?.expires_at ?? "signed-out"}
                 accessToken={providerSession?.access_token}
               />
-              <GoHandoff expanded />
             </>
           )}
         </main>
