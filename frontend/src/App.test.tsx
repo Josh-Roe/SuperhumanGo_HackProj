@@ -53,55 +53,6 @@ describe("simplified event workspace", () => {
     ).toContain("preview-gathering");
     expect(screen.getByText(/isn’t ready to connect to Go yet/)).toBeVisible();
   });
-  it("adds an event and advances through design to distribution without making up Go output", async () => {
-    const user = await workspace();
-    await user.click(screen.getByRole("button", { name: "Add event" }));
-    await user.click(
-      screen.getByRole("button", {
-        name: "Enter event details manually instead",
-      }),
-    );
-    expect(
-      screen.getByRole("button", { name: /2Design & inclusion/ }),
-    ).toBeDisabled();
-    await user.type(screen.getByLabelText("Event title"), "Garden meetup");
-    await user.type(
-      screen.getByLabelText("Location or online meeting link"),
-      "Community garden",
-    );
-    await user.type(
-      screen.getByLabelText("Organizer email"),
-      "organizer@example.com",
-    );
-    await user.type(screen.getByLabelText("Start time"), "2026-11-07T10:00");
-    await user.type(screen.getByLabelText("End time"), "2026-11-07T12:00");
-    await user.click(screen.getByRole("button", { name: "Save & continue" }));
-    expect(
-      await screen.findByText(/Waiting for Go’s first draft/),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: /2Design & inclusion/ }),
-    ).toHaveAttribute("aria-current", "step");
-    await user.click(screen.getByRole("button", { name: "Queue preparation" }));
-    expect(
-      await screen.findByText(/Awaiting Go. Open Superhuman Go/),
-    ).toBeVisible();
-    await user.click(
-      screen.getByRole("button", { name: "Preview distribution" }),
-    );
-    expect(
-      screen.getByRole("button", { name: "Confirm & publish" }),
-    ).toBeDisabled();
-    await user.click(
-      within(screen.getByRole("navigation", { name: "Workspace" })).getByRole(
-        "button",
-        { name: "Your events" },
-      ),
-    );
-    expect(
-      await screen.findByRole("button", { name: /Garden meetup/ }),
-    ).toBeVisible();
-  });
   it("edits writing with provenance and requires explicit review", async () => {
     const user = await sample();
     await user.click(
@@ -264,6 +215,15 @@ describe("Go-backed event read model", () => {
 });
 
 describe("Go-first event transfer test", () => {
+  it("presents Superhuman Go as the way every event is planned", async () => {
+    await workspace();
+    expect(
+      screen.queryByText(/Prefer to plan with Go/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Every event is planned in Superhuman Go/),
+    ).toBeVisible();
+  });
   it("starts new events in Go without first creating a placeholder event", async () => {
     const user = await workspace();
     await user.click(screen.getByRole("button", { name: "Add event" }));
@@ -274,6 +234,9 @@ describe("Go-first event transfer test", () => {
       screen.getByRole("link", { name: /Continue in Superhuman Go/ }),
     ).toHaveAttribute("href", "https://go.superhuman.com/");
     expect(screen.queryByLabelText("Event title")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /manually/ }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Check Your events" }),
     ).toBeDisabled();

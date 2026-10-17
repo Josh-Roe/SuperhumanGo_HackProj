@@ -233,7 +233,23 @@ function GoHandoff({
     </section>
   );
 }
-function GoogleSignIn() {
+// Per-browser hint only: hides the "connect Go" banner once a key was made here.
+const GO_KEY_CREATED = "go-key-created";
+function goKeyRemembered() {
+  try {
+    return localStorage.getItem(GO_KEY_CREATED) === "1";
+  } catch {
+    return false;
+  }
+}
+function rememberGoKey() {
+  try {
+    localStorage.setItem(GO_KEY_CREATED, "1");
+  } catch {
+    // Storage unavailable: the banner just keeps showing.
+  }
+}
+function useGoogleSignIn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function google() {
@@ -250,6 +266,29 @@ function GoogleSignIn() {
       setBusy(false);
     }
   }
+  return { busy, error, google };
+}
+function SignInBanner() {
+  const { busy, error, google } = useGoogleSignIn();
+  return (
+    <section className="notice next-step">
+      <p>
+        <strong>You’re viewing sample events.</strong> Sign in with Google to
+        plan your own and connect Superhuman Go.
+      </p>
+      {error && (
+        <p role="alert" className="error-box">
+          {error}
+        </p>
+      )}
+      <button className="primary" disabled={busy} onClick={google}>
+        {busy ? "Opening Google…" : "Sign in with Google"}
+      </button>
+    </section>
+  );
+}
+function GoogleSignIn() {
+  const { busy, error, google } = useGoogleSignIn();
   return (
     <section className="panel">
       <h2>Sign in</h2>
@@ -1265,6 +1304,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
     () => eventGateway ?? createPreviewGateway(),
   );
   const [session, setSession] = useState<Session>();
+  const [goKeyCreated, setGoKeyCreated] = useState(goKeyRemembered);
   // The organizer gateway reads this, so renewing the token keeps its in-memory state.
   const accessToken = useRef("");
   const [starting, setStarting] = useState(false);
@@ -1679,9 +1719,30 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                 </button>
               </section>
             )}
+          {gateway.mode === "preview" && page !== "settings" && (
+            <SignInBanner />
+          )}
+          {providerSession &&
+            page === "events" &&
+            !editing &&
+            !starting &&
+            !goKeyCreated && (
+              <section className="notice next-step">
+                <p>
+                  <strong>Next: connect Superhuman Go.</strong> Create your Go
+                  key in Settings and paste it into Go’s connector sign-in.
+                </p>
+                <button
+                  className="primary"
+                  onClick={() => navigate("settings")}
+                >
+                  Get your Go key
+                </button>
+              </section>
+            )}
           <p className="preview-note">
             {gateway.mode === "preview"
-              ? "You’re viewing sample events. Sign in with Google to plan your own."
+              ? "You’re viewing sample events."
               : gateway.readOnly
                 ? "Connected event-details test · checks every 10 seconds · read-only · materials and distribution are not loaded"
                 : "Nothing is sent until you approve it."}
@@ -1730,17 +1791,6 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   </button>
                 </div>
               </section>
-              <button
-                className="text-button"
-                disabled={busy || gateway.readOnly}
-                onClick={() => {
-                  setStarting(false);
-                  setEditing(true);
-                  setEditorKey((k) => k + 1);
-                }}
-              >
-                Enter event details manually instead
-              </button>
             </>
           )}
           {page === "events" && !editing && !starting && (
@@ -1759,8 +1809,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     <span>Great gatherings.</span>
                   </h2>
                   <p>
-                    Bring the details together. Let Superhuman Go help with the
-                    rest.
+                    Superhuman Go runs every event: it gathers the details,
+                    writes the invitation, checks access and food, and sends
+                    only when you say so.
                   </p>
                   <button
                     className="primary"
@@ -1826,14 +1877,14 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   disabled={busy}
                   onClick={addEvent}
                 >
-                  <span aria-hidden="true">+</span>Add a new event
+                  <span aria-hidden="true">+</span>Plan a new event in Go
                 </button>
               </div>
               <div className="go-shortcut">
                 <span aria-hidden="true">✳</span>
                 <p>
-                  Prefer to plan with Go? Connect this workspace, then prompt Go
-                  to create and update your events.
+                  Every event is planned in Superhuman Go. Connect this
+                  workspace once; this page shows where each event is.
                 </p>
                 <button
                   className="text-button"
@@ -2056,17 +2107,21 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   </button>
                 </section>
               )}
+              {session && (
+                <GoConnector
+                  key={`${session.email}:${session.expires_at}`}
+                  accessToken={session.access_token}
+                  onCreated={() => {
+                    rememberGoKey();
+                    setGoKeyCreated(true);
+                  }}
+                />
+              )}
               <ConnectedServices
                 key={providerSession?.expires_at ?? "signed-out"}
                 accessToken={providerSession?.access_token}
               />
               <GoHandoff expanded />
-              {session && (
-                <GoConnector
-                  key={`${session.email}:${session.expires_at}`}
-                  accessToken={session.access_token}
-                />
-              )}
             </>
           )}
         </main>
