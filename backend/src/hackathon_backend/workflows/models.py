@@ -128,6 +128,11 @@ class OperationKind(StrEnum):
     GMAIL_SEND = "gmail_send"
 
 
+# Failure codes that prove no provider effect, so a retry is allowed without read-back.
+# Mirrors organizer_put_operation in Supabase.
+NO_EFFECT_CODES = frozenset({"integration_not_connected", "confirmed_no_effect"})
+
+
 class Operation(BaseModel):
     id: str = Field(default_factory=new_id)
     event_id: str
