@@ -89,6 +89,7 @@ Each item lists files, the change, and how to verify it. Run `uv run --project b
 - [ ] **A18 — Confirm Go organizer-tool tenancy.** Owner 2. `task_repository` uses the admin `Database`; isolation for Go's `create_event`/`update_event` relies on the `p_owner` filter in `organizer_write_record`, not RLS. Confirm this is acceptable, or provide an RLS-scoped path. Verify: an isolation SQL test with two organizers through the RPC. Source: 03 context handoff (`d5ce546`).
 - [~] **A10 — Read contracts the UI needs.** Owner-scoped REST reads for current Go work, Gmail binding (sent/draft IDs + revision), and approvals. Make approval creation idempotent and recoverable on reload. A versioned save endpoint for inclusion facts. Requested in 01 context. **Claimed:** Member 1 (User 1, lane L2), 2026-10-16 18:25 PT, main
 - [ ] **A11 — Canva and Google plumbing.** Canva OAuth connect/refresh writing vault provider `canva` as `{access_token}`. A durable flyer-job table and lease, replacing vault state and the in-process lock. A Google token-cache "forget" hook so reconnects take effect immediately. Requested in 03 context.
+  - Note (Member 1, User 1 lane L3, 2026-10-16 18:29 PT): **Claimed** the Canva part (OAuth connect/refresh + durable flyer-job table/lease), main. Google token-cache part is lane L1.
 
 ### Owner 3: Go, Google, composition
 
