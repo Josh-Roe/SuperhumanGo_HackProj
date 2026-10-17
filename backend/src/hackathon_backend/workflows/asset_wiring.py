@@ -14,10 +14,12 @@ into the Distributor, then registers:
 Fail closed: no Canva token → `integration_not_connected`; nothing reports success it lacks.
 Canva create is never retried blindly: an interrupted create stays `creating` until the
 organizer reconciles in Canva and abandons it. Flyer state (including Canva's continuation
-token) is kept per event in the encrypted server vault.
+token) is kept per event in the durable, encrypted `canva_flyer_jobs` table, and every flyer
+action holds that table's fenced cross-process lease (in-memory store/lock in tests and dev).
 """
 
 import asyncio
+import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -139,11 +141,33 @@ class FlyerStateStore(Protocol):
 
     async def put(self, owner_id: str, state: FlyerState) -> None: ...
 
+    def lease(self, owner_id: str, event_id: str) -> Any:
+        """Async context manager: exclusive flyer-write lease for one event."""
+        ...
 
-class MemoryFlyerStateStore:
+
+LEASE_TTL_SECONDS = 300  # longer than one Canva call (read timeout 300 s); expires on crash
+LEASE_ATTEMPTS = 20
+LEASE_RETRY_SECONDS = 0.5
+
+
+class ProcessLeases:
+    """Per-process lock per event: tests, dev and the single-instance legacy vault store."""
+
+    def __init__(self) -> None:
+        self._locks: dict[tuple[str, str], asyncio.Lock] = {}
+
+    @asynccontextmanager
+    async def lease(self, owner_id: str, event_id: str) -> AsyncIterator[None]:
+        async with self._locks.setdefault((owner_id, event_id), asyncio.Lock()):
+            yield
+
+
+class MemoryFlyerStateStore(ProcessLeases):
     """Tests/dev only; state is lost on restart."""
 
     def __init__(self) -> None:
+        super().__init__()
         self.states: dict[tuple[str, str], FlyerState] = {}
 
     async def get(self, owner_id: str, event_id: str) -> FlyerState | None:
@@ -159,10 +183,12 @@ class SecretVault(Protocol):
     async def get_secret(self, owner_id: str, provider: str) -> dict | None: ...
 
 
-class VaultFlyerStateStore:
-    """Encrypted, server-only, owner-scoped (Member 2's vault). Continuation token included."""
+class VaultFlyerStateStore(ProcessLeases):
+    """Legacy: encrypted vault records, process-local lock. Read as a fallback by the durable
+    store for flyers started before `canva_flyer_jobs` existed."""
 
     def __init__(self, vault: SecretVault) -> None:
+        super().__init__()
         self.vault = vault
 
     async def get(self, owner_id: str, event_id: str) -> FlyerState | None:
@@ -173,6 +199,104 @@ class VaultFlyerStateStore:
         await self.vault.put_secret(
             owner_id, FLYER_SECRET_PREFIX + state.event_id, state.model_dump(mode="json")
         )
+
+
+class SupabaseFlyerStateStore:
+    """Durable flyer job state in `canva_flyer_jobs` (migration 20261017030000), server-only.
+
+    State is Fernet-encrypted with CREDENTIAL_ENCRYPTION_KEY and bound to owner/event because it
+    holds Canva's continuation token. Writes are fenced by an expiring lease row: only the
+    current holder can save, a crashed holder's lease expires after LEASE_TTL_SECONDS, and a
+    busy lease reports operation_in_progress instead of running a second Canva action.
+    """
+
+    def __init__(
+        self,
+        database: Any,
+        encryption_key: str,
+        *,
+        legacy: FlyerStateStore | None = None,
+        sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep,
+    ) -> None:
+        from cryptography.fernet import Fernet
+
+        self.db = database
+        self._cipher = Fernet(encryption_key.encode())
+        self.legacy = legacy
+        self._sleep = sleep
+        self._holders: dict[tuple[str, str], str] = {}
+        self._local = ProcessLeases()
+
+    async def get(self, owner_id: str, event_id: str) -> FlyerState | None:
+        from cryptography.fernet import InvalidToken
+
+        rows = await self.db.rows(
+            "canva_flyer_jobs",
+            select="ciphertext",
+            owner_id=f"eq.{owner_id}",
+            event_id=f"eq.{event_id}",
+        )
+        ciphertext = rows[0].get("ciphertext") if rows else None
+        if not ciphertext:
+            return await self.legacy.get(owner_id, event_id) if self.legacy else None
+        try:
+            envelope = json.loads(self._cipher.decrypt(ciphertext.encode()))
+            if envelope["owner_id"] != owner_id or envelope["event_id"] != event_id:
+                raise ValueError("scope mismatch")
+            return FlyerState.model_validate(envelope["state"])
+        except (InvalidToken, ValueError, KeyError, TypeError):
+            raise WorkflowError("provider_failed", "flyer job state is unreadable") from None
+
+    async def put(self, owner_id: str, state: FlyerState) -> None:
+        holder = self._holders.get((owner_id, state.event_id))
+        if holder is None:
+            raise WorkflowError("operation_in_progress", "flyer state written without a lease")
+        envelope = {
+            "owner_id": owner_id,
+            "event_id": state.event_id,
+            "state": state.model_dump(mode="json"),
+        }
+        await self.db.rpc(
+            "canva_flyer_save",
+            p_owner=owner_id,
+            p_event=state.event_id,
+            p_holder=holder,
+            p_event_revision=state.event_revision,
+            p_stage=state.stage,
+            p_ciphertext=self._cipher.encrypt(json.dumps(envelope).encode()).decode(),
+        )
+
+    @asynccontextmanager
+    async def lease(self, owner_id: str, event_id: str) -> AsyncIterator[None]:
+        key = (owner_id, event_id)
+        async with self._local.lease(owner_id, event_id):  # no DB spinning within one process
+            holder = uuid4().hex
+            for attempt in range(LEASE_ATTEMPTS):
+                if await self.db.rpc(
+                    "canva_flyer_acquire",
+                    p_owner=owner_id,
+                    p_event=event_id,
+                    p_holder=holder,
+                    p_ttl_seconds=LEASE_TTL_SECONDS,
+                ):
+                    break
+                if attempt < LEASE_ATTEMPTS - 1:
+                    await self._sleep(LEASE_RETRY_SECONDS)
+            else:
+                raise WorkflowError(
+                    "operation_in_progress", "another flyer action is running; retry shortly"
+                )
+            self._holders[key] = holder
+            try:
+                yield
+            finally:
+                self._holders.pop(key, None)
+                try:
+                    await self.db.rpc(
+                        "canva_flyer_release", p_owner=owner_id, p_event=event_id, p_holder=holder
+                    )
+                except Exception:  # noqa: BLE001 - an unreleased lease expires on its own
+                    pass
 
 
 # Canva sessions ---------------------------------------------------------------------------
@@ -346,7 +470,6 @@ class AssetCoordinator:
         self.flyers = flyers
         self.client_factory = client_factory or _download_client
         self.clock = clock
-        self._locks: dict[tuple[str, str], asyncio.Lock] = {}
 
     def _prep(self, owner_id: str) -> EventAssetPreparationService:
         return EventAssetPreparationService(self.store, self.storage_for(owner_id), self.holidays)
@@ -357,9 +480,9 @@ class AssetCoordinator:
         except Exception as error:
             raise _as_workflow_error(error) from None
 
-    def _lock(self, owner_id: str, event_id: str) -> asyncio.Lock:
-        # Per-process write lock; a multi-worker deployment needs a durable lease (handoff).
-        return self._locks.setdefault((owner_id, event_id), asyncio.Lock())
+    def _lock(self, owner_id: str, event_id: str) -> Any:
+        # The store's lease: durable and cross-process in Supabase mode.
+        return self.flyers.lease(owner_id, event_id)
 
     async def _event(self, owner_id: str, event_id: str, expected_revision: int) -> AssetEvent:
         batch = await self._prep(owner_id).read(owner_id, event_id, expected_revision)
@@ -421,9 +544,7 @@ class AssetCoordinator:
         receipt = await self._guard(prep.request_prose(owner_id, event_id, revision))
         return receipt.model_dump(mode="json", exclude={"owner_id"})
 
-    async def prepare_document(
-        self, owner_id: str, event_id: str, revision: int
-    ) -> dict[str, Any]:
+    async def prepare_document(self, owner_id: str, event_id: str, revision: int) -> dict[str, Any]:
         result = await self._guard(
             self._prep(owner_id).prepare_document(owner_id, event_id, revision)
         )
@@ -800,6 +921,7 @@ def asset_router(coordinator: AssetCoordinator, resolve_owner: OwnerResolver) ->
         "/export": coordinator.export_flyer,
         "/abandon": coordinator.abandon_flyer,
     }
+
     def flyer_route(action: Callable[[str, str, int], Awaitable[Any]]):
         async def route(event_id: PathId, body: RevisionBody, authorization: Auth = None):
             return await respond(
@@ -872,7 +994,13 @@ def register_asset_services(
         from hackathon_backend.repositories.vault import SupabaseCredentialVault
 
         vault = SupabaseCredentialVault(database, settings.credential_encryption_key)
-    flyers: FlyerStateStore = VaultFlyerStateStore(vault) if vault else MemoryFlyerStateStore()
+    flyers: FlyerStateStore = (
+        SupabaseFlyerStateStore(
+            database, settings.credential_encryption_key, legacy=VaultFlyerStateStore(vault)
+        )
+        if vault
+        else MemoryFlyerStateStore()
+    )
 
     def storage_for(owner_id: str) -> SupabaseAssetStorage:
         return SupabaseAssetStorage(database, owner_id)

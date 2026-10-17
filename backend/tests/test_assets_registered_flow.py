@@ -58,7 +58,7 @@ def registered(monkeypatch):
             invitees=[Invitee(id="synthetic-invitee", email="guest@example.invalid")],
         )
     )
-    rows, objects, secrets, downloads = [], {}, {}, []
+    rows, objects, secrets, downloads, flyer_jobs = [], {}, {}, [], {}
 
     def server(request):
         path = request.url.path
@@ -77,6 +77,24 @@ def registered(monkeypatch):
                 return httpx.Response(200, json={})
             key = (request.url.params["owner_id"][3:], request.url.params["provider"][3:])
             return httpx.Response(200, json=[secrets[key]] if key in secrets else [])
+        if path.endswith("/canva_flyer_jobs"):  # durable flyer state (A11 migration)
+            key = (request.url.params["owner_id"][3:], request.url.params["event_id"][3:])
+            job = flyer_jobs.get(key, {})
+            return httpx.Response(200, json=[job] if job else [])
+        if "/rpc/canva_flyer_" in path:
+            data = json.loads(request.content)
+            assert data["p_owner"] == OWNER and data["p_event"] == EVENT
+            job = flyer_jobs.setdefault((OWNER, EVENT), {"ciphertext": None, "holder": None})
+            if path.endswith("_acquire"):
+                free = job["holder"] in (None, data["p_holder"])
+                job["holder"] = data["p_holder"] if free else job["holder"]
+                return httpx.Response(200, json=free)
+            assert job["holder"] == data["p_holder"]
+            if path.endswith("_save"):
+                job["ciphertext"] = data["p_ciphertext"]
+            else:
+                job["holder"] = None
+            return httpx.Response(200, json=1)
         if path.endswith("/organizer_event_json"):
             assert json.loads(request.content)["p_owner"] == OWNER
             return httpx.Response(200, json={"revision": store.events[EVENT].revision})
@@ -142,6 +160,9 @@ def registered(monkeypatch):
         database(settings, admin=True), settings.credential_encryption_key
     )
     asyncio.run(vault.put_secret(OWNER, "canva", {"access_token": "synthetic-canva-token"}))
+    flyers = asset_wiring.SupabaseFlyerStateStore(
+        database(settings, admin=True), settings.credential_encryption_key
+    )
     principals = InMemoryPrincipalResolver()
     connector = principals.issue(OWNER)
     foreign = principals.issue("33333333-3333-4333-8333-333333333333")
@@ -166,7 +187,7 @@ def registered(monkeypatch):
             secrets,
             calendar,
             gmail,
-            vault,
+            flyers,
         )
 
 
@@ -209,12 +230,17 @@ def start_flyer(client, connector, args):
 
 
 def test_registered_go_document_canva_export_storage_and_mime_delivery(registered):
-    client, token, _, store, canva, rows, objects, secrets, calendar, gmail, vault = registered
+    client, token, _, store, canva, rows, objects, secrets, calendar, gmail, flyers = registered
     args = generate_and_review(client, token, store, 1)
     start_flyer(client, token, args)
-    state = asyncio.run(vault.get_secret(OWNER, f"canva_flyer:{EVENT}"))
-    state["job"]["next_poll_at"] = "2020-01-01T00:00:00Z"
-    asyncio.run(vault.put_secret(OWNER, f"canva_flyer:{EVENT}", state))
+
+    async def poll_due_now():
+        async with flyers.lease(OWNER, EVENT):
+            state = await flyers.get(OWNER, EVENT)
+            state.job["next_poll_at"] = "2020-01-01T00:00:00Z"
+            await flyers.put(OWNER, state)
+
+    asyncio.run(poll_due_now())
     assert ok(call(client, token, "poll_canva_flyer", args))["stage"] == "created"
     preview = ok(call(client, token, "preview_canva_flyer", args))
     blocked = call(client, token, "export_canva_flyer", args)
@@ -240,6 +266,7 @@ def test_registered_go_document_canva_export_storage_and_mime_delivery(registere
     assert "synthetic-canva-token" not in json.dumps(
         list(secrets.values())
     )  # actual vault encrypts it
+    assert not any(provider.startswith("canva_flyer") for _, provider in secrets)
     assert "private-poll-token" not in str(exported) and "sig=private" not in str(exported)
     saved = ok(
         call(
@@ -271,7 +298,7 @@ def test_registered_go_document_canva_export_storage_and_mime_delivery(registere
     assert attachment.get_payload(decode=True) == PNG
     ok(call(client, token, "execute_distribution", {"event_id": EVENT, "approval_id": approval.id}))
     assert len(gmail.sent) == 1
-    storage = SupabaseAssetStorage(vault.db, OWNER)
+    storage = SupabaseAssetStorage(flyers.db, OWNER)
     current = asyncio.run(storage.current(EVENT, "event_document"))
     assert current["url"].startswith("https://fixture.supabase.co/storage/v1/object/sign/")
 
