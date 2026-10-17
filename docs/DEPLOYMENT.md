@@ -8,9 +8,12 @@
 `Grammarly Hackathon`, service `srv-db9ccb7btjjs73b6pv50`, Free/Oregon, auto-deploy off.
 The first build used Render's default Python 3.14 because the service API has no
 rootDir parameter; it failed before startup because the project requests Python 3.12
-and managed downloads are disabled. Root `.python-version` now selects native 3.12
-for both API-created/root builds and the Blueprint's backend-root build. This URL is
-reserved; do not mark the event API live until startup and authenticated checks pass.
+and managed downloads are disabled. Root `.python-version` fixed that: the next build
+succeeded, and Render reports Python 3.12.15. Startup then correctly rejected missing
+server credentials and unregistered persistent routes/MCP. An encryption key is now
+set in Render, with a mode-0600 Git-ignored backup at `backend/.env.render`; do not
+rotate it on the next deployment. The Supabase service-role key and Member 3
+composition remain blockers. Do not mark the event API live until authenticated checks pass.
 
 Keep Vercel for the frontend and the existing
 Supabase project for Auth, data and files. Deploy the existing Python/FastAPI/MCP

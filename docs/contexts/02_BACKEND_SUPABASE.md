@@ -72,6 +72,14 @@ Added root `.python-version` to match the existing backend version. Application
 startup still requires the registered persistent composition and server credentials;
 the reserved URL is not a claim that event APIs are live.
 
+**Live hosting follow-up:** native build for `28f9dc5` succeeded; Render selected
+Python 3.12.15. Startup correctly failed the readiness gate for missing server keys
+and Member 3 registration (`dep-db9cd4vavr4c73dhqdd0`, `update_failed`). Generated a
+new encryption key, stored it in Render and mode-0600 Git-ignored `backend/.env.render`;
+no secret value was printed or committed. Environment update queued its own deployment
+(`dep-db9cdfbbc5jc73bmibmg`); no duplicate manual deploy was triggered. Preserve this
+key for future encrypted provider grants. Service-role credentials remain absent.
+
 **Exact next owners:** 3 registers `create_router(settings, events=deps)` before MCP
 and passes the same `create_tool_dependencies(settings)` to `create_app`; adds typed
 create/update MCP tools, persistent OAuth callbacks, and 4's preparation/Canva preview
@@ -80,8 +88,9 @@ exact lifecycle contract; encrypted vault writes alone are not exclusive write l
 1 adopts workspace/approval recovery/inclusion endpoints as needed. Export-byte review
 is distinct from staged Canva transaction approval.
 
-**Remaining Member 2 live blockers:** service-role/encryption credentials, authenticated
-organizer fixture, and provider grants are absent from this checkout. Render host is created.
+**Remaining Member 2 live blockers:** Supabase service-role credentials, authenticated
+organizer fixture and provider grants are absent from this checkout. Render host and
+encryption key are configured; application composition remains Member 3's handoff.
 After 3's composition: deploy, configure Vercel `BACKEND_ORIGIN`, verify actual private
 Storage upload/sign/read, restart persistence and cross-owner HTTP isolation, then
 join the rehearsal. 3's live development-store Google/Go evidence is not proof of this
