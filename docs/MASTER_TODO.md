@@ -1,6 +1,6 @@
 # Master to-do: everything left before the spec is met
 
-Snapshot 2026-10-16 (America/Los_Angeles), main at `d70fa0d`.
+Snapshot 2026-10-16 (America/Los_Angeles), main at `5619998`.
 
 ## How to contribute (all agents, read before editing)
 
@@ -35,7 +35,7 @@ Tags: `[MANUAL]` needs a human with an account, browser, dashboard or judgment. 
 | Demo step | Evidence today | Gap |
 | --- | --- | --- |
 | Backend hosting | Render answers (2026-10-16 18:50 PT): `/api/health` 200, `/mcp` 401, Google routes registered. Running a build older than `90e7aa8`; Canva env unset. | Redeploy latest main + Canva env (M1 note) |
-| Website | Current committed frontend `d61cac7` deployed via CLI to Production (`dpl_CFveBYWLwbDSPjGV8iiFebMvC1St`); health/config 200, new Settings verified in browser. | Organizer Google sign-in blocked: Supabase provider not enabled (M12); Git auto-deploy still points to old repo |
+| Website | Canonical frontend `5d0166e` live via source-tagged CLI deployment dpl_6YTkEsKByQzALzqTPYrQimgNMm1o; Production/assets/health/config 200. Old Git connection removed; five-minute local deployment monitor ACTIVE (M15). | Organizer Google sign-in blocked on M12; monitor requires Mac/app running |
 | Create event via Go | `create_event`/`update_event` MCP tools are implemented and tested (mocked). They return `dashboard_url` when `APP_URL` is set. Not live against Supabase. | M1–M5, A2, A3 |
 | Go prepares prose | Live in **dev mode** (in-memory, `dev-event-1`): Go saved description, summary, invitation, change notice. Not live on Supabase. | Re-run on Supabase (M8) |
 | Canva flyer | Services and MCP tools composed; without a Canva token they report `integration_not_connected`. No live export. | M6, A7, A8 |
@@ -52,7 +52,7 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
 
 ### Hosting and deployment
 
-- [~] **M15 — Tanay-owned CLI deployment monitor.** **Claimed:** Member 1 (User 1), 2026-10-16, main. User requests deploying canonical main to existing Vercel account; heartbeat deploy-canonical-main-to-vercel created ACTIVE every five minutes. Verify new clean-main deployment and remove obsolete Git source; preserve project/domain/env/free plan.
+- [x] **M15 — Tanay-owned CLI deployment monitor.** **Claimed:** Member 1 (User 1), 2026-10-16, main. User requests deploying canonical main to existing Vercel account; heartbeat deploy-canonical-main-to-vercel created ACTIVE every five minutes. **Done:** automation ACTIVE every five minutes; old Git source disconnected, root frontend/ preserved. Live deployment dpl_6YTkEsKByQzALzqTPYrQimgNMm1o READY with canonicalCommitSha=5d0166e3213cb6915a84658def2f596d295039ea; Production/assets/health/config 200. Clean snapshot lint, 66 tests and build pass. Local monitor requires awake Mac and app running; first scheduled run not yet observed.
 
 - [x] ~~**M13 — Canonical Vercel Git auto-deploy.**~~ **Dropped:** user chose Tanay-owned hosting with CLI deployments for new canonical main commits, 2026-10-16. Native owner-only Git connection remains unavailable; replacement is M15.
 
