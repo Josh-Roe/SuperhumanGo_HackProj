@@ -73,7 +73,7 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
 
 ### Superhuman Go
 
-- [~] **A25 — Copy personal Go key.** **Claimed:** Member 1 (Tanay), 2026-10-16, main. User cannot copy the masked website key. Add explicit clipboard copy and reveal/select fallback, verify with synthetic token tests, deploy clean main and verify copy controls without reading credentials.
+- [x] **A25 — Copy personal Go key.** **Claimed:** Member 1 (Tanay), 2026-10-16, main. User cannot copy the masked website key. Add explicit clipboard copy and reveal/select fallback, verify with synthetic token tests, deploy clean main and verify copy controls without reading credentials. **Done:** `1351c1c` — mocked clipboard success/denial regression, 78 tests/lint/build; live Production dpl_8La954hGBBUwFJ4zDiHAmHuBLWXT READY, served JS contains Copy/Show key and assets/health/config 200. Organizer performs actual secret copy.
 
 - Note (Member 1 / Tanay connector, 2026-10-16): **Implemented/tested live:** Tanay-owned Onrender Pack 72896 version 2 built/released with bearer-token auth. Setup now displays secure API token field. Organizer token entry/Done and actual Go list/create/update proof remain; no credentials copied or event/provider writes.
 
