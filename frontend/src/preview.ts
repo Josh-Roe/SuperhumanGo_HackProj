@@ -109,45 +109,22 @@ export function createPreviewGateway(): EventGateway {
       return copy(current(id));
     },
     async save(id, input: EventInput, revision) {
-      if (id) {
-        const item = current(id, revision);
-        item.event = {
-          ...copy(input),
-          id,
-          revision: item.event.revision + 1,
-          status: item.event.status,
-          created_via: item.event.created_via,
-        };
-        item.review_revision = null;
-        item.work = [
-          {
-            id: crypto.randomUUID(),
-            event_revision: item.event.revision,
-            state: "awaiting_go",
-          },
-        ];
-        return copy(item);
-      }
-      const newId = crypto.randomUUID();
-      const item: WorkspaceEvent = {
-        event: {
-          ...copy(input),
-          id: newId,
-          revision: 1,
-          status: "draft",
-          created_via: "manual",
-        },
-        content: [],
-        work: [],
-        assets: [],
-        facts: emptyFacts(),
-        findings: [],
-        operations: [],
-        rsvps: [],
-        gmail: null,
-        review_revision: null,
+      const item = current(id, revision);
+      item.event = {
+        ...copy(input),
+        id,
+        revision: item.event.revision + 1,
+        status: item.event.status,
+        created_via: item.event.created_via,
       };
-      records.set(newId, item);
+      item.review_revision = null;
+      item.work = [
+        {
+          id: crypto.randomUUID(),
+          event_revision: item.event.revision,
+          state: "awaiting_go",
+        },
+      ];
       return copy(item);
     },
     async prepare(id, revision) {

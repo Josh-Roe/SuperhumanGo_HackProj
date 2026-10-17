@@ -122,9 +122,9 @@ describe("published event transfer contract", () => {
       "Bearer synthetic-session",
     );
     expect(gateway.readOnly).toBe(true);
-    await expect(gateway.save(null, snapshot.event)).rejects.toThrow(
-      /event details only/,
-    );
+    await expect(
+      gateway.save(snapshot.event.id, snapshot.event),
+    ).rejects.toThrow(/event details only/);
     await expect(
       gateway.publish(snapshot.event.id, 2, "publish", "key"),
     ).rejects.toThrow(/event details only/);

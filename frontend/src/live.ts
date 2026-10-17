@@ -39,7 +39,6 @@ export function createOrganizerGateway(token: BearerToken): EventGateway {
     string,
     Promise<NonNullable<NonNullable<WorkspaceEvent["live"]>["approval"]>>
   >();
-  const creationKeys = new Map<string, string>();
 
   async function get(id: string): Promise<WorkspaceEvent> {
     const event = parseEvent(await requestJson(path(id), token));
@@ -324,25 +323,14 @@ export function createOrganizerGateway(token: BearerToken): EventGateway {
           email,
           ...(display_name ? { display_name } : {}),
         })),
-        ...(id ? { expected_revision: revision } : {}),
+        expected_revision: revision,
       };
-      const identity = JSON.stringify(payload);
-      const key = creationKeys.get(identity) ?? crypto.randomUUID();
-      if (!id) creationKeys.set(identity, key);
       const saved = parseEvent(
-        await requestJson(
-          id ? path(id) : "/api/events",
-          token,
-          id ? "PUT" : "POST",
-          payload,
-          id ? undefined : key,
-        ),
+        await requestJson(path(id), token, "PUT", payload),
       );
-      if (id && saved.id !== id)
+      if (saved.id !== id)
         throw new Error("The server returned a different saved event.");
-      const result = await get(saved.id);
-      if (!id) creationKeys.delete(identity);
-      return result;
+      return get(saved.id);
     },
     async prepare(id, revision) {
       const work = scoped(

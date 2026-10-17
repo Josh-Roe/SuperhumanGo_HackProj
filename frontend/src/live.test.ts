@@ -47,18 +47,6 @@ describe("published organizer REST adapter", () => {
     });
     expect(JSON.parse(options.body).invitees[0]).not.toHaveProperty("id");
   });
-  it("reuses the create idempotency key after an interrupted read", async () => {
-    const { gateway, event, fetcher } = await backend({ failCreateRead: true });
-    await expect(gateway.save(null, event)).rejects.toThrow(/interrupted/);
-    await gateway.save(null, event);
-    const writes = fetcher.mock.calls.filter(
-      ([url, o]) => url === "/api/events" && o.method === "POST",
-    );
-    expect(writes).toHaveLength(2);
-    expect(writes[0][1].headers["Idempotency-Key"]).toBe(
-      writes[1][1].headers["Idempotency-Key"],
-    );
-  });
   it("queues preparation, saves edited writing through content review, then authorizes Go once", async () => {
     const { gateway, event, fetcher } = await backend();
     const queued = await gateway.prepare(event.id, 1);

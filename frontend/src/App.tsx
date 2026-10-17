@@ -357,13 +357,13 @@ function Details({
   onDirty,
   readOnly = false,
 }: {
-  record: WorkspaceEvent | null;
+  record: WorkspaceEvent;
   onSave: (input: EventInput) => void;
   busy: boolean;
   onDirty: () => void;
   readOnly?: boolean;
 }) {
-  const event = record?.event;
+  const event = record.event;
   const [formError, setFormError] = useState("");
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -404,10 +404,10 @@ function Details({
         links,
         invitees: emails.map((email) => ({
           id:
-            event?.invitees.find((i) => i.email === email)?.id ??
+            event.invitees.find((i) => i.email === email)?.id ??
             crypto.randomUUID(),
           email,
-          display_name: event?.invitees.find((person) => person.email === email)
+          display_name: event.invitees.find((person) => person.email === email)
             ?.display_name,
         })),
       });
@@ -422,18 +422,16 @@ function Details({
       <div className="section-heading">
         <div>
           <p className="eyebrow">01 / THE PLAN</p>
-          <h2>{event ? "Event details" : "Add the basics."}</h2>
+          <h2>Event details</h2>
         </div>
-        {event && <Badge>Revision {event.revision}</Badge>}
+        <Badge>Revision {event.revision}</Badge>
       </div>
       <p className="muted">
         Name your event, set the place and time, and add your guests.
       </p>
-      {event && (
-        <p className="small muted">
-          Saved event ID: <code>{event.id}</code>
-        </p>
-      )}
+      <p className="small muted">
+        Saved event ID: <code>{event.id}</code>
+      </p>
       <fieldset disabled={busy || readOnly}>
         <label>
           Event title
@@ -441,7 +439,7 @@ function Details({
             name="title"
             required
             maxLength={200}
-            defaultValue={event?.title}
+            defaultValue={event.title}
             placeholder="Give your gathering a name"
           />
         </label>
@@ -451,7 +449,7 @@ function Details({
             <input
               name="location"
               required
-              defaultValue={event?.location}
+              defaultValue={event.location}
               placeholder="Venue, address, or meeting URL"
             />
           </label>
@@ -461,7 +459,7 @@ function Details({
               name="contact"
               type="email"
               required
-              defaultValue={event?.organizer_contact}
+              defaultValue={event.organizer_contact}
               placeholder="you@example.com"
             />
           </label>
@@ -473,9 +471,7 @@ function Details({
               name="start"
               type="datetime-local"
               required
-              defaultValue={
-                event ? localTime(event.starts_at, event.timezone) : ""
-              }
+              defaultValue={localTime(event.starts_at, event.timezone)}
             />
           </label>
           <label>
@@ -484,9 +480,7 @@ function Details({
               name="end"
               type="datetime-local"
               required
-              defaultValue={
-                event ? localTime(event.ends_at, event.timezone) : ""
-              }
+              defaultValue={localTime(event.ends_at, event.timezone)}
             />
           </label>
           <label>
@@ -494,10 +488,7 @@ function Details({
             <input
               name="timezone"
               required
-              defaultValue={
-                event?.timezone ??
-                Intl.DateTimeFormat().resolvedOptions().timeZone
-              }
+              defaultValue={event.timezone}
               placeholder="America/Los_Angeles"
               aria-describedby="timezone-hint"
             />
@@ -511,7 +502,7 @@ function Details({
           <textarea
             name="description"
             rows={4}
-            defaultValue={event?.description}
+            defaultValue={event.description}
             placeholder="Your notes for Go. Review Go’s writing in the next step."
           />
         </label>
@@ -521,7 +512,7 @@ function Details({
           <textarea
             name="links"
             rows={2}
-            defaultValue={event?.links.join("\n")}
+            defaultValue={event.links.join("\n")}
           />
         </label>
         <label>
@@ -530,7 +521,7 @@ function Details({
           <textarea
             name="invitees"
             rows={3}
-            defaultValue={event?.invitees.map((i) => i.email).join("\n")}
+            defaultValue={event.invitees.map((i) => i.email).join("\n")}
             placeholder="Separate addresses with commas or new lines"
           />
         </label>
@@ -1933,7 +1924,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
               </div>
             </>
           )}
-          {page === "events" && editing && (
+          {page === "events" && editing && record && (
             <>
               <nav className="stepper" aria-label="Event creation">
                 {steps.map((item, i) => (
@@ -1942,9 +1933,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     className={step === item.id ? "active" : ""}
                     aria-current={step === item.id ? "step" : undefined}
                     disabled={
-                      busy ||
-                      (gateway.readOnly && item.id !== "details") ||
-                      (!record && item.id !== "details")
+                      busy || (gateway.readOnly && item.id !== "details")
                     }
                     onClick={() => changeStep(item.id)}
                   >
@@ -1971,9 +1960,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     void run(
                       () =>
                         gateway.save(
-                          record?.event.id ?? null,
+                          record.event.id,
                           input,
-                          record?.event.revision,
+                          record.event.revision,
                         ),
                       (value) => {
                         update(value);

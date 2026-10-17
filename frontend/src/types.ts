@@ -136,7 +136,7 @@ export interface EventGateway {
   list(): Promise<EventRecord[]>;
   get(id: string): Promise<WorkspaceEvent>;
   save(
-    id: string | null,
+    id: string,
     input: EventInput,
     expected_revision?: number,
   ): Promise<WorkspaceEvent>;

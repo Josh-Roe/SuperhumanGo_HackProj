@@ -2,10 +2,7 @@ import { vi } from "vitest";
 import { createOrganizerGateway } from "../live";
 import { createPreviewGateway } from "../preview";
 
-export async function backend({
-  missingAssets = false,
-  failCreateRead = false,
-} = {}) {
+export async function backend({ missingAssets = false } = {}) {
   const snapshot = await createPreviewGateway().get("preview-gathering");
   let event = {
     ...snapshot.event,
@@ -35,7 +32,6 @@ export async function backend({
     sha256: "a".repeat(64),
     review_state: "reviewed",
   });
-  let created = false;
   const fetcher = vi
     .fn()
     .mockImplementation(async (url: string, options: RequestInit = {}) => {
@@ -43,18 +39,6 @@ export async function backend({
       const json = (value: unknown, status = 200) =>
         new Response(JSON.stringify(value), { status });
       const body = options.body ? JSON.parse(String(options.body)) : undefined;
-      if (url === "/api/events" && method === "POST") {
-        event = {
-          ...event,
-          ...body,
-          invitees: body.invitees.map((person: object) => ({
-            ...person,
-            id: "server-id",
-          })),
-        };
-        created = true;
-        return json(event, 201);
-      }
       if (url.startsWith("/api/events?")) return json([event]);
       if (url === `/api/events/${event.id}`) {
         if (method === "PUT") {
@@ -68,10 +52,6 @@ export async function backend({
             })),
           };
           return json(event);
-        }
-        if (created && failCreateRead) {
-          failCreateRead = false;
-          throw new Error("Connection interrupted after creation");
         }
         return json(event);
       }
