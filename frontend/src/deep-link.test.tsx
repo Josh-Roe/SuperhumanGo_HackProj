@@ -1,6 +1,6 @@
 import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import App from "./App";
 import { ApiError } from "./api";
 import { backend } from "./test/organizerBackend";
@@ -30,24 +30,29 @@ it("opens a linked event after connection or on authenticated load, and hides mi
         );
       return original(url, options);
     });
+    const assign = vi.fn();
+    vi.spyOn(window, "location", "get").mockReturnValue({
+      ...window.location,
+      assign,
+    });
     const user = userEvent.setup();
     render(<App />);
     expect(fetcher).not.toHaveBeenCalled();
     await user.click(
-      screen.getByRole("button", { name: "Connect to open event" }),
-    );
-    await user.click(screen.getByRole("button", { name: "Check event API" }));
-    await user.type(
-      await screen.findByLabelText("Organizer account email"),
-      "organizer@example.com",
-    );
-    await user.type(
-      screen.getByLabelText("Account password"),
-      "synthetic-password",
+      screen.getByRole("button", { name: "Sign in to open event" }),
     );
     await user.click(
-      screen.getByRole("button", { name: "Connect existing workspace" }),
+      screen.getByRole("button", { name: "Sign in with Google" }),
     );
+    await vi.waitFor(() => expect(assign).toHaveBeenCalledOnce());
+    const returnTo = new URL(
+      new URL(assign.mock.calls[0][0]).searchParams.get("redirect_to")!,
+    );
+    expect(returnTo.searchParams.get("event")).toBe(event.id);
+    cleanup();
+    vi.restoreAllMocks();
+    history.replaceState(null, "", `/?event=${event.id}&code=google-code`);
+    render(<App />);
     expect(await screen.findByLabelText("Event title")).toHaveValue(
       event.title,
     );
