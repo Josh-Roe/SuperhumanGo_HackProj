@@ -107,9 +107,7 @@ class FlyerState(BaseModel):
             }
             if self.job
             else None,
-            "design": {
-                key: self.design.get(key) for key in ("design_id", "edit_url", "view_url")
-            }
+            "design": {key: self.design.get(key) for key in ("design_id", "edit_url", "view_url")}
             if self.design
             else None,
             "preview": {
@@ -195,19 +193,28 @@ class CanvaSessions(Protocol):
 class VaultCanvaSessions:
     """Opens Canva's remote MCP with the organizer's server-held access token.
 
-    No token → integration_not_connected. Obtaining/refreshing that token (Canva MCP OAuth
-    client registration) is not implemented anywhere yet; see the handoff in the report.
+    No token → integration_not_connected. The optional OAuth token source refreshes
+    expiring grants before opening a session; legacy injected vault tokens remain supported
+    when the server OAuth client is not configured.
     """
 
-    def __init__(self, vault: SecretVault, connect: Callable[..., Any] | None = None) -> None:
+    def __init__(
+        self,
+        vault: SecretVault,
+        connect: Callable[..., Any] | None = None,
+        token_source: Callable[[str], Awaitable[str | None]] | None = None,
+    ) -> None:
         if connect is None:
             from hackathon_backend.providers.canva.session import connect_canva
 
             connect = connect_canva
         self.vault = vault
         self._connect = connect
+        self._token_source = token_source
 
     async def _token(self, owner_id: str) -> str | None:
+        if self._token_source is not None:
+            return await self._token_source(owner_id)
         record = await self.vault.get_secret(owner_id, CANVA_SECRET)
         token = (record or {}).get("access_token")
         return token if isinstance(token, str) and token else None
@@ -405,9 +412,7 @@ class AssetCoordinator:
         receipt = await self._guard(prep.request_prose(owner_id, event_id, revision))
         return receipt.model_dump(mode="json", exclude={"owner_id"})
 
-    async def prepare_document(
-        self, owner_id: str, event_id: str, revision: int
-    ) -> dict[str, Any]:
+    async def prepare_document(self, owner_id: str, event_id: str, revision: int) -> dict[str, Any]:
         result = await self._guard(
             self._prep(owner_id).prepare_document(owner_id, event_id, revision)
         )
@@ -784,6 +789,7 @@ def asset_router(coordinator: AssetCoordinator, resolve_owner: OwnerResolver) ->
         "/export": coordinator.export_flyer,
         "/abandon": coordinator.abandon_flyer,
     }
+
     def flyer_route(action: Callable[[str, str, int], Awaitable[Any]]):
         async def route(event_id: PathId, body: RevisionBody, authorization: Auth = None):
             return await respond(
@@ -859,10 +865,17 @@ def register_asset_services(
     def storage_for(owner_id: str) -> SupabaseAssetStorage:
         return SupabaseAssetStorage(database, owner_id)
 
+    from hackathon_backend.providers.canva.oauth import CanvaOAuthConfig, CanvaTokens
+    from hackathon_backend.providers.canva.oauth_routes import canva_connect_router
+
+    oauth = CanvaOAuthConfig.from_settings(settings)
+    tokens = CanvaTokens(oauth, vault) if oauth and vault else None
     coordinator = AssetCoordinator(
         events.store,
         storage_for=storage_for,
-        canva=VaultCanvaSessions(vault) if vault else None,
+        canva=VaultCanvaSessions(vault, token_source=tokens.access_token if tokens else None)
+        if vault
+        else None,
         flyers=flyers,
         holidays=HolidayCalendar(),
     )
@@ -870,6 +883,7 @@ def register_asset_services(
     async def resolve_owner(authorization: str | None) -> str:
         return (await authenticate(settings, authorization)).owner_id
 
+    _include_before_mounts(app, canva_connect_router(settings, tokens, resolve_owner))
     register_assets(
         app,
         mcp,

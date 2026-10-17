@@ -22,6 +22,12 @@ import { eventDate, localTime, toInstant } from "./dates";
 import "./App.css";
 import { createOrganizerGateway } from "./live";
 import { GoConnector } from "./GoConnector";
+import {
+  DistributionPreview,
+  FlyerApproval,
+  ProviderCallbackNotice,
+  ProviderConnection,
+} from "./ProviderPanels";
 
 type Page = "events" | "settings" | "profile";
 type Step = "details" | "review" | "distribution";
@@ -1347,6 +1353,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   const heading = useRef<HTMLHeadingElement>(null);
   const publishKeys = useRef(new Map<string, string>());
   const epoch = useRef(0);
+  // Provider actions need the organizer's own session on a full (not read-only) live gateway.
+  const providerSession =
+    gateway.mode === "live" && !gateway.readOnly ? session : undefined;
   const pendingLinkedEvent = useRef(
     new URLSearchParams(location.search).get("event"),
   );
@@ -1703,6 +1712,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
               {error || loadError}
             </p>
           )}
+          <ProviderCallbackNotice />
           <p className="status-message" role="status">
             {busy ? "Working…" : message}
           </p>
@@ -1904,6 +1914,13 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   }
                 />
               )}
+              {record && step === "review" && providerSession && (
+                <FlyerApproval
+                  eventId={record.event.id}
+                  revision={record.event.revision}
+                  accessToken={providerSession.access_token}
+                />
+              )}
               {record && step === "review" && (
                 <Review
                   key={`${editorKey}:${recordVersion}`}
@@ -1965,6 +1982,13 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                       Open Superhuman Go ↗
                     </a>
                   </div>
+                  {providerSession && (
+                    <DistributionPreview
+                      eventId={record.event.id}
+                      revision={record.event.revision}
+                      accessToken={providerSession.access_token}
+                    />
+                  )}
                   <Distribution
                     key={`${editorKey}:${recordVersion}`}
                     record={record}
@@ -2063,6 +2087,14 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                   accessToken={session.access_token}
                 />
               )}
+              {providerSession &&
+                (["google", "canva"] as const).map((provider) => (
+                  <ProviderConnection
+                    key={`${provider}:${providerSession.expires_at}`}
+                    provider={provider}
+                    accessToken={providerSession.access_token}
+                  />
+                ))}
               <section className="panel settings-connections">
                 <h2>Your connected tools</h2>
                 <p className="muted">

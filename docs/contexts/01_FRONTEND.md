@@ -6,6 +6,8 @@ Current branch: `codex/member-1-live-adapter`, based on merged main `1752141`. E
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four member contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/01_FRONTEND.md) before work. Write only this personal context. Preserve other members' changes.
 
+**2026-10-16 | implemented, mocked (A16, `c308e0e`):** `frontend/src/ProviderPanels.tsx` + `providers.ts`: exact-digest flyer approve/abandon, Google/Canva connect + status, A13 callback notice, distribution blockers. Proposed for Owner 3: `GET /api/events/{id}/distribution/preview` returning `DistributionPlan` (only the MCP tool exists).
+
 ## CalSpork-inspired light blue glass UI — 2026-10-16
 
 **User | agreed, implemented | `codex/member-1-liquid-glass`, based on merged main `61edb62`:** the user is now acting as Member 1 and requested an Apple Liquid Glass-inspired light blue theme matching their CalSpork project. Read CalSpork's current `mobile/theme.ts`, `GlassCard.tsx` and `ScreenBackground.tsx` as the visual reference: translucent white surfaces, blue/cyan background glows, bright edges, rounded corners, blur/saturation and soft shadows. This is a web CSS treatment, not Apple's native Liquid Glass API.
