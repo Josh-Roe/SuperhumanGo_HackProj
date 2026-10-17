@@ -11,6 +11,8 @@ Own Python event domain/API/auth/repositories, `supabase/**` schema/migrations/R
 
 ## Live Render activation — 2026-10-16
 
+**2026-10-16 | proposed/blocked | Canva deployment handoff:** user requested server-only `CANVA_CLIENT_ID`, `CANVA_CLIENT_SECRET`, `CANVA_REDIRECT_URI=https://superhuman-go-event-backend.onrender.com/api/canva/callback`, `APP_URL=https://mtcxhackathon1.vercel.app`, preserving existing Supabase/encryption credentials and redeploying with one worker after OAuth merge. Main `2581ee3` has no Canva OAuth route/settings or open OAuth PR; live callback returns 404, health 200, Render has one instance. Latest master plan assigns OAuth/shared code to User 1; Member 2 handles deployment. Member 4 account email supplied privately for a workspace invite; browser is signed out and connector has no invitation operation, so no invite/settings change occurred. Workspace Hobby plans cannot invite members (Render team-members docs); workspace tier itself is unverified. Existing credentials remain unchanged. Next: signed-in workspace admin invites if the plan permits, or owner enters Canva credentials directly; apply configuration and deploy only after OAuth merge.
+
 **Tested live:** after the user saved the service-role credential directly in Render,
 deployment `dep-db9cldijnfac73bptnog` of `5d1595a` reports `live`. Application startup
 and MCP session-manager startup completed. HTTPS `/api/health` returns 200 with
