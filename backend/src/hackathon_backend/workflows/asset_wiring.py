@@ -1012,7 +1012,11 @@ def register_asset_services(
     from hackathon_backend.providers.canva.oauth import CanvaTokens
     from hackathon_backend.repositories.assets import SupabaseAssetStorage
     from hackathon_backend.repositories.transport import Database
-    from hackathon_backend.workflows.canva_connect import canva_oauth_config
+    from hackathon_backend.workflows.canva_connect import (
+        canva_connect_configured,
+        canva_connect_router,
+        canva_oauth_config,
+    )
 
     database = Database(settings, admin=True)
     vault = None
@@ -1031,10 +1035,13 @@ def register_asset_services(
     def storage_for(owner_id: str) -> SupabaseAssetStorage:
         return SupabaseAssetStorage(database, owner_id)
 
+    tokens = CanvaTokens(vault, canva_oauth_config(settings)) if vault else None
+    if canva_connect_configured(settings):
+        _include_before_mounts(app, canva_connect_router(settings, tokens))
     coordinator = AssetCoordinator(
         events.store,
         storage_for=storage_for,
-        canva=VaultCanvaSessions(vault, tokens=CanvaTokens(vault, canva_oauth_config(settings)))
+        canva=VaultCanvaSessions(vault, tokens=tokens)
         if vault
         else None,
         flyers=flyers,

@@ -22,10 +22,6 @@ from hackathon_backend.inference import OnnxRunner
 from hackathon_backend.mcp_tools.event_tools import EventToolDeps, register_event_tools
 from hackathon_backend.mcp_tools.organizer_tools import register_organizer_tools
 from hackathon_backend.workflows.asset_wiring import register_asset_services
-from hackathon_backend.workflows.canva_connect import (
-    canva_connect_configured,
-    canva_connect_router,
-)
 from hackathon_backend.workflows.dev import DevWorkflow, dev_router, dev_workflow_from_env
 from hackathon_backend.workflows.distribution_routes import register_distribution_routes
 from hackathon_backend.workflows.google_connect import (
@@ -171,8 +167,6 @@ def create_app(
             app.include_router(
                 google_connect_router(settings, on_change=getattr(tokens, "forget", None))
             )
-        if canva_connect_configured(settings):
-            app.include_router(canva_connect_router(settings))
         if supabase and events is not None:
             register_asset_services(app, mcp, settings, events)
             register_distribution_routes(app, settings, events)
