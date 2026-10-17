@@ -221,6 +221,35 @@ def _thumbnail_urls(metadata: dict[str, Any]) -> tuple[str, ...]:
     return (value,)
 
 
+def _export_receipt(design: DesignRef, result: dict[str, Any]) -> "ExportReceipt":
+    """Connect/MCP export job → receipt. Status values: in_progress, success, failed."""
+    job = result.get("job", {})
+    if not isinstance(job, dict) or not isinstance(job.get("id"), str) or not job["id"]:
+        raise CanvaError("missing_export_job_id")
+    base = {"design": design, "export_id": job["id"]}
+    if job.get("status") in {"in_progress", "pending"}:
+        return ExportReceipt(**base, state="pending")
+    if job.get("status") == "failed":
+        return ExportReceipt(**base, state="failed", failure_code="canva_export_failed")
+    if job.get("status") != "success" or len(job.get("urls", [])) != 1:
+        raise CanvaError("export_not_ready_or_not_single_page")
+    url = job["urls"][0]
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "export-download.canva.com"
+        or parsed.port not in (None, 443)
+        or parsed.username
+        or parsed.password
+    ):
+        raise CanvaError("invalid_export_download_url")
+    return ExportReceipt(**base, state="completed", download_url=url)
+
+
+class ExportJobReader(Protocol):
+    async def get_export(self, export_id: str) -> dict[str, Any]: ...
+
+
 class CanvaMCPAdapter:
     """Member 3 supplies an authenticated session for exactly this organizer.
 
@@ -235,6 +264,7 @@ class CanvaMCPAdapter:
         *,
         owner_id: str,
         tool_names: dict[str, str] | None = None,
+        export_jobs: ExportJobReader | None = None,
     ) -> None:
         if getattr(session, "owner_id", owner_id) != owner_id:
             raise PermissionError("Canva session is outside the current organizer scope")
@@ -242,6 +272,7 @@ class CanvaMCPAdapter:
         self.session = session
         self.owner_id = owner_id
         self.tool_names = dict(tool_names or {})
+        self.export_jobs = export_jobs
 
     async def _call(self, name: str, **arguments: Any) -> dict[str, Any]:
         arguments.setdefault("user_intent", "Prepare and review the organizer's event flyer.")
@@ -635,36 +666,32 @@ class CanvaMCPAdapter:
     async def request_png_export(
         self, event: EventSnapshot, design: VerifiedDesign
     ) -> ExportReceipt:
-        self._design_scope(design.design, event)
-        if design.state != "verified" or design.design.event_revision != event.revision:
-            raise StaleRevisionError("Only the verified current flyer can be exported")
+        self._require_exportable(event, design)
         result = await self._call(
             "export-design",
             design_id=design.design.design_id,
             format="png",
             user_intent="Export the verified event flyer for private versioned Storage.",
         )
-        job = result.get("job", {})
-        if not isinstance(job.get("id"), str) or not job["id"]:
-            raise CanvaError("missing_export_job_id")
-        base = {"design": design.design, "export_id": job["id"]}
-        if job.get("status") in {"in_progress", "pending"}:
-            return ExportReceipt(**base, state="pending")
-        if job.get("status") == "failed":
-            return ExportReceipt(**base, state="failed", failure_code="canva_export_failed")
-        if job.get("status") != "success" or len(job.get("urls", [])) != 1:
-            raise CanvaError("export_not_ready_or_not_single_page")
-        url = job["urls"][0]
-        parsed = urlsplit(url)
-        if (
-            parsed.scheme != "https"
-            or parsed.hostname != "export-download.canva.com"
-            or parsed.port not in (None, 443)
-            or parsed.username
-            or parsed.password
-        ):
-            raise CanvaError("invalid_export_download_url")
-        return ExportReceipt(**base, state="completed", download_url=url)
+        return _export_receipt(design.design, result)
+
+    async def poll_png_export(
+        self, event: EventSnapshot, design: VerifiedDesign, export_id: str
+    ) -> ExportReceipt:
+        """Resume an already-requested export by its job ID; never requests a new export."""
+        self._require_exportable(event, design)
+        if self.export_jobs is None:
+            raise CanvaError("canva_export_poll_unavailable")
+        result = await self.export_jobs.get_export(export_id)
+        receipt = _export_receipt(design.design, result)
+        if receipt.export_id != export_id:
+            raise CanvaError("export_job_identity_mismatch")
+        return receipt
+
+    def _require_exportable(self, event: EventSnapshot, design: VerifiedDesign) -> None:
+        self._design_scope(design.design, event)
+        if design.state != "verified" or design.design.event_revision != event.revision:
+            raise StaleRevisionError("Only the verified current flyer can be exported")
 
     async def export_png(self, event: EventSnapshot, design: VerifiedDesign) -> dict[str, str]:
         """Compatibility helper for callers that only accept a completed export.

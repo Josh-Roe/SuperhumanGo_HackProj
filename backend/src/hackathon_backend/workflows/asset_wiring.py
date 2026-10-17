@@ -293,7 +293,7 @@ def _as_workflow_error(error: Exception) -> WorkflowError:
         return WorkflowError("revision_conflict", "event or flyer revision changed; reload")
     if isinstance(error, CanvaError):
         code = str(error) or "canva_failed"
-        if code == "canva_required_tool_unavailable":
+        if code in {"canva_required_tool_unavailable", "canva_export_poll_unavailable"}:
             return WorkflowError("integration_not_connected", f"canva: {code}")
         return WorkflowError("provider_failed", f"canva: {code}")
     if isinstance(error, ValidationError):
@@ -571,11 +571,24 @@ class AssetCoordinator:
             raise WorkflowError("integration_not_connected", "private asset Storage is missing")
         event = await self._event(owner_id, event_id, revision)
         verified = VerifiedDesign.model_validate(state.verified)
+        pending_id = (state.export or {}).get("export_id") if state.stage == "exporting" else None
         async with self._canva(owner_id, "export") as canva:
-            receipt: ExportReceipt = await canva.request_png_export(event, verified)
+            # A pending export is resumed by its persisted job ID, never requested again.
+            receipt: ExportReceipt = (
+                await canva.poll_png_export(event, verified, pending_id)
+                if pending_id
+                else await canva.request_png_export(event, verified)
+            )
         export = {"export_id": receipt.export_id, "state": receipt.state}
         if receipt.state == "failed":
-            await self._save(owner_id, state, export=export, failure_code=receipt.failure_code)
+            # A failed job yields no file, so the next export call may request a fresh one.
+            await self._save(
+                owner_id,
+                state,
+                stage="approved",
+                export=export,
+                failure_code=receipt.failure_code,
+            )
             raise WorkflowError("provider_failed", f"canva: {receipt.failure_code}")
         if receipt.state == "pending":
             return (await self._save(owner_id, state, stage="exporting", export=export)).public()
