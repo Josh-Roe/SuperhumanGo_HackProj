@@ -112,7 +112,8 @@ class WorkItem(BaseModel):
 
 
 class Approval(BaseModel):
-    """Organizer's in-app publish/update action. Go can read but never create one."""
+    """Organizer's publish/update approval of exact content. Created by the website, or by
+    `send_invitations` after the organizer says "send" in the Go chat (decision 2026-10-16)."""
 
     id: str
     event_id: str
