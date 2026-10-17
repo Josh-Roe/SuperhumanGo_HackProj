@@ -13,12 +13,13 @@ Own Python event domain/API/auth/repositories, `supabase/**` schema/migrations/R
 
 **User | agreed:** finish Member 2's remaining responsibilities, keep working through
 role handoffs, automatically commit/push finished work. A VPS is optional; user asked
-about free hosting. Native Render Free configuration is prepared, not deployed.
+about free hosting. A stable Render Free service is now created; app activation is pending.
 
 **Integrated baseline:** fast-forwarded the clean branch from `4ec2367` to merged
 main `1752141`, preserving peer work. PR #3 is merged; its draft descriptions below
 are historical. Read new Member 1 live-adapter PR #6 and accepted its canonical
-CRUD/content/approval mapping. No frontend/main.py/MCP/Google/Canva-owner files edited.
+CRUD/content/approval mapping, then merged its green branch (`de4e708`) into this
+integration branch (`91b021a`). No peer-owned source was hand-edited.
 
 **Implemented | exact handoff:** [BACKEND_API.md](../BACKEND_API.md), OpenAPI v0.3
 (24 paths, 42 components): private workspace/work/binding/approval reads, retry-safe
@@ -46,20 +47,30 @@ SQL/metadata tests are not actual file-upload/provider-send evidence.
 and [setup/migration guide](../DEPLOYMENT.md). Supabase remains in place; no Docker/VPS
 required. Native startup refuses absent/hidden REST registration, absent/different
 persistent MCP dependencies, missing/invalid secrets or dev mode. Render Free sleeps
-after 15 idle minutes; an infinite calculation cannot prevent it. No host/account or
-paid resource provisioned.
+after 15 idle minutes; an infinite calculation cannot prevent it. User confirmed
+workspace `Grammarly Hackathon` and the Free service; no paid compute was selected.
 
 **Tested locally:** backend **284 passed / 1 optional ML skipped**, uncached Ruff
-and diff whitespace pass; integrated-main frontend **37 tests**, lint/build pass.
+and diff whitespace pass; merged PR #6 frontend **51 tests**, lint/build pass.
 Exact response schemas export successfully. All three rollback SQL suites passed
 on hosted Supabase; a count check after the first two showed zero events/tasks,
 export reviews and synthetic users. CI now replays every `supabase/tests/*.sql`.
 Current CLI readiness correctly fails the unregistered production composition.
-Render Blueprint parsing/actual deployment and final PR CI are separate checks.
+Render YAML parses with Free/native runtime and auto-deploy off. [CI run
+38988028603](https://github.com/Josh-Roe/SuperhumanGo_HackProj/actions/runs/38988028603)
+passed both checks and database jobs for implementation `8b2a38a`, including fresh
+migration replay, all three SQL suites, Docker builds and container smoke tests.
 
-**User requested an actual stable backend address:** discovered an available Render
-integration, not yet installed/connected. Requested installation/connection; no host
-URL has been fabricated. A service's stable URL does not imply free always-on runtime.
+**User requested an actual stable backend address | created:** connected Render;
+confirmed workspace `tea-db9cb3u7bikc73fgplq0` (`Grammarly Hackathon`). Created
+`srv-db9ccb7btjjs73b6pv50`, Free/Oregon, branch `codex/member-2-backend-supabase`,
+auto-deploy off. Stable URL: https://superhuman-go-event-backend.onrender.com;
+[dashboard](https://dashboard.render.com/web/srv-db9ccb7btjjs73b6pv50).
+Initial deploy `dep-db9ccbnbtjjs73b6q080` failed during build because Render used
+root Python 3.14 while the project requests 3.12 and disables managed downloads.
+Added root `.python-version` to match the existing backend version. Application
+startup still requires the registered persistent composition and server credentials;
+the reserved URL is not a claim that event APIs are live.
 
 **Exact next owners:** 3 registers `create_router(settings, events=deps)` before MCP
 and passes the same `create_tool_dependencies(settings)` to `create_app`; adds typed
@@ -69,8 +80,8 @@ exact lifecycle contract; encrypted vault writes alone are not exclusive write l
 1 adopts workspace/approval recovery/inclusion endpoints as needed. Export-byte review
 is distinct from staged Canva transaction approval.
 
-**Remaining Member 2 live blockers:** no selected/connected host, service-role/encryption
-credentials, authenticated organizer fixture, or provider grant in this checkout.
+**Remaining Member 2 live blockers:** service-role/encryption credentials, authenticated
+organizer fixture, and provider grants are absent from this checkout. Render host is created.
 After 3's composition: deploy, configure Vercel `BACKEND_ORIGIN`, verify actual private
 Storage upload/sign/read, restart persistence and cross-owner HTTP isolation, then
 join the rehearsal. 3's live development-store Google/Go evidence is not proof of this
