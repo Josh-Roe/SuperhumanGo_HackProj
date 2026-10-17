@@ -57,7 +57,7 @@ class CanvaTokenEndpoint:
             if token not in SESSIONS:
                 return httpx.Response(401, json={"msg": "invalid"})
             return httpx.Response(200, json={"id": SESSIONS[token]})
-        assert (request.url.host, request.url.path) == ("mcp.canva.com", "/token")
+        assert (request.url.host, request.url.path) == ("api.canva.com", "/auth/v1/oauth/token")
         form = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
         self.forms.append(form)
         self.auth.append(request.headers["authorization"])
@@ -103,7 +103,7 @@ def start(client, session="session-a"):
     )
     assert response.status_code == 302
     url = urlsplit(response.headers["location"])
-    assert (url.hostname, url.path) == ("mcp.canva.com", "/authorize")
+    assert (url.hostname, url.path) == ("www.canva.com", "/api/oauth/authorize")
     return {k: v[0] for k, v in parse_qs(url.query).items()}
 
 
@@ -206,7 +206,7 @@ def test_sessions_use_fresh_token_keep_legacy_record_and_ask_reconnect_on_reject
                 "access_token": "x",
                 "refresh_token": "revoked",
                 "expires_at": 0,
-                "resource": "https://mcp.canva.com/mcp",
+                "resource": "https://api.canva.com/connect/v1/mcp",
             },
         )
         env.endpoint.used_refresh.add("revoked")

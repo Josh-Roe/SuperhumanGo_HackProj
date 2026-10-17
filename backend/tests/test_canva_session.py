@@ -108,7 +108,7 @@ def test_real_mcp_sdk_http_handshake_discovery_call_and_close_with_fake_server()
     requests = []
 
     def server(request):
-        assert str(request.url) == "https://mcp.canva.com/mcp"
+        assert str(request.url) == "https://api.canva.com/connect/v1/mcp"
         assert request.headers["authorization"] == "Bearer synthetic-test-token"
         requests.append(request.method)
         if request.method in {"DELETE", "GET"}:
