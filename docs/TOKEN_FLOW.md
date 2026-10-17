@@ -13,7 +13,7 @@ Which server holds which credential, and which hop carries it. Read with [archit
 | Go connector | Superhuman Go Packs SDK (TypeScript) | Superhuman | `integrations/superhuman/**` |
 | Identity, data, files | Supabase Auth, Postgres with RLS, Storage | Supabase | `supabase/migrations/**` |
 | Credential vault | Fernet-encrypted rows in `provider_secrets` | Supabase Postgres (encrypted by the backend) | `repositories/vault.py` |
-| Providers | Gmail, Google Calendar, Canva MCP plus Canva Connect REST | Google, Canva | `providers/google/**`, `providers/canva/**` |
+| Providers | Gmail, Google Calendar, Canva MCP (`mcp.canva.com/mcp`, MCP OAuth) | Google, Canva | `providers/google/**`, `providers/canva/**` |
 
 ## Servers and tokens
 
@@ -51,8 +51,8 @@ flowchart LR
 ```mermaid
 flowchart LR
     B["Browser"] -- "Bearer user JWT<br/>POST /api/{google,canva}/connect" --> OA["Render<br/>OAuth connect"]
-    OA -- "consent URL<br/>(state; PKCE for Canva)" --> B
-    B -. "consent" .-> P["Google OAuth /<br/>Canva OAuth"]
+    OA -- "consent URL (Google) or<br/>/api/canva/start bootstrap (Canva)" --> B
+    B -. "consent (Canva: browser-bound<br/>cookie + S256 PKCE)" .-> P["Google OAuth /<br/>Canva MCP OAuth"]
     P -. "code to /api/.../callback" .-> OA
     OA -- "client secret + code" --> P
     P -- "access + refresh token" --> OA
@@ -61,7 +61,7 @@ flowchart LR
 
     W["Render workflows<br/>(REST or MCP)"] -- "service role: read + decrypt" --> V
     W -- "Google access token" --> G["Gmail API<br/>Calendar API"]
-    W -- "Canva access token" --> C["mcp.canva.com<br/>Canva Connect exports"]
+    W -- "Canva MCP access token" --> C["mcp.canva.com/mcp<br/>create, edit, export"]
 ```
 
 ## Credential inventory
@@ -75,8 +75,8 @@ flowchart LR
 | `CREDENTIAL_ENCRYPTION_KEY` (Fernet) | Generated on the server | Render env only | Nowhere (encrypts and decrypts vault rows in-process) | Supabase, browser |
 | Google client ID/secret | Google Cloud console | Render env | Google token endpoint | Browser, Go |
 | Google refresh token | Organizer consent (`gmail.compose`, `gmail.readonly`, `calendar.events`) | `provider_secrets` row `google`, Fernet-encrypted | Google token endpoint, then short-lived access tokens to the Gmail and Calendar APIs | Browser, Go, Git |
-| Canva client ID/secret | Canva developer portal (M6) | Render env (`CANVA_*`, which is also what registers the `/api/canva/*` routes) | Canva token endpoint | Browser, Go |
-| Canva access/refresh token | Organizer consent via PKCE | `provider_secrets` row `canva`, Fernet-encrypted; refresh rotates it | `mcp.canva.com/mcp` and the Canva Connect export API | Browser, Go, Git |
+| Canva client ID/secret | Canva developer portal: MCP app "Event Workspace" (REST integration disabled); see [Canva OAuth setup](canva/OAUTH_SETUP.md) | Render env (`CANVA_*`, which is also what registers the `/api/canva/*` routes) | Canva's MCP token endpoint (client Basic auth) | Browser, Go |
+| Canva access/refresh token | Organizer consent via S256 PKCE, bound to the `/mcp` resource | `provider_secrets` row `canva`, Fernet-encrypted; refreshed shortly before expiry and the rotated refresh token is saved | `mcp.canva.com/mcp` only (not reused for Canva REST) | Browser, Go, Git |
 | Signed Storage URL | Backend, per request | Not stored; valid for 120 s | Browser (flyer preview/download) | (short-lived by design) |
 
 ## Why each hop is shaped this way
@@ -84,10 +84,11 @@ flowchart LR
 - **The browser holds only its own session.** The website is a public client: `VITE_*` values ship in the bundle, so no provider or service-role secret ever goes there.
 - **Go never sees provider tokens.** Go authenticates as an organizer with the `go_…` token. The backend maps that to `owner_id` and then uses that organizer's vault entries. Gmail, Calendar and Canva calls happen on Render, so the backend can record revisions and receipts and keep retries idempotent.
 - **Supabase stores encrypted provider secrets but can't read them.** The Fernet key lives only on Render, so a database leak alone does not expose Google or Canva tokens.
-- **The OAuth callbacks are browser redirects with no bearer token.** A single-use `state` value bound to `owner_id` (plus a PKCE verifier for Canva) identifies the organizer. The callback then redirects to `APP_URL/?google|canva=connected|error`.
+- **The OAuth callbacks are browser redirects with no bearer token.** A single-use `state` value bound to `owner_id` identifies the organizer. Canva also needs the PKCE verifier and a browser-bound cookie set by `/api/canva/start`, so connect from the website, not from a copied link. The callback then redirects to `APP_URL/?google|canva=connected|error`.
 
 ## Known gaps
 
-- Pending OAuth `state` lives in backend process memory, so a Render restart drops consents that are still in flight.
-- No one has verified that `mcp.canva.com` accepts a token from a Canva Connect OAuth app (see A11 in the [master to-do](MASTER_TODO.md)).
+- Pending OAuth `state` and Canva refresh serialization live in backend process memory. Run one Render worker; a restart drops consents that are still in flight.
+- Hosted Canva consent is unverified (A7). A Canva export that is still pending keeps its job ID but can't be polled yet, because the MCP token isn't used as a REST token and no separate authorized poll reader exists.
+- Grants made before the `/mcp` resource marker require reconnecting.
 - `WORKFLOW_DEV_MODE` with `DEV_CONNECTOR_TOKEN` is a single global token for isolated demos only. It does not provide multi-user authorization.
