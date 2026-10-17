@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { issueGoConnector } from "./api";
 
-export function GoConnector({ accessToken }: { accessToken: string }) {
+export function GoConnector({
+  accessToken,
+  onCreated,
+}: {
+  accessToken: string;
+  onCreated?: () => void;
+}) {
   const [credential, setCredential] =
     useState<Awaited<ReturnType<typeof issueGoConnector>>>();
   const [busy, setBusy] = useState(false);
@@ -55,6 +61,7 @@ export function GoConnector({ accessToken }: { accessToken: string }) {
             setError("");
             try {
               setCredential(await issueGoConnector(accessToken));
+              onCreated?.();
             } catch (err) {
               setError(
                 err instanceof Error
