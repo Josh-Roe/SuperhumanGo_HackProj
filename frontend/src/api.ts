@@ -349,11 +349,6 @@ export async function requestJson(
   }
   return response.status === 204 ? null : response.json();
 }
-export const authConfigured = Boolean(
-  import.meta.env.VITE_SUPABASE_URL &&
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY &&
-  import.meta.env.VITE_EVENT_API_ENABLED === "true",
-);
 function supabaseOrigin(config?: PublicAuthConfig): string {
   const url = new URL(
     config?.supabase_url ?? import.meta.env.VITE_SUPABASE_URL,
@@ -412,23 +407,6 @@ async function tokenSession(
     expires_at: Date.now() + data.expires_in * 1000,
   };
 }
-export async function signIn(
-  email: string,
-  password: string,
-  config?: PublicAuthConfig,
-): Promise<Session> {
-  if (!config && !authConfigured)
-    throw new Error(
-      "Live sign-in is awaiting a connected organizer account. Use the local preview.",
-    );
-  return tokenSession(
-    config,
-    "password",
-    { email, password },
-    "Sign-in failed. Check your credentials and Supabase email/password settings.",
-  );
-}
-
 // Google sign-in through Supabase Auth's PKCE flow. The verifier and the public
 // config survive the redirect in sessionStorage; tokens never appear in the URL.
 const GOOGLE_PENDING = "google-sign-in";
