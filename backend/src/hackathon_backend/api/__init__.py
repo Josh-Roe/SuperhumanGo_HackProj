@@ -11,13 +11,17 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from starlette.responses import JSONResponse
 
+from hackathon_backend.api.inclusion import InclusionSave, InclusionView, read_inclusion
+from hackathon_backend.api.read_models import ProviderBindings, WorkspaceResponse, WorkSummary
 from hackathon_backend.auth.connectors import issue_connector
 from hackathon_backend.auth.identity import authenticate
 from hackathon_backend.config import Settings
 from hackathon_backend.domain.models import (
     ApprovalInput,
+    ArtifactReview,
     ConnectorInput,
     ContentReview,
+    DistributionInput,
     DomainError,
     ErrorResponse,
     EventInput,
@@ -29,12 +33,15 @@ from hackathon_backend.domain.models import (
     TaskRecord,
     TaskUpdate,
 )
+from hackathon_backend.mcp_tools.event_tools import EventToolDeps
 from hackathon_backend.repositories.assets import SupabaseAssetStorage
 from hackathon_backend.repositories.organizer import OrganizerRepository
 from hackathon_backend.repositories.transport import Database
 from hackathon_backend.repositories.workflow import SupabaseWorkflowStore
+from hackathon_backend.services.assets.models import StaleRevisionError
+from hackathon_backend.workflows.distribution import DistributionPlan, DistributionResult
 from hackathon_backend.workflows.go_work import WorkflowError
-from hackathon_backend.workflows.models import WorkItem, WorkKind
+from hackathon_backend.workflows.models import Approval, WorkItem, WorkKind
 from hackathon_backend.workflows.ports import RevisionConflict
 
 
@@ -57,17 +64,27 @@ class DomainRoute(APIRoute):
                 return JSONResponse(
                     {"detail": {"code": error.code, "message": error.message}},
                     status_code=error.status,
-                    headers={"WWW-Authenticate": "Bearer"} if error.status == 401 else None,
+                    headers={
+                        "Cache-Control": "no-store",
+                        **({"WWW-Authenticate": "Bearer"} if error.status == 401 else {}),
+                    },
                 )
-            except (WorkflowError, RevisionConflict) as error:
+            except (WorkflowError, RevisionConflict, StaleRevisionError) as error:
                 code = getattr(error, "code", "revision_conflict")
-                return JSONResponse({"detail": {"code": code, "message": str(error)}}, 409)
+                return JSONResponse(
+                    {"detail": {"code": code, "message": str(error)}},
+                    409,
+                    headers={"Cache-Control": "no-store"},
+                )
 
         return handler
 
 
 def create_router(
-    settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
+    settings: Settings,
+    *,
+    transport: httpx.AsyncBaseTransport | None = None,
+    events: EventToolDeps | None = None,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/api",
@@ -98,7 +115,7 @@ def create_router(
         }
 
     @router.get("/events", response_model=list[EventRecord])
-    async def events(repo: Repo, limit: Limit = 50, offset: Offset = 0):
+    async def list_events(repo: Repo, limit: Limit = 50, offset: Offset = 0):
         return await repo.list_records("events", limit, offset)
 
     @router.post("/events", response_model=EventRecord, status_code=201)
@@ -137,7 +154,7 @@ def create_router(
     async def task_revisions(task_id: UUID, repo: Repo):
         return await repo.revisions("tasks", str(task_id))
 
-    @router.post("/events/{event_id}/prepare", status_code=202)
+    @router.post("/events/{event_id}/prepare", status_code=202, response_model=WorkItem)
     async def prepare(event_id: UUID, payload: RevisionInput, repo: Repo):
         event = await repo.get("events", str(event_id))
         if event["revision"] != payload.expected_revision:
@@ -177,6 +194,25 @@ def create_router(
             },
         }
 
+    @router.get("/events/{event_id}/workspace", response_model=WorkspaceResponse)
+    async def workspace(event_id: UUID, repo: Repo):
+        return await repo.workspace(str(event_id))
+
+    @router.get("/events/{event_id}/inclusion", response_model=InclusionView)
+    async def inclusion(event_id: UUID, repo: Repo):
+        return await read_inclusion(repo, str(event_id))
+
+    @router.put("/events/{event_id}/inclusion", response_model=EventRecord)
+    async def save_inclusion(event_id: UUID, payload: InclusionSave, repo: Repo):
+        await repo.get("events", str(event_id))
+        return await Database(settings, admin=True, transport=transport).rpc(
+            "organizer_save_inclusion",
+            p_owner=repo.owner_id,
+            p_event=str(event_id),
+            p_expected=payload.expected_revision,
+            p_inputs=payload.facts.model_dump(mode="json"),
+        )
+
     @router.post("/content/{content_id}/review")
     async def review_content(content_id: UUID, payload: ContentReview, repo: Repo):
         return await repo.review_content(
@@ -196,6 +232,22 @@ def create_router(
             payload.acknowledged_unknowns,
         )
 
+    @router.get("/events/{event_id}/approvals", response_model=list[Approval])
+    async def approvals(event_id: UUID, repo: Repo):
+        return await repo.event_children(str(event_id), "approvals")
+
+    @router.get("/events/{event_id}/work", response_model=list[WorkSummary])
+    async def work(event_id: UUID, repo: Repo):
+        return (await repo.workspace(str(event_id)))["work"]
+
+    @router.get("/events/{event_id}/bindings", response_model=ProviderBindings)
+    async def bindings(event_id: UUID, repo: Repo):
+        store = SupabaseWorkflowStore(repo.db)
+        return {
+            "calendar": await store.get_calendar_binding(repo.owner_id, str(event_id)),
+            "gmail": await store.get_gmail_binding(repo.owner_id, str(event_id)),
+        }
+
     @router.get("/events/{event_id}/operations")
     async def operations(event_id: UUID, repo: Repo):
         return await SupabaseWorkflowStore(repo.db).list_operations(repo.owner_id, str(event_id))
@@ -213,6 +265,55 @@ def create_router(
         if kind not in {"event_document", "flyer_png"}:
             raise DomainError("not_found", "Artifact kind not found", 404)
         return await SupabaseAssetStorage(repo.db, repo.owner_id).current(str(event_id), kind)
+
+    @router.post("/events/{event_id}/artifacts/{artifact_id}/review")
+    async def review_artifact(
+        event_id: UUID,
+        artifact_id: UUID,
+        payload: ArtifactReview,
+        repo: Repo,
+    ):
+        # The user session authorizes the event first. Only the server can mutate
+        # trusted artifact metadata; browser column grants stay read-only.
+        await repo.get("events", str(event_id))
+        database = Database(settings, admin=True, transport=transport)
+        return await database.rpc(
+            "organizer_review_asset",
+            p_owner=repo.owner_id,
+            p_event=str(event_id),
+            p_asset=str(artifact_id),
+            p_expected=payload.expected_revision,
+            p_hash=payload.sha256,
+        )
+
+    def distribution():
+        nonlocal events
+        if events is None:
+            from hackathon_backend.api.dependencies import create_tool_dependencies
+
+            events = create_tool_dependencies(settings, transport=transport)
+        if events.distributor is None:
+            raise DomainError(
+                "integration_not_connected", "Google distribution is not configured", 503
+            )
+        return events.distributor
+
+    async def require_revision(repo: OrganizerRepository, event_id: UUID, expected: int):
+        current = await repo.get("events", str(event_id))
+        if current["revision"] != expected:
+            raise DomainError("revision_conflict", "Event changed; reload before distribution")
+
+    @router.post("/events/{event_id}/distribution/preview", response_model=DistributionPlan)
+    async def distribution_preview(event_id: UUID, payload: RevisionInput, repo: Repo):
+        await require_revision(repo, event_id, payload.expected_revision)
+        plan = await distribution().preview(repo.owner_id, str(event_id))
+        await require_revision(repo, event_id, payload.expected_revision)
+        return plan
+
+    @router.post("/events/{event_id}/distribution/execute", response_model=DistributionResult)
+    async def distribution_execute(event_id: UUID, payload: DistributionInput, repo: Repo):
+        await require_revision(repo, event_id, payload.expected_revision)
+        return await distribution().execute(repo.owner_id, str(event_id), str(payload.approval_id))
 
     @router.post("/connectors", status_code=201)
     async def connector(payload: ConnectorInput, repo: Repo):

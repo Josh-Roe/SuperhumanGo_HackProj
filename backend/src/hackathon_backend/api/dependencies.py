@@ -6,18 +6,18 @@ from hackathon_backend.mcp_tools.event_tools import EventToolDeps
 from hackathon_backend.providers.google import GoogleCalendarAPI, GoogleGmailAPI
 from hackathon_backend.providers.google.oauth import GoogleOAuthConfig, VaultTokenSource
 from hackathon_backend.repositories.assets import SupabaseAttachmentSource
+from hackathon_backend.repositories.distribution import PersistentDistributor
 from hackathon_backend.repositories.organizer import OrganizerRepository
 from hackathon_backend.repositories.transport import Database
 from hackathon_backend.repositories.vault import SupabaseCredentialVault
 from hackathon_backend.repositories.workflow import SupabaseWorkflowStore
-from hackathon_backend.workflows.distribution import Distributor
 from hackathon_backend.workflows.models import Principal
 from hackathon_backend.workflows.rsvp import RSVPTracker
 
 
-def create_tool_dependencies(settings: Settings) -> EventToolDeps:
+def create_tool_dependencies(settings: Settings, *, transport=None) -> EventToolDeps:
     """Fail closed without server credentials. Configured does not imply live verified."""
-    database = Database(settings, admin=True)
+    database = Database(settings, admin=True, transport=transport)
     store = SupabaseWorkflowStore(database)
     deps = EventToolDeps(store=store, principals=SupabasePrincipalResolver(database))
     if all(
@@ -36,9 +36,10 @@ def create_tool_dependencies(settings: Settings) -> EventToolDeps:
                 settings.google_redirect_uri,
             ),
             vault,
+            transport=transport,
         )
         calendar, gmail = GoogleCalendarAPI(tokens), GoogleGmailAPI(tokens)
-        deps.distributor = Distributor(
+        deps.distributor = PersistentDistributor(
             store, calendar, gmail, tokens, SupabaseAttachmentSource(database)
         )
         deps.rsvp = RSVPTracker(store, calendar, gmail, tokens)
