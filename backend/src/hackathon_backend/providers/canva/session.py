@@ -11,7 +11,6 @@ from mcp.client.streamable_http import streamable_http_client
 from pydantic import TypeAdapter
 
 from hackathon_backend.providers.canva import CanvaError, CanvaMCPAdapter, ExportJobReader
-from hackathon_backend.providers.canva.connect import CanvaConnectExports
 from hackathon_backend.services.assets.models import BoundaryModel, Identifier
 
 CANVA_MCP_URL = "https://mcp.canva.com/mcp"
@@ -165,5 +164,6 @@ async def connect_canva(
                 yield await DiscoveredCanvaSession.discover(
                     session,
                     owner_id=owner_id,
-                    export_jobs=CanvaConnectExports(access_token, transport=transport),
+                    # MCP grants are audience-bound. Do not send them to the REST API;
+                    # pending exports need an explicitly authorized reader.
                 )

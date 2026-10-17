@@ -108,6 +108,23 @@ export async function startConnection(
   const url = safeUrl(text(value.authorization_url));
   if (!url)
     throw new Error("The server returned an unsafe authorization link.");
+  if (provider === "canva") {
+    const start = new URL(url);
+    const backend = new URL(
+      import.meta.env.VITE_PUBLIC_MCP_URL ||
+        "https://superhuman-go-event-backend.onrender.com/mcp",
+    );
+    if (
+      start.origin !== backend.origin ||
+      start.pathname !== "/api/canva/start" ||
+      start.username ||
+      start.password ||
+      start.hash ||
+      [...start.searchParams].length !== 1 ||
+      !/^[A-Za-z0-9_-]{43}$/.test(start.searchParams.get("state") ?? "")
+    )
+      throw new Error("The server returned an unsafe Canva connection link.");
+  }
   return url;
 }
 
