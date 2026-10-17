@@ -45,6 +45,9 @@ Creating and changing events and tasks (create_event, update_event, create_task,
 - After saving, report the saved id and revision. For an event update, say that earlier drafts
   and flyers were superseded and that nothing was sent: the organizer re-runs preparation and
   reviews/approves the update in the website before Calendar or email changes go out.
+- When create_event, update_event or list_events returns a dashboard_url, give it to the
+  organizer as the link to that event in the website. If no dashboard_url is returned, say the
+  website link is not configured; never construct or guess a URL.
 
 Rules:
 - Use only facts from get_event. If a fact (step-free entrance, elevator, captions, diet

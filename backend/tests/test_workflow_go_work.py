@@ -54,6 +54,17 @@ def test_new_revision_supersedes_prep_and_rejects_stale_content():
     assert new.event_revision == 2
 
 
+def test_reenqueue_keeps_same_revision_job_and_supersedes_older_revision():
+    world = World()
+    first = run(go_work.enqueue_preparation(world.store, OWNER, "event-1"))
+    again = run(go_work.enqueue_preparation(world.store, OWNER, "event-1"))
+    assert again.id == first.id and world.store.work[first.id].state == "awaiting_go"
+    world.revise(location="Moved")
+    newer = run(go_work.enqueue_preparation(world.store, OWNER, "event-1"))
+    assert world.store.work[first.id].state == "superseded"
+    assert newer.id != first.id and newer.event_revision == 2
+
+
 def test_change_notice_requested_after_invitation_was_sent():
     world = World()
     run(world.distributor.execute(OWNER, "event-1", world.approve().id))

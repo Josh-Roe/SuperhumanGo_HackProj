@@ -44,7 +44,9 @@ async def enqueue_preparation(
     *,
     batch: str = DEFAULT_BATCH,
 ) -> WorkItem:
-    """Called by the website after saving a revision. Supersedes older open work of this batch."""
+    """Called by the website after saving a revision. Supersedes older-revision open work of this
+    batch; open work for the current revision is kept and returned, matching the repository's
+    same-revision deduplication."""
     event = await require_event(store, owner_id, event_id)
     for item in await store.list_work(owner_id, OPEN_STATES):
         if (
@@ -52,6 +54,8 @@ async def enqueue_preparation(
             and item.kind == WorkKind.PREPARE_CONTENT
             and item.payload.get("batch", DEFAULT_BATCH) == batch
         ):
+            if item.event_revision == event.revision:
+                return item
             await store.put_work(item.model_copy(update={"state": "superseded"}))
     requested = list(kinds or PREPARE_KINDS)
     previously_sent = (await store.get_gmail_binding(owner_id, event_id)) is not None
