@@ -12,7 +12,7 @@ Read these files before planning or editing, including when resuming an existing
 4. [Member 3: Superhuman Go and Google integrations](docs/contexts/03_GO_GOOGLE.md)
 5. [Member 4: Canva, inclusion, and presentation](docs/contexts/04_CANVA_INCLUSION.md)
 6. [Integration contract](docs/INTEGRATION_CONTRACT.md), your assigned [prompt](docs/TEAM_TASKS.md), and applicable directory instructions.
-7. [Master to-do](docs/MASTER_TODO.md): remaining manual and agentic work toward the final demo; tick items with evidence.
+7. [Master to-do](docs/MASTER_TODO.md): remaining manual and agentic work toward the final demo. Any member may edit it; follow its "How to contribute" rules (claim, evidence, stable IDs).
 
 Inspect branch, working tree, and upstream changes. Read the latest available versions of all contexts without overwriting uncommitted work. Reread them before changing an interface, taking a handoff, or finishing a task. A persistent conversation does not automatically receive files another device pushed. An operator using a tool that does not discover `AGENTS.md` must explicitly ask it to read this file.
 

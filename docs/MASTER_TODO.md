@@ -1,6 +1,20 @@
 # Master to-do: everything left before the spec is met
 
-Snapshot 2026-10-16 (America/Los_Angeles), main at `afd1b2c`. Written for agents. Read [AGENTS.md](../AGENTS.md) and the four [contexts](contexts/) first. Those files take precedence over this list. When an item is done, tick it and add the evidence (commit, command output, receipt ID), then commit this file with the change. Never record secrets or private RSVP data here.
+Snapshot 2026-10-16 (America/Los_Angeles), main at `afd1b2c`. Written for agents. Read [AGENTS.md](../AGENTS.md) and the four [contexts](contexts/) first. Those files take precedence over this list. Never record secrets or private RSVP data here.
+
+## How to contribute (all agents, read before editing)
+
+The user has authorized every member's agent to edit this file. This is an exception to AGENTS.md's rule that only Member 2 edits coordination docs. It is still not a place for progress diaries: detailed evidence stays in your own context, and this file holds one line of status per task.
+
+1. **Sync first.** Run `git pull` before reading or editing this file, and again right before committing. Other agents edit it in parallel.
+2. **Claim before starting.** Change `- [ ]` to `- [~]` and append `**Claimed:** Member N, YYYY-MM-DD HH:MM PT, branch`. Commit and push the claim by itself right away so nobody duplicates the work. Skip an item someone else has claimed. If a claim is more than 2 hours old with no linked commit, you may take it over: note `took over from Member N` on the item.
+3. **Status markers.** `- [ ]` open, `- [~]` claimed or in progress, `- [x]` done, `- [!]` blocked. A blocked item gets `**Blocked:** <exact missing input, e.g. "Render env SUPABASE_SERVICE_ROLE_KEY unset"> → needs <M-item or Member N>`.
+4. **Done means evidence.** Mark `[x]` only after the item's verify step passes. Append `**Done:** <commit SHA or PR> — <local | mocked | live>: <one-line proof>`. Examples: `pytest 320 passed`, `curl /api/health → 200`, `Calendar event id abc123 same after rev 2`. Mocked or local evidence never completes an item whose wording says live. Leave it `[~]` and say what remains.
+5. **Edit only your item's lines.** Don't rewrite, reorder or reword other items. If you think another item is wrong, add an indented `- Note (Member N, date): …` under it.
+6. **Adding tasks.** New tasks take the next free ID: **next manual = M11, next agent = A18**. Bump these numbers in the same edit. IDs are permanent: never renumber or reuse one. Put the task under the right owner heading with files, change and verify step. Cite where the need came from (spec line, context handoff, failing check). Add it to §4 if it is on the critical path.
+7. **Never delete tasks.** If a task is obsolete, mark it `[x]` and strike it through: `~~text~~ **Dropped:** <reason, who decided>`. Cutting scope listed in §4 needs the user's or team lead's decision. Record who made it.
+8. **Keep §1 true.** When your evidence changes a row in the Current state table, update that row and the snapshot line (date + main SHA).
+9. **Commit separately.** Commit to-do edits on their own or together with the code they report, with messages like `todo: claim A5` or `todo: done A5 (abc1234)`. If a push is rejected, merge `origin/main` and keep both sides' edits. Never force-push.
 
 **Deadline:** Devpost submission at 8:00 PM Pacific ([HACKATHON.md](HACKATHON.md)).
 
