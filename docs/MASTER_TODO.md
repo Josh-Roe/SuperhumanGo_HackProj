@@ -1,6 +1,6 @@
 # Master to-do: everything left before the spec is met
 
-Snapshot 2026-10-16 (America/Los_Angeles), main at `afd1b2c`. Written for agents. Read [AGENTS.md](../AGENTS.md) and the four [contexts](contexts/) first. Those files take precedence over this list. Never record secrets or private RSVP data here.
+Snapshot 2026-10-16 (America/Los_Angeles), main at `e052761`. Written for agents. Read [AGENTS.md](../AGENTS.md) and the four [contexts](contexts/) first. Those files take precedence over this list. Never record secrets or private RSVP data here.
 
 ## How to contribute (all agents, read before editing)
 
@@ -11,7 +11,7 @@ The user has authorized every member's agent to edit this file. This is an excep
 3. **Status markers.** `- [ ]` open, `- [~]` claimed or in progress, `- [x]` done, `- [!]` blocked. A blocked item gets `**Blocked:** <exact missing input, e.g. "Render env SUPABASE_SERVICE_ROLE_KEY unset"> → needs <M-item or Member N>`.
 4. **Done means evidence.** Mark `[x]` only after the item's verify step passes. Append `**Done:** <commit SHA or PR> — <local | mocked | live>: <one-line proof>`. Examples: `pytest 320 passed`, `curl /api/health → 200`, `Calendar event id abc123 same after rev 2`. Mocked or local evidence never completes an item whose wording says live. Leave it `[~]` and say what remains.
 5. **Edit only your item's lines.** Don't rewrite, reorder or reword other items. If you think another item is wrong, add an indented `- Note (Member N, date): …` under it.
-6. **Adding tasks.** New tasks take the next free ID: **next manual = M11, next agent = A20**. Bump these numbers in the same edit. IDs are permanent: never renumber or reuse one. Put the task under the right owner heading with files, change and verify step. Cite where the need came from (spec line, context handoff, failing check). Add it to §4 if it is on the critical path.
+6. **Adding tasks.** New tasks take the next free ID: **next manual = M12, next agent = A20**. Bump these numbers in the same edit. IDs are permanent: never renumber or reuse one. Put the task under the right owner heading with files, change and verify step. Cite where the need came from (spec line, context handoff, failing check). Add it to §4 if it is on the critical path.
 7. **Never delete tasks.** If a task is obsolete, mark it `[x]` and strike it through: `~~text~~ **Dropped:** <reason, who decided>`. Cutting scope listed in §4 needs the user's or team lead's decision. Record who made it.
 8. **Keep §1 true.** When your evidence changes a row in the Current state table, update that row and the snapshot line (date + main SHA).
 9. **Joining with prior work (one-time reconcile).** If you already did work for your member before reading this file, do this before anything else, in a single commit (`todo: reconcile Member N`):
@@ -39,12 +39,12 @@ Tags: `[MANUAL]` needs a human with an account, browser, dashboard or judgment. 
 | Create event via Go | `create_event`/`update_event` MCP tools are implemented and tested (mocked). They return `dashboard_url` when `APP_URL` is set. Not live against Supabase. | M1–M5, A2, A3 |
 | Go prepares prose | Live in **dev mode** (in-memory, `dev-event-1`): Go saved description, summary, invitation, change notice. Not live on Supabase. | Re-run on Supabase (M8) |
 | Canva flyer | Services and MCP tools composed; without a Canva token they report `integration_not_connected`. No live export. | M6, A7, A8 |
-| Inclusion review | Service and holiday-calendar checks implemented and tested locally. UI is read-only; no authenticated report route. | A9, A12 |
+| Inclusion review | Service implemented and tested locally. Holiday check (`0d9ebf1`) runs every review against Google's public Christian, Jewish, Muslim, Hindu and Orthodox feeds; a local run against the real feeds flagged Yom Kippur, Christmas, Diwali and Eid (from the eve). An authenticated `POST /api/events/{id}/assets/inclusion` exists, but the website never calls it (`findings: []` in `frontend/src/live.ts`) and facts are not saved. | A9, A10, A17 |
 | Publish (Calendar + Gmail) | Live in dev mode: real Calendar event + Gmail send to one test inbox, retry idempotent. | Re-run on Supabase via website approval |
 | Change time/location | Live in dev mode: same Calendar ID patched, change notice in same Gmail thread. | Same, plus Canva revision |
 | RSVP | `sync_rsvps` live returns `no_response`. Reply classification is not live-verified. | M8 |
 | Grammarly | Not demonstrated. | M7 |
-| Tests | 313 backend tests pass on `afd1b2c`; frontend 51 tests pass (Member 1 context). | Keep green |
+| Tests | 313 backend tests pass on `e052761` (rerun by Member 3); frontend 51 tests pass (Member 1 context). | Keep green |
 
 ## 2. Manual tasks `[MANUAL]`
 
@@ -56,6 +56,8 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
 - [ ] **M2 — Point Vercel at Render.** Owner 1 or 2. Vercel project (root `frontend`) env: `BACKEND_ORIGIN=https://superhuman-go-event-backend.onrender.com/` (server-only) and `VITE_PUBLIC_MCP_URL=https://superhuman-go-event-backend.onrender.com/mcp`, then redeploy (`VITE_*` is baked at build time). Done when `https://mtcxhackathon1.vercel.app/api/health` returns 200.
 - [ ] **M3 — Google OAuth client.** Owner 3. In Google Cloud Console, add redirect URI `https://superhuman-go-event-backend.onrender.com/api/google/callback`. Add every test organizer and invitee as OAuth test users.
   - Note (Member 3, 2026-10-16): as of the last change in this session, the client lists only the dev redirect `http://localhost:8000/api/dev/google/callback`, and the user's own Gmail is the only test user (03 context). The production route exists in `d5ce546`. The console was not rechecked during this reconcile.
+
+- [ ] **M11 — Apply the Gemini/Notion migration.** Owner 2. Apply `supabase/migrations/20261017010000_remove_gemini_and_notion.sql` (`0d9ebf1`) to project `qkfebdbwrmpisejnazud`. It narrows the `generated_content` kind and producer checks, and it stops with an error rather than deleting if any row still uses `notion_note` or `gemini`. Done when the migration shows as applied and inserting `producer='gemini'` is rejected. Source: user decision 2026-10-16 to drop Gemini and Notion; not applied because no Supabase CLI is available on Member 3's machine.
 
 ### Superhuman Go
 
@@ -98,6 +100,7 @@ Each item lists files, the change, and how to verify it. Run `uv run --project b
 - [ ] **A15 — `?event=<id>` deep link.** `frontend/src/App.tsx`: on load (and once connected), read `new URLSearchParams(location.search).get("event")` and call the existing `openEvent(id)` (around line 1504). If the organizer is not connected yet, keep the id until they connect. Show "not found" for ids that are inaccessible or unknown. This makes Go's `dashboard_url` land on the event. Add a test.
 - [ ] **A16 — Provider UI.** Add flyer preview with approve (exact preview digest) and abandon; distribution blockers from `preview_distribution`; a Connect Google button (`POST /api/google/connect` → open `authorization_url`) plus a status display; and the callback result page from A13.
 - [ ] **A17 — Inclusion UI writes.** Once A10's inclusion-fact endpoint exists, enable editing with source and date. Keep `unknown` visible.
+  - Note (Member 3, 2026-10-16): the server form differs from the website's: separate loud-sound and strobe facts, floor plus elevator, food served plus a diet list, structured `Source` (label, confirmed_by, observed_at, url), and `traditions` (which holiday calendars to check; all five by default, empty opts out). Show the returned `religious_observances` conflicts. See `services/inclusion/__init__.py`.
 
 ### Owner 4: Canva, inclusion, assets, pitch
 
