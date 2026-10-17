@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { issueGoConnector } from "./api";
 
 export function GoConnector({ accessToken }: { accessToken: string }) {
@@ -6,6 +6,14 @@ export function GoConnector({ accessToken }: { accessToken: string }) {
     useState<Awaited<ReturnType<typeof issueGoConnector>>>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const tokenField = useRef<HTMLInputElement>(null);
+  const createButton = useRef<HTMLButtonElement>(null);
+  const hadCredential = useRef(false);
+  useEffect(() => {
+    if (credential) tokenField.current?.focus();
+    else if (hadCredential.current) createButton.current?.focus();
+    hadCredential.current = Boolean(credential);
+  }, [credential]);
   return (
     <section className="panel">
       <h2>Authorize Go for your events</h2>
@@ -19,6 +27,7 @@ export function GoConnector({ accessToken }: { accessToken: string }) {
           <label>
             Personal Go connector token
             <input
+              ref={tokenField}
               type="password"
               readOnly
               value={credential.token}
@@ -42,6 +51,7 @@ export function GoConnector({ accessToken }: { accessToken: string }) {
       ) : (
         <button
           className="secondary"
+          ref={createButton}
           disabled={busy}
           onClick={async () => {
             setBusy(true);
