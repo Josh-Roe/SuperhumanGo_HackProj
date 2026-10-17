@@ -72,3 +72,29 @@ The main backend merge is incorporated into `codex/member-1-frontend`. Merge [PR
 4. **Go account owner:** install/authorize the backend MCP connector in standalone Go. In website Settings, check the event API and connect the same organizer. Run the synthetic prompt above and compare saved ID/revision and exact fields. Returning to the window refreshes events; visible pages also check every ten seconds. Change the location and confirm the same ID plus a newer revision.
 
 Actual Vercel routing, standalone Go authorization and the full transfer remain unverified. Proxy checks use mocked upstream responses. See [Vercel function API](https://vercel.com/docs/functions/functions-api-reference) and [quickstart](https://vercel.com/docs/functions/quickstart).
+
+## Live organizer adapter (Member 1, current)
+
+This section supersedes the earlier details-only integration notes. Settings now connects `createOrganizerGateway` after existing-account Supabase sign-in. The initial screen still opens the labeled local preview, with no signup gate. All private REST requests carry the organizer access token, held only in memory. Disconnect, expiry or closing/reloading the page removes that session.
+
+The adapter uses the implemented Member 2 endpoints:
+
+| Action | Actual REST boundary |
+| --- | --- |
+| List/read | Paginated `GET /api/events`, canonical `GET /api/events/{id}` |
+| Create/edit | `POST /api/events` with a stable retry `Idempotency-Key`; full `PUT /api/events/{id}` with `expected_revision`; server creates guest IDs |
+| Prepare | `POST /api/events/{id}/prepare`, displaying its real queued/awaiting-Go receipt |
+| Load material | `GET /api/events/{id}/review`, `/operations`, `/rsvps`, and signed `/artifacts/{flyer_png\|event_document}/current` links |
+| Review prose | `POST /api/content/{id}/review`; edited content uses the returned replacement record on refresh |
+| Authorize distribution | `POST /api/events/{id}/approvals`, bound to the exact invitation ID shown in the organizer's preview |
+| Connect Go | `POST /api/connectors` issues a masked, in-memory personal token in Settings |
+
+Publishing here records a durable approval and provides the exact Go `execute_distribution` prompt. It does not call a nonexistent publish endpoint, trigger Go automatically, or claim delivery. Missing current reviewed attachments or unavailable provider receipts block approval. An unknown approval outcome is not blindly retried; the integration owner must inspect stored approvals. Successful Gmail operation receipts establish sent history, and changes use a new change notice. Sent messages/attachments remain immutable. Without a readable Gmail binding, the organizer explicitly chooses first invitation versus change notice and Go must reconcile authoritative provider state.
+
+The app refreshes connected data on window focus and every ten seconds while visible and clean. Unsaved changes pause polling; new writing/revisions reset the relevant editor only when its server version changes. Auth and revision conflicts surface instead of substituting sample data. An unavailable RSVP endpoint is labeled unavailable; private RSVP notes are excluded from the UI read model.
+
+Inclusion facts are read-only because no fact-save endpoint exists. Unsourced or undated access confirmations remain unknown. No inclusion report, live queue feed, Gmail draft binding or Canva transaction approval is fabricated. A preparation receipt is a snapshot from this tab, not an execution-progress feed. Current artifact links come only from scoped signed server responses. No guessed Canva edit URLs or public Storage paths are constructed.
+
+The frontend `/mcp` route now forwards the caller's Bearer and protocol headers to `BACKEND_ORIGIN/mcp`. This preserves a website-domain connector address after the backend is deployed and configured; it does not implement Python or authorize anonymous calls. Set `VITE_PUBLIC_MCP_URL` to the public connector address you actually use, then rebuild. The glass styles are preserved.
+
+Verification: lint, TypeScript/Vite build and mocked HTTP/UI tests cover the above boundaries. The local sample dashboard was visually inspected at 1440×1000; exact 390×844 browser checks show no horizontal document overflow on dashboard, details and review. Full screen-reader verification, deployed authenticated integration, supported Grammarly assistance and real Go/provider rehearsal remain separate live checks.

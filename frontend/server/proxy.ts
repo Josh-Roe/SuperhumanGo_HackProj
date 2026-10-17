@@ -1,7 +1,10 @@
 import process from "node:process";
 
 // Server-only. Never inject backend credentials: authentication belongs to the caller.
-export async function forwardApi(request: Request): Promise<Response> {
+async function forwardBackend(
+  request: Request,
+  mcp: boolean,
+): Promise<Response> {
   const fail = (status: number, error: string) =>
     Response.json(
       { error },
@@ -27,17 +30,35 @@ export async function forwardApi(request: Request): Promise<Response> {
     );
   }
   const incoming = new URL(request.url);
-  if (!incoming.pathname.startsWith("/api/"))
+  if (
+    mcp
+      ? !["/mcp", "/api/mcp"].includes(incoming.pathname)
+      : !incoming.pathname.startsWith("/api/")
+  )
     return fail(404, "Unknown API route.");
   // Explicit rewrite supports nested routes in this Vite app without Next.js routing.
   const routedPath = incoming.searchParams.get("__backend_path");
   incoming.searchParams.delete("__backend_path");
-  const path = routedPath === null ? incoming.pathname : `/api/${routedPath}`;
+  const path = mcp
+    ? "/mcp"
+    : routedPath === null
+      ? incoming.pathname
+      : `/api/${routedPath}`;
   const target = new URL(path + incoming.search, origin);
-  if (target.origin !== origin.origin || !target.pathname.startsWith("/api/"))
+  if (
+    target.origin !== origin.origin ||
+    (!mcp && !target.pathname.startsWith("/api/"))
+  )
     return fail(400, "Invalid API path.");
   const headers = new Headers({ Accept: "application/json" });
-  for (const name of ["authorization", "content-type", "idempotency-key"]) {
+  for (const name of [
+    "authorization",
+    "content-type",
+    "idempotency-key",
+    ...(mcp
+      ? ["accept", "mcp-protocol-version", "mcp-session-id", "last-event-id"]
+      : []),
+  ]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
@@ -60,7 +81,12 @@ export async function forwardApi(request: Request): Promise<Response> {
         "Backend redirected the API request. Check BACKEND_ORIGIN.",
       );
     const responseHeaders = new Headers({ "Cache-Control": "no-store" });
-    for (const name of ["content-type", "www-authenticate", "retry-after"]) {
+    for (const name of [
+      "content-type",
+      "www-authenticate",
+      "retry-after",
+      "mcp-session-id",
+    ]) {
       const value = upstream.headers.get(name);
       if (value) responseHeaders.set(name, value);
     }
@@ -72,3 +98,6 @@ export async function forwardApi(request: Request): Promise<Response> {
     return fail(502, "The hosted event backend could not be reached.");
   }
 }
+
+export const forwardApi = (request: Request) => forwardBackend(request, false);
+export const forwardMcp = (request: Request) => forwardBackend(request, true);
