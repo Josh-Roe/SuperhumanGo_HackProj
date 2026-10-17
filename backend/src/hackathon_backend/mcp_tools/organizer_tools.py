@@ -8,6 +8,7 @@ connector token on every call; `owner_id` is never a tool argument.
 from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated, Any, Literal, Protocol
+from urllib.parse import urlencode
 
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
@@ -59,10 +60,10 @@ def _default_factory(settings: Settings, principal: Principal) -> OrganizerRecor
     return task_repository(settings, principal)
 
 
-def event_summary(row: dict[str, Any]) -> dict[str, Any]:
-    """Saved id/revision and key facts. Invitee emails stay out of Go's context."""
+def event_summary(row: dict[str, Any], app_url: str = "") -> dict[str, Any]:
+    """Saved id/revision, key facts and dashboard link. Invitee emails stay out of Go's context."""
     invitees = row.get("invitees") or []
-    return {
+    summary = {
         "id": row["id"],
         "revision": row["revision"],
         "status": row.get("status"),
@@ -74,6 +75,9 @@ def event_summary(row: dict[str, Any]) -> dict[str, Any]:
         "invitee_count": len(invitees),
         "updated_at": row.get("updated_at"),
     }
+    if app_url:
+        summary["dashboard_url"] = f"{app_url}/?{urlencode({'event': row['id']})}"
+    return summary
 
 
 def task_summary(row: dict[str, Any]) -> dict[str, Any]:
@@ -133,7 +137,7 @@ def register_organizer_tools(
         """
         records = await repo(ctx)
         rows = await _call(records.list_records("events", limit, 0))
-        return [event_summary(row) for row in rows]
+        return [event_summary(row, settings.app_url) for row in rows]
 
     @mcp.tool(annotations=WRITE)
     async def create_event(
@@ -157,9 +161,10 @@ def register_organizer_tools(
         "America/New_York". `idempotency_key` is any unique string you choose for this request
         (for example "go-create-<short description>-<date>"); reuse the SAME key if you retry so
         the event is not created twice. A different payload with a used key fails with
-        idempotency_conflict. Returns the saved id and revision (1). Creating an event does not
-        write prose, send email or create Calendar invites; the organizer prepares, reviews and
-        publishes in the website.
+        idempotency_conflict. Returns the saved id, revision (1) and, when configured, a
+        dashboard_url: give it to the organizer so they can open the event in the website.
+        Creating an event does not write prose, send email or create Calendar invites; the
+        organizer prepares, reviews and publishes in the website.
         """
         records = await repo(ctx)
         payload = build(
@@ -176,7 +181,9 @@ def register_organizer_tools(
                 "invitees": invitees or [],
             },
         )
-        return event_summary(await _call(records.create_event(payload, idempotency_key)))
+        return event_summary(
+            await _call(records.create_event(payload, idempotency_key)), settings.app_url
+        )
 
     @mcp.tool(annotations=WRITE)
     async def update_event(
@@ -225,7 +232,7 @@ def register_organizer_tools(
         }
         data.update({key: value for key, value in changes.items() if value is not None})
         payload = build(EventUpdate, {**data, "expected_revision": expected_revision})
-        return event_summary(await _call(records.update_event(event_id, payload)))
+        return event_summary(await _call(records.update_event(event_id, payload)), settings.app_url)
 
     @mcp.tool(annotations=READ)
     async def list_tasks(ctx: Context, limit: Limit = 50) -> list[dict[str, Any]]:

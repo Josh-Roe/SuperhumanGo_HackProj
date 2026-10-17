@@ -11,7 +11,7 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
 ## First deliverables
 
 1. Prove Go reads an authorized test event and saves Go-written output through the hosted MCP connector. Verify actual account grants/triggers. Keep a visible manual Go-assisted queue fallback if website-triggered automation cannot be supported.
-2. Make Go produce descriptions, plain-language summaries, invitation/change emails, document prose, and optional Notion notes; document a real Grammarly writing-assistance path. Gemini support must be explicitly labeled.
+2. Make Go produce descriptions, plain-language summaries, invitation/change emails and document prose. Grammarly is part of Go, so it needs no separate integration (user decision 2026-10-16: Gemini and Notion dropped, `0d9ebf1`).
 3. Implement one-writer Calendar/Gmail operations: stable event ID; deliberate notifications; stable draft tracking; new message/draft after sent; current flyer/document links and MIME attachments; operation receipts/idempotency.
 4. Sync Calendar RSVP status and classify matched reply emails through Go. Ambiguous/forwarded/quoted/conditional replies require review; preserve source/provenance and prevent duplicate ingestion.
 

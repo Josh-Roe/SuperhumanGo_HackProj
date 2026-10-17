@@ -7,3 +7,6 @@ __pycache__/
 !.env.example
 tests/
 *.onnx
+.env.*
+!.env.example
+tests/
