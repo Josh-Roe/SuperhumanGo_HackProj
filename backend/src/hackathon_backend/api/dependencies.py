@@ -38,6 +38,7 @@ def create_tool_dependencies(settings: Settings, *, transport=None) -> EventTool
             vault,
             transport=transport,
         )
+        vault.watch_refresh(tokens.forget)
         calendar, gmail = GoogleCalendarAPI(tokens), GoogleGmailAPI(tokens)
         deps.distributor = PersistentDistributor(
             store, calendar, gmail, tokens, SupabaseAttachmentSource(database)

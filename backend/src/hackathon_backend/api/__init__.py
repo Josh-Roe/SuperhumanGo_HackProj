@@ -286,8 +286,19 @@ def create_router(
             p_hash=payload.sha256,
         )
 
-    def distribution():
+    def distribution(request: Request):
         nonlocal events
+        if events is None:
+            # Member 3's middleware holds the actual shared production services.
+            # Reuse them so REST observes the same provider policy/token cache as Go.
+            events = next(
+                (
+                    middleware.kwargs.get("deps")
+                    for middleware in request.app.user_middleware
+                    if middleware.cls.__name__ == "MCPBearerAuth"
+                ),
+                None,
+            )
         if events is None:
             from hackathon_backend.api.dependencies import create_tool_dependencies
 
@@ -304,16 +315,22 @@ def create_router(
             raise DomainError("revision_conflict", "Event changed; reload before distribution")
 
     @router.post("/events/{event_id}/distribution/preview", response_model=DistributionPlan)
-    async def distribution_preview(event_id: UUID, payload: RevisionInput, repo: Repo):
+    async def distribution_preview(
+        event_id: UUID, payload: RevisionInput, repo: Repo, request: Request
+    ):
         await require_revision(repo, event_id, payload.expected_revision)
-        plan = await distribution().preview(repo.owner_id, str(event_id))
+        plan = await distribution(request).preview(repo.owner_id, str(event_id))
         await require_revision(repo, event_id, payload.expected_revision)
         return plan
 
     @router.post("/events/{event_id}/distribution/execute", response_model=DistributionResult)
-    async def distribution_execute(event_id: UUID, payload: DistributionInput, repo: Repo):
+    async def distribution_execute(
+        event_id: UUID, payload: DistributionInput, repo: Repo, request: Request
+    ):
         await require_revision(repo, event_id, payload.expected_revision)
-        return await distribution().execute(repo.owner_id, str(event_id), str(payload.approval_id))
+        return await distribution(request).execute(
+            repo.owner_id, str(event_id), str(payload.approval_id)
+        )
 
     @router.post("/connectors", status_code=201)
     async def connector(payload: ConnectorInput, repo: Repo):

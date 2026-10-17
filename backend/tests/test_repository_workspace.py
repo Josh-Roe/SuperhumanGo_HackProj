@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from hackathon_backend.api import create_router
 from hackathon_backend.config import Settings
 from hackathon_backend.domain.models import DomainError
+from hackathon_backend.main import MCPBearerAuth
 from hackathon_backend.mcp_tools.event_tools import EventToolDeps
 from hackathon_backend.repositories.assets import SupabaseAttachmentSource
 from hackathon_backend.repositories.organizer import OrganizerRepository
@@ -191,6 +192,44 @@ def test_distribution_endpoints_use_verified_owner_and_never_create_approvals():
         )
         assert response.status_code == 200
         assert response.json()["sent"] is False
+
+
+def test_rest_reuses_member3_registered_distribution_instance():
+    class SharedDistributor:
+        async def preview(self, owner_id, event_id):
+            assert (owner_id, event_id) == (OWNER, EVENT)
+            return {
+                "event_id": EVENT,
+                "event_revision": 1,
+                "calendar_action": "create",
+                "calendar_event_id": None,
+                "gmail_action": "create_draft",
+                "required_content_kind": "invitation",
+                "invitee_count": 0,
+                "blockers": ["shared-policy"],
+            }
+
+    def handler(request):
+        if request.url.path == "/auth/v1/user":
+            return httpx.Response(200, json={"id": OWNER})
+        assert request.url.path.endswith("organizer_event_json")
+        return httpx.Response(200, json=saved_event())
+
+    app = FastAPI()
+    app.include_router(create_router(SETTINGS, transport=httpx.MockTransport(handler)))
+    app.add_middleware(
+        MCPBearerAuth,
+        token="",
+        deps=EventToolDeps(store=None, principals=None, distributor=SharedDistributor()),
+    )
+    with TestClient(app) as client:
+        result = client.post(
+            f"/api/events/{EVENT}/distribution/preview",
+            headers=HEADERS,
+            json={"expected_revision": 1},
+        )
+    assert result.status_code == 200
+    assert result.json()["blockers"] == ["shared-policy"]
 
 
 def test_supabase_attachments_require_both_files():

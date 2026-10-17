@@ -34,13 +34,18 @@ class PersistentDistributor(Distributor):
         event = await require_event(self.store, owner_id, event_id)
         if event.revision != plan.event_revision:
             raise WorkflowError("revision_conflict", "Event changed during distribution preview")
-        try:
-            files = await self.preflight.source.current_attachments(owner_id, event)
-            if not files:
-                raise WorkflowError("needs_review", "Required reviewed event assets are missing")
-        except WorkflowError as error:
-            plan.blockers.append(f"{error.code}: {error}")
         return plan
+
+    async def _required_attachments(self, owner_id: str, event):
+        # Member 3's asset registration may supply an attachment policy/source.
+        # Its preflight and MIME hooks must still consume the exact bytes loaded
+        # by this production composition, including the mandatory document.
+        if self.preflight.prepared.get() is not None:
+            return await self.preflight.current_attachments(owner_id, event)
+        files = await self.preflight.source.current_attachments(owner_id, event)
+        if not files:
+            raise WorkflowError("needs_review", "Required reviewed event assets are missing")
+        return files
 
     async def execute(self, owner_id: str, event_id: str, approval_id: str):
         event = await require_event(self.store, owner_id, event_id)

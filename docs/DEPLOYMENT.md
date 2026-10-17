@@ -12,8 +12,9 @@ and managed downloads are disabled. Root `.python-version` fixed that: the next 
 succeeded, and Render reports Python 3.12.15. Startup then correctly rejected missing
 server credentials and unregistered persistent routes/MCP. An encryption key is now
 set in Render, with a mode-0600 Git-ignored backup at `backend/.env.render`; do not
-rotate it on the next deployment. The Supabase service-role key and Member 3
-composition remain blockers. Do not mark the event API live until authenticated checks pass.
+rotate it on the next deployment. Member 3's persistent composition is now integrated;
+the Supabase service-role key remains the startup blocker. Do not mark the event API
+live until authenticated checks pass.
 
 Keep Vercel for the frontend and the existing
 Supabase project for Auth, data and files. Deploy the existing Python/FastAPI/MCP
@@ -34,11 +35,12 @@ eligibility/card requirements and current limits at signup. Official limits chec
 
 ### Composition gate
 
-Member 3 must include `api.create_router(settings, events=deps)` **before** the MCP
-catch-all and pass the same `api.dependencies.create_tool_dependencies(settings)`
-to `create_app(events=deps)`. The current `main.py` does not register those factories.
-Event/task creation MCP tools and persistent organizer OAuth/Canva session flows
-remain Member 3's integration. Development-store personal data/tokens are not Git data.
+Member 3's `main.py` now registers REST before the MCP catch-all and composes
+`api.dependencies.create_tool_dependencies(settings)` when server credentials exist.
+The REST execution adapter reuses that exact middleware dependency instance, including
+Go's provider policy and Google token cache. Typed task/event create/update MCP tools,
+the Google callback `/api/google/callback`, and asset/preview services are registered.
+Actual account grants remain separate. Development-store personal data/tokens are not Git data.
 
 The native entrypoint `python -m hackathon_backend.api.serve` refuses startup if REST
 routes are missing/hidden behind MCP, MCP uses a nonpersistent/different database,
