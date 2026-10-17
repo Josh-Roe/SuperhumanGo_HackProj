@@ -5,6 +5,7 @@ import {
   parseWorkspace,
   requestJson,
 } from "./api";
+import type { BearerToken } from "./api";
 import { normalizeContentKind } from "./content";
 import { parseInclusion } from "./inclusion";
 import { emptyFacts, safeUrl } from "./types";
@@ -26,7 +27,7 @@ function scoped(value: Row, id: string) {
   return value;
 }
 
-export function createOrganizerGateway(token: string): EventGateway {
+export function createOrganizerGateway(token: BearerToken): EventGateway {
   const read = createEventTransferGateway(token);
   const path = (id: string) => `/api/events/${encodeURIComponent(id)}`;
   const queued = new Map<string, WorkspaceEvent["work"][number]>();

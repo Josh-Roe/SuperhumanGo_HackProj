@@ -5,6 +5,8 @@ import {
   loadPublicAuthConfig,
   googleSignInUrl,
   completeGoogleSignIn,
+  forgetSession,
+  renewSession,
 } from "./api";
 import { createPreviewGateway } from "./preview";
 import { contentDefinitions, destinations, routeContent } from "./content";
@@ -1263,6 +1265,8 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
     () => eventGateway ?? createPreviewGateway(),
   );
   const [session, setSession] = useState<Session>();
+  // The organizer gateway reads this, so renewing the token keeps its in-memory state.
+  const accessToken = useRef("");
   const [starting, setStarting] = useState(false);
   const [page, setPage] = useState<Page>("events");
   const [step, setStep] = useState<Step>("details");
@@ -1354,24 +1358,42 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   }, [dirty]);
   useEffect(() => {
     if (!session) return;
+    const signedOut = () => {
+      epoch.current++;
+      setBusy(false);
+      setEvents([]);
+      setGateway(createPreviewGateway());
+      setSession(undefined);
+      setRecord(null);
+      setEditing(false);
+      setStarting(false);
+      setDirty(false);
+      setMessage("You were signed out. Sign in again in Settings.");
+    };
+    let active = true;
+    // Renew a minute early; past expiry, a failed renewal signs out.
     const timer = window.setTimeout(
-      () => {
-        epoch.current++;
-        setBusy(false);
-        setEvents([]);
-        setGateway(createPreviewGateway());
-        setSession(undefined);
-        setRecord(null);
-        setEditing(false);
-        setStarting(false);
-        setDirty(false);
-        setMessage("You were signed out. Sign in again in Settings.");
-      },
-      Math.max(0, session.expires_at - Date.now()),
+      () =>
+        renewSession()
+          .catch(() => null)
+          .then((next) => {
+            if (!active) return;
+            if (!next) return signedOut();
+            accessToken.current = next.access_token;
+            setSession(next);
+          }),
+      Math.max(0, session.expires_at - Date.now() - 60_000),
     );
-    return () => clearTimeout(timer);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [session]);
-  function connectWorkspace(next: EventGateway, activeSession: Session) {
+  function connectWorkspace(
+    next: EventGateway,
+    activeSession: Session,
+    message = "Signed in. Your events are on the Your events page.",
+  ) {
     if (!canLeave()) return;
     epoch.current++;
     setEvents([]);
@@ -1382,12 +1404,19 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
     setEditing(false);
     setStarting(false);
     setDirty(false);
-    setMessage("Signed in. Your events are on the Your events page.");
+    setMessage(message);
   }
   const googleSignInResult = useEffectEvent(
-    (result: { gateway: EventGateway; session: Session } | Error) => {
+    (
+      result:
+        { gateway: EventGateway; session: Session; restored: boolean } | Error,
+    ) => {
       if (!(result instanceof Error))
-        return connectWorkspace(result.gateway, result.session);
+        return connectWorkspace(
+          result.gateway,
+          result.session,
+          result.restored ? "" : undefined,
+        );
       setPage("settings");
       setError(result.message);
     },
@@ -1395,11 +1424,16 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
   useEffect(() => {
     if (eventGateway) return;
     completeGoogleSignIn()
-      .then(async (activeSession) => {
+      .then(async (signedIn) => {
+        const restored = !signedIn;
+        // A reload or new tab resumes the saved session; offline keeps it for later.
+        const activeSession =
+          signedIn ?? (await renewSession().catch(() => null));
         if (!activeSession) return;
-        const next = createOrganizerGateway(activeSession.access_token);
+        accessToken.current = activeSession.access_token;
+        const next = createOrganizerGateway(() => accessToken.current);
         await next.list();
-        googleSignInResult({ gateway: next, session: activeSession });
+        googleSignInResult({ gateway: next, session: activeSession, restored });
       })
       .catch((err: unknown) =>
         googleSignInResult(
@@ -2008,6 +2042,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     onClick={() => {
                       if (canLeave()) {
                         epoch.current++;
+                        forgetSession();
                         setEvents([]);
                         setBusy(false);
                         setSession(undefined);
