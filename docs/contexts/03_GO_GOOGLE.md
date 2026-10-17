@@ -54,6 +54,12 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
   - Likely root cause: a stray newline in the first pasted token makes the gateway fail before sending (`<no HTTP response>`, 7 ms). The domain was not blocked.
   - Each domain change in a pack release requires the user to sign in again.
   - Go asks for in-chat approval before each write tool (`claim_go_work`, `save_generated_content`).
+- **2026-10-16 | live, tested | Go writing loop:**
+  - After the organizer approved the tool calls in Go chat, Go ran `claim_go_work` → `get_event` → `save_generated_content` ×3 on `dev-event-1` revision 1.
+  - Server state: the work item is `succeeded`; `invitation` (with subject), `description` and `summary` are saved as `producer: superhuman_go`, `needs_review`.
+  - The drafts keep unknowns ("not yet confirmed" for entry, step-free access, captions, diet). They contain no invitee emails, only the organizer contact.
+  - This is in-memory dev mode, not Supabase. Nothing was sent.
+  - Next: organizer approve → publish to the test inbox only → revise → change notice → RSVP.
 
 ## Handoffs (proposed, awaiting recipient agreement)
 
