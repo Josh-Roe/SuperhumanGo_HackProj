@@ -6,6 +6,16 @@ Branch: `codex/member-1-frontend`, based on `3bd33b3`.
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four member contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/01_FRONTEND.md) before work. Write only this personal context. Preserve other members' changes.
 
+## CalSpork-inspired light blue glass UI — 2026-10-16
+
+**User | agreed, implemented | `codex/member-1-liquid-glass`, based on merged main `61edb62`:** the user is now acting as Member 1 and requested an Apple Liquid Glass-inspired light blue theme matching their CalSpork project. Read CalSpork's current `mobile/theme.ts`, `GlassCard.tsx` and `ScreenBackground.tsx` as the visual reference: translucent white surfaces, blue/cyan background glows, bright edges, rounded corners, blur/saturation and soft shadows. This is a web CSS treatment, not Apple's native Liquid Glass API.
+
+- Replaced the previous green/cream styling throughout `frontend/src/index.css` and `App.css` with blue material tokens, a floating frosted sidebar, glass cards/panels, pill buttons, segmented event stages, and larger, clearer type. Dashboard adds a decorative code-native calendar/mail/people illustration and a Go-first planning action using the existing create flow. The illustration is hidden from assistive technology and makes no provider-status claim.
+- Preserved the three sidebar destinations, manual fallback, authenticated read adapter, Go prompts, revision/provenance states, review/publication gates, private RSVP display, and explicit local-preview disclosure. No API/schema, backend, dependency or deployment changes.
+- Keyboard focus remains visible, focused headings clear the mobile navigation, controls retain 44px minimum button targets, and small screens use single-column forms/cards. Added reduced-motion/reduced-transparency and no-backdrop-filter/forced-colors fallbacks. Blue primary gradient endpoints have at least 4.67:1 contrast with white text; this is a targeted check, not a full WCAG audit.
+- **Tested locally:** frontend lint, all **37 existing tests**, TypeScript and production Vite build pass. Browser visual/DOM checks cover 1440px desktop, 768px tablet, 390px phone and 320px minimum layouts without document horizontal overflow; inspected event details/review, Settings and Profile, and confirmed keyboard Tab reaches a visibly outlined input. Synthetic preview only; no live account/provider actions or deployment performed.
+- **Handoff:** frontend-only review/merge; existing live backend/MCP/account blockers are unaffected. Updated only `frontend/**` and this context. Review screenshots are local artifacts outside Git; no attendee/private account data included.
+
 ## Go-first creation and first transfer test — 2026-10-16
 
 **User | agreed, implemented:** New event now begins by prompting standalone Superhuman Go, with expanded MCP setup and copyable prompt. It creates no local/server placeholder. Manual entry is secondary. After Go saves, the organizer checks Your events; sample preview cannot claim to import a real Go event.

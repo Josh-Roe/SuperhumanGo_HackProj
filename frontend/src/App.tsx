@@ -31,6 +31,64 @@ const steps: { id: Step; name: string }[] = [
 ];
 const GO_URL = "https://go.superhuman.com/";
 const MCP_URL = safeUrl(import.meta.env.VITE_PUBLIC_MCP_URL);
+function GatheringIllustration() {
+  return (
+    <div className="hero-art" aria-hidden="true">
+      <div className="hero-orbit" />
+      <div className="hero-calendar">
+        <div className="hero-calendar-top">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+          >
+            <rect x="3" y="5" width="18" height="16" rx="4" />
+            <path d="M7 3v5m10-5v5M3 11h18" />
+          </svg>
+          <span />
+        </div>
+        <div className="hero-calendar-grid">
+          {Array.from({ length: 12 }, (_, i) => (
+            <span key={i} />
+          ))}
+        </div>
+      </div>
+      <div className="hero-float hero-mail">
+        <svg
+          viewBox="0 0 32 32"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="4" y="7" width="24" height="18" rx="5" />
+          <path d="m5 9 9 8a3 3 0 0 0 4 0l9-8" />
+        </svg>
+      </div>
+      <div className="hero-float hero-people">
+        <svg
+          viewBox="0 0 32 32"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        >
+          <circle cx="13" cy="11" r="4" />
+          <path d="M5 26v-3a8 8 0 0 1 16 0v3m1-19a4 4 0 0 1 0 8m3 4a7 7 0 0 1 3 7" />
+        </svg>
+      </div>
+      <svg className="hero-spark" viewBox="0 0 40 40" fill="none">
+        <path
+          d="M20 4c0 10-6 16-16 16 10 0 16 6 16 16 0-10 6-16 16-16C26 20 20 14 20 4Z"
+          fill="currentColor"
+          opacity=".55"
+        />
+      </svg>
+    </div>
+  );
+}
 function Badge({
   children,
   tone = "",
@@ -1362,7 +1420,17 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           }}
         >
           <span className="brand-icon" aria-hidden="true">
-            ↗
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="4" y="5" width="16" height="16" rx="4" />
+              <path d="M8 3v5m8-5v5M4 11h16m-12 5 3 2 5-4" />
+            </svg>
           </span>
           Event Workspace
         </a>
@@ -1386,6 +1454,13 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
             </button>
           ))}
         </nav>
+        <div className="sidebar-caption">
+          <span>POWERED BY SUPERHUMAN GO</span>
+          <p>
+            A little more clarity.
+            <br />A lot more connection.
+          </p>
+        </div>
         <div className="sidebar-profile">
           <span className="avatar" aria-hidden="true">
             {profile.name.charAt(0).toUpperCase()}
@@ -1501,6 +1576,33 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           )}
           {page === "events" && !editing && !starting && (
             <>
+              <section
+                className="workspace-hero"
+                aria-labelledby="gathering-heading"
+              >
+                <div className="hero-copy">
+                  <span className="eyebrow">
+                    LESS PLANNING. MORE POSSIBILITY.
+                  </span>
+                  <h2 id="gathering-heading">
+                    Good plans.
+                    <br />
+                    <span>Great gatherings.</span>
+                  </h2>
+                  <p>
+                    Bring the details together. Let Superhuman Go help with the
+                    rest.
+                  </p>
+                  <button
+                    className="primary"
+                    disabled={busy}
+                    onClick={addEvent}
+                  >
+                    Plan with Superhuman Go <span aria-hidden="true">↗</span>
+                  </button>
+                </div>
+                <GatheringIllustration />
+              </section>
               <div className="events-toolbar">
                 <h2>
                   Upcoming events <span>{events.length}</span>
