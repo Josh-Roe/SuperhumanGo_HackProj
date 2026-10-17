@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
-from pydantic import Field, HttpUrl, ValidationError
+from pydantic import Field, HttpUrl, ValidationError, WithJsonSchema
 
 from hackathon_backend.config import Settings
 from hackathon_backend.domain.models import (
@@ -34,6 +34,10 @@ Title = Annotated[str, Field(min_length=1, max_length=200)]
 LongText = Annotated[str, Field(max_length=30_000)]
 Limit = Annotated[int, Field(ge=1, le=100)]
 TaskStatus = Literal["todo", "in_progress", "done"]
+# Supply self-contained property schemas to MCP action confirmation clients.
+# Keep the canonical Pydantic validator while avoiding references into the
+# tool's root $defs at this client compatibility boundary.
+MCPInvitee = Annotated[InviteeInput, WithJsonSchema(InviteeInput.model_json_schema())]
 
 
 class OrganizerRecords(Protocol):
@@ -151,7 +155,7 @@ def register_organizer_tools(
         location: Annotated[str, Field(max_length=500)] = "",
         links: Annotated[list[HttpUrl], Field(max_length=20)] | None = None,
         organizer_contact: Annotated[str, Field(max_length=500)] = "",
-        invitees: Annotated[list[InviteeInput], Field(max_length=500)] | None = None,
+        invitees: Annotated[list[MCPInvitee], Field(max_length=500)] | None = None,
     ) -> dict[str, Any]:
         """Create an event ONLY when the organizer asks you to in this conversation.
 
@@ -198,7 +202,7 @@ def register_organizer_tools(
         timezone: Annotated[str, Field(max_length=100)] | None = None,
         links: Annotated[list[HttpUrl], Field(max_length=20)] | None = None,
         organizer_contact: Annotated[str, Field(max_length=500)] | None = None,
-        invitees: Annotated[list[InviteeInput], Field(max_length=500)] | None = None,
+        invitees: Annotated[list[MCPInvitee], Field(max_length=500)] | None = None,
     ) -> dict[str, Any]:
         """Change an event ONLY when the organizer asks you to; confirm the change first.
 

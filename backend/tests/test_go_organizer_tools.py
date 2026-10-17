@@ -148,6 +148,22 @@ def test_tools_are_listed_with_read_write_annotations(setup):
     assert "expected_revision" in tools["update_event"]["inputSchema"]["required"]
 
 
+def test_event_action_schemas_inline_guest_validation_for_confirmation_clients(setup):
+    db, client, tokens = setup
+    tools = {t["name"]: t for t in rpc(client, tokens["a"], "tools/list", {})["tools"]}
+    for name in ("create_event", "update_event"):
+        schema = tools[name]["inputSchema"]
+        assert '"$ref"' not in json.dumps(schema)
+        assert "$defs" not in schema
+        guests = schema["properties"]["invitees"]["anyOf"][0]
+        assert guests["items"]["required"] == ["email"]
+        assert guests["items"]["additionalProperties"] is False
+        assert tools[name]["annotations"]["readOnlyHint"] is False
+    invalid = {**EVENT, "invitees": [{"email": "invalid"}]}
+    assert call(client, tokens["a"], "create_event", invalid)["isError"]
+    assert db.writes == 0
+
+
 def test_unauthenticated_calls_are_rejected(setup):
     db, client, _ = setup
     for token in ("", "guess"):

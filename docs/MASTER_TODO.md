@@ -73,7 +73,7 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
 
 ### Superhuman Go
 
-- [~] **A26 — Go write confirmation compatibility.** **Claimed:** Member 1 / Tanay, 2026-10-16, main, explicit user authorization. Actual Go list_events succeeds but create_event confirmation cannot display. Remove schema references/nullable array unions from organizer tools while preserving validation, ownership, idempotency and write confirmation; test and verify actual Go draft creation after backend deploy.
+- [~] **A26 — Go write confirmation compatibility.** **Claimed:** Member 1 / Tanay, 2026-10-16, main, explicit user authorization. Actual Go list_events succeeds but create_event confirmation cannot display. Remove schema references from organizer tools while preserving validation, ownership, idempotency and write confirmation; test and verify actual Go draft creation after backend deploy.
 
 - [x] **A25 — Copy personal Go key.** **Claimed:** Member 1 (Tanay), 2026-10-16, main. User cannot copy the masked website key. Add explicit clipboard copy and reveal/select fallback, verify with synthetic token tests, deploy clean main and verify copy controls without reading credentials. **Done:** `1351c1c` — mocked clipboard success/denial regression, 78 tests/lint/build; live Production dpl_8La954hGBBUwFJ4zDiHAmHuBLWXT READY, served JS contains Copy/Show key and assets/health/config 200. Organizer performs actual secret copy.
 
