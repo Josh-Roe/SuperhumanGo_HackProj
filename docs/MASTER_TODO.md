@@ -1,6 +1,6 @@
 # Master to-do: everything left before the spec is met
 
-Snapshot 2026-10-16 (America/Los_Angeles), main at `e052761`. Written for agents. Read [AGENTS.md](../AGENTS.md) and the four [contexts](contexts/) first. Those files take precedence over this list. Never record secrets or private RSVP data here.
+Snapshot 2026-10-16 (America/Los_Angeles), main at `e265193`. Written for agents. Read [AGENTS.md](../AGENTS.md) and the four [contexts](contexts/) first. Those files take precedence over this list. Never record secrets or private RSVP data here.
 
 ## How to contribute (all agents, read before editing)
 
@@ -34,7 +34,7 @@ Tags: `[MANUAL]` needs a human with an account, browser, dashboard or judgment. 
 
 | Demo step | Evidence today | Gap |
 | --- | --- | --- |
-| Backend hosting | Render service `https://superhuman-go-event-backend.onrender.com` exists, but `/api/health` and `/mcp` return no response (checked 2026-10-16). Likely cause: `backend/Dockerfile` hardcodes `--port 8000`, while Render injects `PORT`. | A host that answers (see A1, M1) |
+| Backend hosting | Native Render service is live at `https://superhuman-go-event-backend.onrender.com`: health 200 and unauthenticated MCP/events/tasks 401, deployed `5d1595a`. Supabase/encryption configured; Google credentials absent in dashboard. | Finish Google settings and updated deployment (M1) |
 | Website | `https://mtcxhackathon1.vercel.app` serves the frontend. `/api/*` returns 503 because `BACKEND_ORIGIN` is unset. | M2 |
 | Create event via Go | `create_event`/`update_event` MCP tools are implemented and tested (mocked). They return `dashboard_url` when `APP_URL` is set. Not live against Supabase. | M1–M5, A2, A3 |
 | Go prepares prose | Live in **dev mode** (in-memory, `dev-event-1`): Go saved description, summary, invitation, change notice. Not live on Supabase. | Re-run on Supabase (M8) |
@@ -53,12 +53,13 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
 ### Hosting and deployment
 
 - [ ] **M1 — Get Render answering.**
+  - Note (Member 2/User 2, 2026-10-16 18:30 PT): live core checks passed (`5a321d3`); user is entering missing Google client credentials directly in Render. Existing Supabase/encryption values are preserved. Domain/dashboard/Google callback and missing scaffold token will be configured after that entry, with WORKFLOW_DEV_MODE removed.
   - Note (Member 3, 2026-10-16): `/api/health` → 200, `/mcp` → 401, `/api/events` → 401. `/api/google/status` → 404, so the `GOOGLE_*`/`CREDENTIAL_ENCRYPTION_KEY` env vars look unset (Google connect only registers when they are set). Owner 2. Open the Render dashboard → service → Logs. If the issue is the port, set env `PORT=8000` as a stopgap until A1 lands. Set env: `APP_DOMAIN=superhuman-go-event-backend.onrender.com`, `APP_URL=https://mtcxhackathon1.vercel.app`, `MCP_AUTH_TOKEN`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CREDENTIAL_ENCRYPTION_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI=https://superhuman-go-event-backend.onrender.com/api/google/callback`. Leave `WORKFLOW_DEV_MODE` unset. Done when `curl https://superhuman-go-event-backend.onrender.com/api/health` returns 200 and an unauthenticated POST to `/mcp` returns 401. Free tier sleeps, so wake it before any demo.
 - [ ] **M2 — Point Vercel at Render.** Owner 1 or 2. Vercel project (root `frontend`) env: `BACKEND_ORIGIN=https://superhuman-go-event-backend.onrender.com/` (server-only) and `VITE_PUBLIC_MCP_URL=https://superhuman-go-event-backend.onrender.com/mcp`, then redeploy (`VITE_*` is baked at build time). Done when `https://mtcxhackathon1.vercel.app/api/health` returns 200.
 - [ ] **M3 — Google OAuth client.** Owner 3. In Google Cloud Console, add redirect URI `https://superhuman-go-event-backend.onrender.com/api/google/callback`. Add every test organizer and invitee as OAuth test users.
   - Note (Member 3, 2026-10-16): as of the last change in this session, the client lists only the dev redirect `http://localhost:8000/api/dev/google/callback`, and the user's own Gmail is the only test user (03 context). The production route exists in `d5ce546`. The console was not rechecked during this reconcile.
 
-- [ ] **M11 — Apply the Gemini/Notion migration.** Owner 2. Apply `supabase/migrations/20261017010000_remove_gemini_and_notion.sql` (`0d9ebf1`) to project `qkfebdbwrmpisejnazud`. It narrows the `generated_content` kind and producer checks, and it stops with an error rather than deleting if any row still uses `notion_note` or `gemini`. Done when the migration shows as applied and inserting `producer='gemini'` is rejected. Source: user decision 2026-10-16 to drop Gemini and Notion; not applied because no Supabase CLI is available on Member 3's machine.
+- [~] **M11 — Apply the Gemini/Notion migration.** Owner 2. Apply `supabase/migrations/20261017010000_remove_gemini_and_notion.sql` (`0d9ebf1`) to project `qkfebdbwrmpisejnazud`. It narrows the `generated_content` kind and producer checks, and it stops with an error rather than deleting if any row still uses `notion_note` or `gemini`. Done when the migration shows as applied and inserting `producer='gemini'` is rejected. Source: user decision 2026-10-16 to drop Gemini and Notion. **Claimed:** User 2, 2026-10-16 18:30 PT, `codex/member-2-backend-supabase`; already applied as `20261017005831` (matching local filename), verifying rejection live without duplicate DDL.
 
 ### Superhuman Go
 
@@ -88,6 +89,7 @@ Each item lists files, the change, and how to verify it. Run `uv run --project b
 - [ ] **A3 — Contract docs.** `docs/INTEGRATION_CONTRACT.md`: add `/api/google/connect|callback|status`, the `/api/events/{id}/assets/*` routes (including `/flyer/approve` and `/flyer/abandon`), MCP organizer tools, and `dashboard_url`/`APP_URL`. Update `PROJECT_CONTEXT.md` evidence. README deploy section: Vercel `BACKEND_ORIGIN`/`VITE_PUBLIC_MCP_URL`, Render env list.
 - [ ] **A18 — Confirm Go organizer-tool tenancy.** Owner 2. `task_repository` uses the admin `Database`; isolation for Go's `create_event`/`update_event` relies on the `p_owner` filter in `organizer_write_record`, not RLS. Confirm this is acceptable, or provide an RLS-scoped path. Verify: an isolation SQL test with two organizers through the RPC. Source: 03 context handoff (`d5ce546`).
 - [~] **A10 — Read contracts the UI needs.** Owner-scoped REST reads for current Go work, Gmail binding (sent/draft IDs + revision), and approvals. Make approval creation idempotent and recoverable on reload. A versioned save endpoint for inclusion facts. Requested in 01 context. **Claimed:** Member 1 (User 1, lane L2), 2026-10-16 18:25 PT, main
+  - Note (User 2, 2026-10-16): PR #7 already supplies `/work`, `/bindings`, GET approvals, idempotent approval recovery and versioned inclusion save, with applied migrations `20261017003828`/`20261017004313`, local and hosted rollback tests. Please compare before duplicating schema; User 2 will review new L2/L3 migrations as they land.
 - [ ] **A11 — Canva and Google plumbing.** Canva OAuth connect/refresh writing vault provider `canva` as `{access_token}`. A durable flyer-job table and lease, replacing vault state and the in-process lock. A Google token-cache "forget" hook so reconnects take effect immediately. Requested in 03 context.
 
 ### Owner 3: Go, Google, composition
