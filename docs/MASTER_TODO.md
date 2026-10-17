@@ -111,7 +111,7 @@ Each item lists files, the change, and how to verify it. Run `uv run --project b
 - [ ] **A7 — Canva live path.** After M6: export flyer → `SupabaseAssetStorage.put_if_absent` → `publish_current` → attachment via `SupabaseAttachmentSource`. Verify a real upload and signed-URL round trip (currently unverified).
 - [ ] **A8 — Canva revision on change.** On a new event revision, update the current design or create a new version and export, and record its revision. Old exports stay as immutable snapshots.
 - [ ] **A9 — Inclusion report transport.** With 2 and 3: an authenticated inclusion-report route and pending Canva operation previews (operation ID, digest, revision, thumbnails, approval action) that the UI consumes.
-- [ ] **A19 — Canva pending-export poll.** Owner 4. `providers/canva` has no way to poll a pending export, so `/api/events/{id}/assets/flyer/export` requests a new export on each call until one completes. Add a poll or resume using the export job ID. Verify: a mocked test where a second export call polls the same job. Source: 03 context handoff (`d5ce546`).
+- [~] **A19 — Canva pending-export poll.** Owner 4. `providers/canva` has no way to poll a pending export, so `/api/events/{id}/assets/flyer/export` requests a new export on each call until one completes. Add a poll or resume using the export job ID. Verify: a mocked test where a second export call polls the same job. Source: 03 context handoff (`d5ce546`). **Claimed:** Member 1 (User 1, lane L3), 2026-10-16 18:26 PT, main
 - [ ] **A12 — Pitch assets.** `docs/PRESENTATION.md`: a 2-minute script that follows the final demo, plus the disclosure slide. Add `assets/**` for Canva deck exports.
 
 ## 4. Critical path
