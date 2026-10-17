@@ -6,6 +6,8 @@ Current branch: `codex/member-1-live-adapter`, based on merged main `1752141`. E
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four member contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/01_FRONTEND.md) before work. Write only this personal context. Preserve other members' changes.
 
+**2026-10-16 | implemented, mocked (A17, `ef6883b`):** `frontend/src/InclusionEditor.tsx` + `inclusion.ts` edit facts in the A10 server form via GET/PUT `/inclusion` with version-conflict reload; findings now come from `/inclusion`.
+
 **2026-10-16 | implemented, mocked (A16, `c308e0e`):** `frontend/src/ProviderPanels.tsx` + `providers.ts`: exact-digest flyer approve/abandon, Google/Canva connect + status, A13 callback notice, distribution blockers. Proposed for Owner 3: `GET /api/events/{id}/distribution/preview` returning `DistributionPlan` (only the MCP tool exists).
 
 ## CalSpork-inspired light blue glass UI — 2026-10-16

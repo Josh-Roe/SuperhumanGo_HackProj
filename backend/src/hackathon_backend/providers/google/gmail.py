@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 
 from hackathon_backend.providers.google._http import GoogleREST, segment
+from hackathon_backend.providers.google.mime import message_header
 from hackathon_backend.workflows.ports import GoogleTokenSource
 
 GMAIL_BASE_URL = "https://gmail.googleapis.com/gmail/v1/users/me"
@@ -74,3 +75,45 @@ class GoogleGmailAPI:
         )
         messages = (result or {}).get("messages", [])
         return [message for message in messages if isinstance(message, dict)]
+
+    async def find_by_message_id(self, owner_id: str, rfc822_message_id: str) -> list[dict]:
+        """Read-back for unknown create/send outcomes via the deterministic Message-ID header.
+
+        Search may lag a just-written message; callers treat "found" as proof, never "absent"
+        as proof that a send did not happen.
+        """
+        bare = rfc822_message_id.strip().strip("<>")
+        query = {"q": f"rfc822msgid:{bare}", "includeSpamTrash": "false"}
+        listing = await self._rest.request(owner_id, "GET", "/messages", params=query)
+        drafts = await self._rest.request(owner_id, "GET", "/drafts", params=query)
+        draft_ids = {
+            draft.get("message", {}).get("id"): draft.get("id")
+            for draft in (drafts or {}).get("drafts", []) or []
+            if isinstance(draft, dict)
+        }
+        found = []
+        for item in (listing or {}).get("messages", []) or []:
+            message_id = item.get("id") if isinstance(item, dict) else None
+            if not message_id:
+                continue
+            message = await self._rest.request(
+                owner_id,
+                "GET",
+                f"/messages/{segment(message_id)}",
+                params={"format": "metadata", "metadataHeaders": "Message-ID"},
+                none_on_404=True,
+            )
+            if not message or "TRASH" in message.get("labelIds", []):
+                continue
+            header = message_header(message, "Message-ID") or ""
+            if header.strip().strip("<>") != bare:
+                continue
+            found.append(
+                {
+                    "id": message_id,
+                    "threadId": message.get("threadId"),
+                    "labelIds": message.get("labelIds", []),
+                    "draft_id": draft_ids.get(message_id),
+                }
+            )
+        return found

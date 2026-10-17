@@ -161,7 +161,11 @@ def create_app(
         if supabase_rest_configured(settings):
             app.include_router(create_router(settings))
         if google_connect_configured(settings):
-            app.include_router(google_connect_router(settings))
+            # Drop the cached access token for an organizer as soon as they reconnect Google.
+            tokens = events.distributor.tokens if events and events.distributor else None
+            app.include_router(
+                google_connect_router(settings, on_change=getattr(tokens, "forget", None))
+            )
         if supabase and events is not None:
             register_asset_services(app, mcp, settings, events)
 

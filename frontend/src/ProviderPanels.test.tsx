@@ -257,3 +257,56 @@ it("says plainly when the server has no distribution preview route", async () =>
     /does not show the distribution preview yet/,
   );
 });
+
+it("connects Canva through the browser-bound backend bootstrap", async () => {
+  const url = `https://superhuman-go-event-backend.onrender.com/api/canva/start?state=${"s".repeat(43)}`;
+  const fetcher = server({
+    "GET /api/canva/status": [[200, { configured: true, connected: false }]],
+    "POST /api/canva/connect": [[200, { authorization_url: url }]],
+  });
+  const navigate = vi.fn();
+  render(
+    <ProviderConnection
+      provider="canva"
+      accessToken="session-1"
+      navigate={navigate}
+    />,
+  );
+  await screen.findByText("Not connected.");
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Connect Canva" }));
+  expect(navigate).toHaveBeenCalledWith(url);
+  expect(fetcher.mock.calls[1][1].headers).toMatchObject({
+    Authorization: "Bearer session-1",
+  });
+});
+
+it.each([
+  "https://evil.example/api/canva/start?state=" + "s".repeat(43),
+  "https://superhuman-go-event-backend.onrender.com/api/canva/start?state=short",
+  "https://superhuman-go-event-backend.onrender.com/api/canva/start?state=" +
+    "s".repeat(43) +
+    "&next=https://evil.example",
+])("refuses an invalid Canva bootstrap URL: %s", async (url) => {
+  server({
+    "GET /api/canva/status": [[200, { connected: false }]],
+    "POST /api/canva/connect": [[200, { authorization_url: url }]],
+  });
+  const navigate = vi.fn();
+  render(
+    <ProviderConnection
+      provider="canva"
+      accessToken="session-1"
+      navigate={navigate}
+    />,
+  );
+  await screen.findByText("Not connected.");
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Connect Canva" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "unsafe Canva connection link",
+  );
+  expect(navigate).not.toHaveBeenCalled();
+});

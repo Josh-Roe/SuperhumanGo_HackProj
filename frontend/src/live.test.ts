@@ -17,6 +17,13 @@ describe("published organizer REST adapter", () => {
     expect(JSON.stringify(snapshot)).not.toContain("DO NOT DISPLAY");
     expect(snapshot.gmail).toBeNull();
     expect(snapshot.live?.warnings.join(" ")).toContain("Gmail draft bindings");
+    expect(snapshot.findings).toEqual([
+      expect.objectContaining({
+        category: "religious_observances",
+        status: "attention",
+        conflicts: ["Yom Kippur"],
+      }),
+    ]);
     expect(
       fetcher.mock.calls.every(
         ([, options]) =>

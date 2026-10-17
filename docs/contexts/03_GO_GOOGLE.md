@@ -92,6 +92,9 @@ Own official Go connector/agent instructions, authenticated event MCP tools, `wo
   - **Not live-verified:** the Supabase REST round trip, connector-token resolution in the database, the production Google consent → vault path, and Canva export → Storage → attachment.
   - **Deploy steps:** `docs/SUPERHUMAN.md#deploy`.
 
+- **2026-10-16 | main | implemented, tested (mocked) | A14 unknown-effect reconciliation:** `Distributor` reads back Calendar (event revision) and Gmail (draft present / SENT label / deterministic `Message-ID` search) before retrying a Gmail step that failed without proof of no effect or any step left `running` > 2 min; adopts the receipt, retries once only after a proven no-effect, else `needs_review` (`tests/test_workflow_unknown_effect.py`). Not live-verified: Gmail keeping our `Message-ID` header and `rfc822msgid:` search latency.
+- **2026-10-16 | main | implemented, tested (mocked) | A11 Google forget hook:** `google_connect_router(..., on_change=)` calls `VaultTokenSource.forget(owner)` after storing a new grant (wired in `main.py` and the dev callback); `forget` also stops an in-flight refresh from caching the old grant (`test_google_connect.py`, `test_google_oauth.py`). No disconnect route: `CredentialVault` has no delete (Member 2). Live reconnect waits on M1/M3/M5.
+
 ## Handoffs (proposed, awaiting recipient agreement)
 
 - **Member 2 (from integration, 2026-10-16):**

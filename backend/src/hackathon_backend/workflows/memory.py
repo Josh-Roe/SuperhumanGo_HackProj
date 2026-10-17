@@ -2,8 +2,11 @@
 
 import hashlib
 import secrets
+from typing import Any
 
+from hackathon_backend.workflows.go_work import WorkflowError
 from hackathon_backend.workflows.models import (
+    NO_EFFECT_CODES,
     Approval,
     CalendarBinding,
     ContentKind,
@@ -111,7 +114,60 @@ class InMemoryWorkflowStore:
         return op if op and self._owns(owner_id, op.event_id) else None
 
     async def put_operation(self, owner_id, operation):
-        self.operations[operation.idempotency_key] = operation
+        """Same transition rules as Supabase organizer_put_operation (attempts are store-owned)."""
+        current = self.operations.get(operation.idempotency_key)
+        if operation.state == "running" and any(
+            o.event_id == operation.event_id
+            and o.state == "running"
+            and o.idempotency_key != operation.idempotency_key
+            for o in self.operations.values()
+        ):
+            raise WorkflowError("operation_in_progress", "another provider step is running")
+        if current is None:
+            if operation.state != "running":
+                raise WorkflowError("needs_review", "operation must start running")
+            operation.attempts = 1
+        else:
+            if current.state == "succeeded":
+                if operation.state != "succeeded" or operation.receipt != current.receipt:
+                    raise WorkflowError("idempotency_conflict", "receipt is immutable")
+                return
+            if operation.state == "running":
+                if current.state == "running":
+                    raise WorkflowError("operation_in_progress", "operation is running")
+                if (
+                    current.state == "failed"
+                    and current.kind.value in ("gmail_draft", "gmail_send")
+                    and (current.error_code or "") not in NO_EFFECT_CODES
+                ):
+                    raise WorkflowError("reconciliation_required", "read back provider first")
+                operation.attempts = current.attempts + 1
+            elif operation.attempts != current.attempts:
+                raise WorkflowError("idempotency_conflict", "stale attempt")
+        self.operations[operation.idempotency_key] = operation.model_copy()
+
+    async def reconcile_operation(
+        self, owner_id: str, key: str, attempt: int, outcome: str, receipt: dict[str, Any]
+    ) -> Operation:
+        """Same contract as SupabaseWorkflowStore.reconcile_operation (server read-back only)."""
+        op = self.operations.get(key)
+        if op is None or not self._owns(owner_id, op.event_id):
+            raise WorkflowError("not_found", "operation not found")
+        if op.attempts != attempt:
+            raise WorkflowError("idempotency_conflict", "stale attempt")
+        if op.state == "succeeded":
+            return op
+        if outcome not in ("succeeded", "not_applied") or not receipt:
+            raise WorkflowError("needs_review", "reconcile needs a definite outcome and receipt")
+        done = op.model_copy(
+            update={
+                "state": "succeeded" if outcome == "succeeded" else "failed",
+                "error_code": None if outcome == "succeeded" else "confirmed_no_effect",
+                "receipt": receipt,
+            }
+        )
+        self.operations[key] = done
+        return done
 
     async def list_operations(self, owner_id, event_id):
         if not self._owns(owner_id, event_id):
