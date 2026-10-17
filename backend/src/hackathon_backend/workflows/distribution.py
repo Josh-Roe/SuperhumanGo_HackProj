@@ -6,8 +6,16 @@ connectors, which would duplicate invites/emails and lose receipts.
 
 Every provider step is an Operation keyed by event/revision(/content), so a retry after any crash
 reuses the recorded result or reconciles provider state instead of repeating the write.
+
+Unknown outcomes (A14): a Gmail step that failed without proof of no effect, or any step left
+`running` by a dead worker, is read back from the provider before another attempt. If the effect
+happened, its receipt is adopted; if it provably did not, the step is retried once; otherwise the
+step stays blocked as `needs_review`. Nothing is ever retried blindly.
 """
 
+import re
+from collections.abc import Awaitable, Callable
+from datetime import datetime, timedelta
 from typing import Any, Protocol
 
 from pydantic import BaseModel
@@ -16,6 +24,7 @@ from hackathon_backend.providers.google.calendar import calendar_body, determini
 from hackathon_backend.providers.google.mime import build_message
 from hackathon_backend.workflows.go_work import WorkflowError, require_event
 from hackathon_backend.workflows.models import (
+    NO_EFFECT_CODES,
     Approval,
     CalendarBinding,
     ContentKind,
@@ -39,6 +48,12 @@ from hackathon_backend.workflows.ports import (
 CALENDAR_ID = "primary"
 SENDING_ACTIONS = {"publish", "update"}
 APPROVAL_ACTIONS = SENDING_ACTIONS | {"draft_only"}
+# A live attempt is bounded by Google's 15 s request timeout (a few calls per step), so a step
+# still `running` after this long belongs to a dead worker and may be read back and taken over.
+STALE_RUNNING_AFTER = timedelta(minutes=2)
+
+# (outcome, receipt) for store.reconcile_operation; None means the read-back proved nothing.
+ReadBack = tuple[str, dict[str, Any]] | None
 
 
 class AttachmentPolicy(Protocol):
@@ -75,8 +90,10 @@ class Distributor:
         tokens: GoogleTokenSource,
         attachments: AttachmentSource | None = None,
         attachment_policy: AttachmentPolicy | None = None,
+        clock: Callable[[], datetime] = utcnow,
     ) -> None:
         self.store = store
+        self.clock = clock
         self.calendar = calendar
         self.gmail = gmail
         self.tokens = tokens
@@ -221,7 +238,13 @@ class Distributor:
         return content
 
     async def _begin(
-        self, owner_id: str, event: EventSnapshot, approval: Approval, kind: OperationKind, key: str
+        self,
+        owner_id: str,
+        event: EventSnapshot,
+        approval: Approval,
+        kind: OperationKind,
+        key: str,
+        read_back: Callable[[Operation], Awaitable[ReadBack]],
     ) -> Operation:
         op = await self.store.get_operation(owner_id, key)
         if op is None:
@@ -234,16 +257,49 @@ class Distributor:
             )
         if op.state == "succeeded":
             return op
+        if self._outcome_unknown(op):
+            try:
+                rejected = _rejected_status(op.error_code)
+                found = (
+                    ("not_applied", {"read_back": f"provider_rejected:{rejected}"})
+                    if rejected
+                    else await read_back(op)
+                )
+            except ProviderError as failure:
+                raise WorkflowError(
+                    "provider_failed", f"{kind.value} read-back: {failure}"
+                ) from None
+            if found is None:
+                raise WorkflowError(
+                    "needs_review",
+                    f"{kind.value} outcome is unknown and provider read-back cannot prove it; "
+                    "check Gmail/Calendar before retrying",
+                )
+            outcome, receipt = found
+            op = await self.store.reconcile_operation(owner_id, key, op.attempts, outcome, receipt)
+            if op.state == "succeeded":
+                return op
         op = op.model_copy(
-            update={"state": "running", "attempts": op.attempts + 1, "updated_at": utcnow()}
+            update={"state": "running", "attempts": op.attempts + 1, "updated_at": self.clock()}
         )
         await self.store.put_operation(owner_id, op)
         return op
 
+    def _outcome_unknown(self, op: Operation) -> bool:
+        if op.state == "running":
+            if self.clock() - op.updated_at < STALE_RUNNING_AFTER:
+                raise WorkflowError("operation_in_progress", f"{op.kind.value} is running")
+            return True  # its worker died mid-step
+        return (
+            op.state == "failed"
+            and op.kind in (OperationKind.GMAIL_DRAFT, OperationKind.GMAIL_SEND)
+            and (op.error_code or "") not in NO_EFFECT_CODES
+        )
+
     async def _finish(
         self, owner_id: str, op: Operation, receipt: dict[str, Any] | None, error: str | None
     ) -> Operation:
-        update: dict[str, Any] = {"updated_at": utcnow()}
+        update: dict[str, Any] = {"updated_at": self.clock()}
         if error:
             update |= {"state": "failed", "error_code": error}
         else:
@@ -271,7 +327,28 @@ class Distributor:
 
     async def _calendar(self, owner_id: str, event: EventSnapshot, approval: Approval):
         key = f"{event.id}:{event.revision}:{OperationKind.CALENDAR_UPSERT.value}"
-        op = await self._begin(owner_id, event, approval, OperationKind.CALENDAR_UPSERT, key)
+
+        async def read_back(_: Operation) -> ReadBack:
+            binding = await self.store.get_calendar_binding(owner_id, event.id)
+            remote_id = (
+                binding.remote_event_id if binding else deterministic_event_id("evt", event.id)
+            )
+            try:
+                remote = await self.calendar.get_event(owner_id, CALENDAR_ID, remote_id)
+            except ProviderError as missing:
+                if missing.status != 404:
+                    raise
+                return "not_applied", {"calendar_event_id": remote_id, "read_back": "absent"}
+            if _remote_revision(remote) != event.revision:
+                return "not_applied", {
+                    "calendar_event_id": remote_id,
+                    "read_back": f"remote_revision_{_remote_revision(remote)}",
+                }
+            return "succeeded", await self._bind_calendar(owner_id, event, remote_id, remote)
+
+        op = await self._begin(
+            owner_id, event, approval, OperationKind.CALENDAR_UPSERT, key, read_back
+        )
         if op.state == "succeeded":
             return op
         return await self._guard(owner_id, op, lambda: self._upsert_calendar(owner_id, event))
@@ -313,6 +390,11 @@ class Distributor:
         remote = await self.calendar.get_event(owner_id, CALENDAR_ID, remote_id)  # read back
         if _remote_revision(remote) != event.revision:
             raise ProviderError(409, "Calendar read-back does not match the approved revision")
+        return await self._bind_calendar(owner_id, event, remote_id, remote)
+
+    async def _bind_calendar(
+        self, owner_id: str, event: EventSnapshot, remote_id: str, remote: dict[str, Any]
+    ) -> dict[str, Any]:
         await self.store.put_calendar_binding(
             owner_id,
             CalendarBinding(
@@ -360,7 +442,25 @@ class Distributor:
         calendar_op: Operation,
     ) -> Operation:
         key = f"{event.id}:{event.revision}:{content.id}:{OperationKind.GMAIL_DRAFT.value}"
-        op = await self._begin(owner_id, event, approval, OperationKind.GMAIL_DRAFT, key)
+
+        async def read_back(_: Operation) -> ReadBack:
+            sender = await self.tokens.account_email(owner_id)
+            binding = await self._reconcile_gmail(
+                owner_id, await self.store.get_gmail_binding(owner_id, event.id)
+            )
+            if binding and binding.content_id == content.id and (binding.draft_id or binding.sent):
+                return "succeeded", {**_draft_receipt(binding), "read_back": "binding"}
+            found = await self.gmail.find_by_message_id(
+                owner_id, _message_id(event, content, sender)
+            )
+            drafts = [item for item in found if item.get("draft_id")]
+            if len(found) != 1 or len(drafts) != 1:
+                return None  # absent from search is not proof; several copies need a human
+            adopted = _content_binding(event, content, binding, drafts[0])
+            await self.store.put_gmail_binding(owner_id, adopted)
+            return "succeeded", {**_draft_receipt(adopted), "read_back": "message_id_search"}
+
+        op = await self._begin(owner_id, event, approval, OperationKind.GMAIL_DRAFT, key, read_back)
         if op.state == "succeeded":
             return op
 
@@ -383,21 +483,19 @@ class Distributor:
             if draft is None:
                 draft = await self.gmail.create_draft(owner_id, raw, thread_id)
             message = draft.get("message", {})
-            updated = GmailBinding(
-                event_id=event.id,
-                draft_id=draft["id"],
-                message_id=message.get("id"),
-                thread_id=message.get("threadId") or thread_id,
-                sent=False,
-                event_revision=event.revision,
-                content_id=content.id,
-                sent_history=binding.sent_history if binding else [],
+            updated = _content_binding(
+                event,
+                content,
+                binding,
+                {
+                    "draft_id": draft["id"],
+                    "id": message.get("id"),
+                    "threadId": message.get("threadId") or thread_id,
+                },
             )
             await self.store.put_gmail_binding(owner_id, updated)
             return {
-                "draft_id": updated.draft_id,
-                "message_id": updated.message_id,
-                "thread_id": updated.thread_id,
+                **_draft_receipt(updated),
                 "replaced_unsent_draft": bool(binding and not binding.sent and binding.draft_id),
             }
 
@@ -407,7 +505,29 @@ class Distributor:
         self, owner_id: str, event: EventSnapshot, approval: Approval, content: GeneratedContent
     ) -> Operation:
         key = f"{event.id}:{event.revision}:{content.id}:{OperationKind.GMAIL_SEND.value}"
-        op = await self._begin(owner_id, event, approval, OperationKind.GMAIL_SEND, key)
+
+        async def read_back(_: Operation) -> ReadBack:
+            sender = await self.tokens.account_email(owner_id)
+            stored = await self.store.get_gmail_binding(owner_id, event.id)
+            binding = await self._reconcile_gmail(owner_id, stored)
+            if binding is None or binding.content_id != content.id:
+                return None
+            if binding.sent:
+                return "succeeded", {**_sent_receipt(binding), "read_back": "sent_label"}
+            if binding.draft_id:  # _reconcile_gmail just saw the draft: Gmail removes it on send
+                return "not_applied", {"draft_id": binding.draft_id, "read_back": "draft_unsent"}
+            # The draft vanished and its message ID shows no SENT copy; search the header too.
+            found = await self.gmail.find_by_message_id(
+                owner_id, _message_id(event, content, sender)
+            )
+            sent = [item for item in found if "SENT" in item.get("labelIds", [])]
+            if len(sent) != 1:
+                return None
+            binding = _mark_sent(binding, sent[0])
+            await self.store.put_gmail_binding(owner_id, binding)
+            return "succeeded", {**_sent_receipt(binding), "read_back": "message_id_search"}
+
+        op = await self._begin(owner_id, event, approval, OperationKind.GMAIL_SEND, key, read_back)
         if op.state == "succeeded":
             return op
 
@@ -421,7 +541,7 @@ class Distributor:
                 message = await self.gmail.send_draft(owner_id, binding.draft_id or "")
                 binding = _mark_sent(binding, message)
                 await self.store.put_gmail_binding(owner_id, binding)
-            return {"message_id": binding.message_id, "thread_id": binding.thread_id}
+            return _sent_receipt(binding)
 
         return await self._guard(owner_id, op, send)
 
@@ -455,8 +575,58 @@ class Distributor:
             subject=content.subject or event.title,
             text_body="\n".join(details) + "\n",
             attachments=files,
-            headers={"X-Event-Revision": f"{event.id}/{event.revision}"},
+            headers={
+                "X-Event-Revision": f"{event.id}/{event.revision}",
+                # Deterministic so an unknown draft-create outcome can be found again by header.
+                "Message-ID": _message_id(event, content, sender),
+            },
         )
+
+
+def _message_id(event: EventSnapshot, content: GeneratedContent, sender: str) -> str:
+    def clean(value: str) -> str:
+        return re.sub(r"[^A-Za-z0-9.-]", "-", value)
+
+    domain = clean(sender.rpartition("@")[2]) or "invalid"
+    return f"<evt-{clean(event.id)}-r{event.revision}-{clean(content.id)}@{domain}>"
+
+
+def _rejected_status(error_code: str | None) -> int | None:
+    """A definite 4xx answer (not a timeout) means Google refused the write: no effect."""
+    status = (error_code or "").removeprefix("provider_failed:")
+    if status.isdigit() and 400 <= int(status) < 500 and int(status) != 408:
+        return int(status)
+    return None
+
+
+def _content_binding(
+    event: EventSnapshot,
+    content: GeneratedContent,
+    previous: GmailBinding | None,
+    message: dict[str, Any],
+) -> GmailBinding:
+    return GmailBinding(
+        event_id=event.id,
+        draft_id=message.get("draft_id"),
+        message_id=message.get("id"),
+        thread_id=message.get("threadId") or (previous.thread_id if previous else None),
+        sent=False,
+        event_revision=event.revision,
+        content_id=content.id,
+        sent_history=previous.sent_history if previous else [],
+    )
+
+
+def _draft_receipt(binding: GmailBinding) -> dict[str, Any]:
+    return {
+        "draft_id": binding.draft_id,
+        "message_id": binding.message_id,
+        "thread_id": binding.thread_id,
+    }
+
+
+def _sent_receipt(binding: GmailBinding) -> dict[str, Any]:
+    return {"message_id": binding.message_id, "thread_id": binding.thread_id}
 
 
 def _remote_revision(remote: dict[str, Any]) -> int:

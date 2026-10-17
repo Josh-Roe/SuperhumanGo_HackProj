@@ -1,7 +1,9 @@
-"""Canva MCP OAuth, PKCE and encrypted owner-scoped token refresh.
+"""Canva MCP OAuth (Authorization Code + PKCE) and per-organizer token refresh.
 
-Endpoints/resource were verified from Canva's public OAuth metadata. This is a
-single-process implementation: run one worker until shared state/refresh leases exist.
+Each organizer connects their own Canva account. Tokens live only in the encrypted server
+vault as provider `canva`: `{access_token, refresh_token, expires_at, scope}`. Readers that
+only know `{access_token}` keep working. Canva refresh tokens are single use, so every
+refresh stores the rotated refresh token, and refreshes are serialized per organizer.
 """
 
 import asyncio
@@ -11,21 +13,27 @@ import secrets
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, timedelta
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import urlencode, urlsplit
 
 import httpx
 
-from hackathon_backend.config import Settings
 from hackathon_backend.domain.models import DomainError
+from hackathon_backend.providers.canva import CanvaError
 
-AUTH_URL = "https://mcp.canva.com/authorize"
+AUTHORIZE_URL = "https://mcp.canva.com/authorize"
 TOKEN_URL = "https://mcp.canva.com/token"
 RESOURCE = "https://mcp.canva.com/mcp"
-SCOPES = (
-    "profile:read design:meta:read design:content:read design:content:write asset:read asset:write"
+CANVA_SECRET = "canva"
+# Create/read/edit designs and export them; scopes must also be enabled on the Canva app.
+DEFAULT_SCOPES = (
+    "design:meta:read",
+    "design:content:read",
+    "design:content:write",
+    "asset:read",
+    "asset:write",
 )
+REFRESH_MARGIN_SECONDS = 60
 
 
 @dataclass(frozen=True)
@@ -33,6 +41,7 @@ class CanvaOAuthConfig:
     client_id: str
     client_secret: str = field(repr=False)
     redirect_uri: str
+    scopes: tuple[str, ...] = DEFAULT_SCOPES
 
     def __post_init__(self):
         parsed = urlsplit(self.redirect_uri)
@@ -50,16 +59,6 @@ class CanvaOAuthConfig:
             raise ValueError("Use the registered HTTPS Canva callback (or loopback HTTP)")
         if not self.client_id or not self.client_secret:
             raise ValueError("Configure Canva OAuth client credentials")
-
-    @classmethod
-    def from_settings(cls, settings: Settings):
-        if not all(
-            (settings.canva_client_id, settings.canva_client_secret, settings.canva_redirect_uri)
-        ):
-            return None
-        return cls(
-            settings.canva_client_id, settings.canva_client_secret, settings.canva_redirect_uri
-        )
 
 
 @dataclass(frozen=True)
@@ -125,127 +124,175 @@ class CanvaOAuthStates:
         return found
 
 
-def authorization_url(config: CanvaOAuthConfig, state: str, challenge: str) -> str:
-    return (
-        AUTH_URL
-        + "?"
-        + urlencode(
-            {
-                "client_id": config.client_id,
-                "redirect_uri": config.redirect_uri,
-                "response_type": "code",
-                "state": state,
-                "scope": SCOPES,
-                "resource": RESOURCE,
-                "code_challenge": challenge,
-                "code_challenge_method": "S256",
-            }
-        )
-    )
-
-
-class CanvaVault(Protocol):
-    async def get_secret(self, owner_id: str, provider: str) -> dict | None: ...
+class SecretVault(Protocol):
     async def put_secret(self, owner_id: str, provider: str, value: dict) -> None: ...
+
+    async def get_secret(self, owner_id: str, provider: str) -> dict | None: ...
+
+
+def pkce_pair() -> tuple[str, str]:
+    """(code_verifier, S256 code_challenge) per RFC 7636."""
+    verifier = secrets.token_urlsafe(64)
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    return verifier, base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def authorization_url(config: CanvaOAuthConfig, state: str, code_challenge: str) -> str:
+    query = {
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+        "scope": " ".join(config.scopes),
+        "response_type": "code",
+        "client_id": config.client_id,
+        "resource": RESOURCE,
+        "state": state,
+        "redirect_uri": config.redirect_uri,
+    }
+    return f"{AUTHORIZE_URL}?{urlencode(query)}"
+
+
+async def _token_request(
+    config: CanvaOAuthConfig,
+    form: dict[str, str],
+    transport: httpx.AsyncBaseTransport | None,
+    now: float,
+) -> dict[str, Any]:
+    basic = base64.b64encode(f"{config.client_id}:{config.client_secret}".encode()).decode()
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(30), follow_redirects=False, trust_env=False, transport=transport
+        ) as client:
+            response = await client.post(
+                TOKEN_URL,
+                data={**form, "resource": RESOURCE},
+                headers={"Authorization": f"Basic {basic}"},
+            )
+    except httpx.HTTPError:
+        raise CanvaError("canva_token_request_failed") from None
+    if response.status_code != 200:
+        raise CanvaError("canva_token_rejected")
+    try:
+        body = response.json()
+        access, refresh = body["access_token"], body.get("refresh_token")
+        expires_in = body["expires_in"]
+        if (
+            not isinstance(access, str)
+            or not access
+            or len(access) > 16384
+            or any(c.isspace() for c in access)
+            or body.get("token_type", "").lower() != "bearer"
+            or isinstance(expires_in, bool)
+            or not isinstance(expires_in, int)
+            or not 0 < expires_in <= 31_536_000
+            or (
+                refresh is not None
+                and (not isinstance(refresh, str) or not refresh or len(refresh) > 16384)
+            )
+        ):
+            raise ValueError
+    except (ValueError, KeyError, TypeError, AttributeError):
+        raise CanvaError("canva_token_rejected") from None
+    return {
+        "access_token": access,
+        "refresh_token": refresh,
+        "expires_at": now + expires_in,
+        "scope": body.get("scope") if isinstance(body.get("scope"), str) else "",
+        "resource": RESOURCE,
+    }
+
+
+async def exchange_code(
+    config: CanvaOAuthConfig,
+    code: str,
+    code_verifier: str,
+    transport: httpx.AsyncBaseTransport | None = None,
+    now: Callable[[], float] = time.time,
+) -> dict[str, Any]:
+    form = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "code_verifier": code_verifier,
+        "redirect_uri": config.redirect_uri,
+    }
+    return await _token_request(config, form, transport, now())
 
 
 class CanvaTokens:
+    """Fresh per-organizer access tokens from the vault, refreshing shortly before expiry."""
+
     def __init__(
         self,
-        config: CanvaOAuthConfig,
-        vault: CanvaVault,
+        vault: SecretVault,
+        config: CanvaOAuthConfig | None,
         *,
         transport: httpx.AsyncBaseTransport | None = None,
-        now: Callable[[], datetime] = lambda: datetime.now(UTC),
-    ):
-        self.config, self.vault, self.transport, self.now = config, vault, transport, now
-        self.locks: dict[str, asyncio.Lock] = {}
+        now: Callable[[], float] = time.time,
+    ) -> None:
+        self.vault, self.config = vault, config
+        self._transport, self._now = transport, now
+        self._locks: dict[str, asyncio.Lock] = {}
 
-    async def _exchange(self, form: dict, prior: dict | None = None) -> dict:
-        try:
-            async with httpx.AsyncClient(
-                timeout=20, follow_redirects=False, trust_env=False, transport=self.transport
-            ) as client:
-                response = await client.post(
-                    TOKEN_URL,
-                    auth=httpx.BasicAuth(self.config.client_id, self.config.client_secret),
-                    data={**form, "resource": RESOURCE},
-                )
-        except httpx.RequestError:
-            raise DomainError(
-                "provider_failed", "Canva token service could not be reached", 502
-            ) from None
-        if response.status_code != 200:
-            raise DomainError(
-                "integration_not_connected",
-                "Canva authorization failed; reconnect your account",
-                503,
-            )
-        try:
-            data = response.json()
-            access = data["access_token"]
-            expires = data["expires_in"]
-            refresh = data.get("refresh_token") or (prior or {}).get("refresh_token")
-            if (
-                not isinstance(access, str)
-                or not access
-                or len(access) > 16384
-                or any(c.isspace() for c in access)
-                or data.get("token_type", "").lower() != "bearer"
-                or isinstance(expires, bool)
-                or not isinstance(expires, int)
-                or not 0 < expires <= 31_536_000
-                or (
-                    refresh is not None
-                    and (not isinstance(refresh, str) or not refresh or len(refresh) > 16384)
-                )
-            ):
-                raise ValueError
-        except (ValueError, KeyError, TypeError, AttributeError):
-            raise DomainError(
-                "provider_failed", "Canva returned an invalid token response", 502
-            ) from None
-        return {
-            "access_token": access,
-            "refresh_token": refresh,
-            "expires_at": (self.now() + timedelta(seconds=expires)).isoformat(),
-            "scope": str(data.get("scope", (prior or {}).get("scope", ""))),
-        }
+    async def save_grant(self, owner_id: str, grant: dict[str, Any]) -> None:
+        await self.vault.put_secret(owner_id, CANVA_SECRET, {**grant, "resource": RESOURCE})
 
     async def authorize(self, owner_id: str, code: str, verifier: str) -> None:
-        async with self.locks.setdefault(owner_id, asyncio.Lock()):
-            record = await self._exchange(
-                {
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "code_verifier": verifier,
-                    "redirect_uri": self.config.redirect_uri,
-                }
-            )
-            await self.vault.put_secret(owner_id, "canva", record)
+        if self.config is None:
+            raise CanvaError("canva_oauth_not_configured")
+        async with self._locks.setdefault(owner_id, asyncio.Lock()):
+            grant = await exchange_code(self.config, code, verifier, self._transport, self._now)
+            await self.save_grant(owner_id, grant)
+
+    async def connected(self, owner_id: str) -> bool:
+        record = await self.vault.get_secret(owner_id, CANVA_SECRET) or {}
+        if self.config is not None and record.get("resource") != RESOURCE:
+            return False  # Unknown/REST audience: organizer must reconnect to MCP.
+        expiry = record.get("expires_at")
+        fresh = (
+            isinstance(expiry, (int, float))
+            and not isinstance(expiry, bool)
+            and expiry > self._now()
+        )
+        return bool(
+            record.get("access_token")
+            and (fresh or record.get("refresh_token") or (self.config is None and expiry is None))
+        )
 
     async def access_token(self, owner_id: str) -> str | None:
-        async with self.locks.setdefault(owner_id, asyncio.Lock()):
-            record = await self.vault.get_secret(owner_id, "canva")
-            if not record or not record.get("access_token"):
-                return None
-            try:
-                expiry = datetime.fromisoformat(record["expires_at"])
-                if expiry.tzinfo is None:
-                    raise ValueError
-            except (ValueError, KeyError, TypeError):
-                # Legacy manually inserted tokens need reconnect; do not assume immortality.
-                raise DomainError(
-                    "integration_not_connected", "Reconnect Canva to renew its authorization", 503
-                ) from None
-            if expiry > self.now() + timedelta(seconds=60):
-                return record["access_token"]
-            if not record.get("refresh_token"):
-                raise DomainError(
-                    "integration_not_connected", "Canva authorization expired; reconnect", 503
+        """None when not connected. Raises CanvaError when a needed refresh fails."""
+        async with self._locks.setdefault(owner_id, asyncio.Lock()):
+            record = await self.vault.get_secret(owner_id, CANVA_SECRET) or {}
+            if record and (
+                record.get("resource") not in (None, RESOURCE)
+                or (self.config is not None and record.get("resource") != RESOURCE)
+            ):
+                raise CanvaError("canva_mcp_reconnect_required")
+            token = record.get("access_token")
+            expires_at = record.get("expires_at")
+            fresh = (
+                isinstance(token, str)
+                and bool(token)
+                and (
+                    (
+                        isinstance(expires_at, (int, float))
+                        and not isinstance(expires_at, bool)
+                        and expires_at - REFRESH_MARGIN_SECONDS > self._now()
+                    )
+                    or (self.config is None and expires_at is None)
                 )
-            fresh = await self._exchange(
-                {"grant_type": "refresh_token", "refresh_token": record["refresh_token"]}, record
             )
-            await self.vault.put_secret(owner_id, "canva", fresh)
-            return fresh["access_token"]
+            if fresh:
+                return token
+            refresh = record.get("refresh_token")
+            if not isinstance(refresh, str) or not refresh:
+                return None
+            if self.config is None:
+                raise CanvaError("canva_oauth_not_configured")
+            grant = await _token_request(
+                self.config,
+                {"grant_type": "refresh_token", "refresh_token": refresh},
+                self._transport,
+                self._now(),
+            )
+            grant["refresh_token"] = grant.get("refresh_token") or refresh
+            await self.save_grant(owner_id, grant)
+            return grant["access_token"]

@@ -174,6 +174,7 @@ class VaultTokenSource:
         self._transport = transport
         self._cache: dict[str, tuple[str, datetime]] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self._generation: dict[str, int] = {}
 
     def __repr__(self) -> str:
         return f"VaultTokenSource(cached_owners={len(self._cache)})"
@@ -185,7 +186,12 @@ class VaultTokenSource:
         return None
 
     def forget(self, owner_id: str) -> None:
-        """Drop a cached token (e.g. after disconnect or a 401)."""
+        """Drop a cached token (reconnect, disconnect, revocation) so the vault is read again.
+
+        Also invalidates a refresh already in flight: its grant came from the old refresh token
+        and must not be cached over the new connection.
+        """
+        self._generation[owner_id] = self._generation.get(owner_id, 0) + 1
         self._cache.pop(owner_id, None)
 
     async def access_token(self, owner_id: str) -> str:
@@ -196,6 +202,7 @@ class VaultTokenSource:
             token = self._fresh(owner_id)
             if token:
                 return token
+            generation = self._generation.get(owner_id, 0)
             refresh_token = await self._vault.get_refresh_token(owner_id)
             if not refresh_token:
                 raise IntegrationNotConnected("Google account not connected")
@@ -208,7 +215,8 @@ class VaultTokenSource:
                         "Google authorization expired or revoked"
                     ) from None
                 raise
-            self._cache[owner_id] = (grant.access_token, grant.expires_at)
+            if self._generation.get(owner_id, 0) == generation:
+                self._cache[owner_id] = (grant.access_token, grant.expires_at)
             return grant.access_token
 
     async def account_email(self, owner_id: str) -> str:

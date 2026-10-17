@@ -23,6 +23,7 @@ from hackathon_backend.mcp_tools.event_tools import EventToolDeps, register_even
 from hackathon_backend.mcp_tools.organizer_tools import register_organizer_tools
 from hackathon_backend.workflows.asset_wiring import register_asset_services
 from hackathon_backend.workflows.dev import DevWorkflow, dev_router, dev_workflow_from_env
+from hackathon_backend.workflows.distribution_routes import register_distribution_routes
 from hackathon_backend.workflows.google_connect import (
     google_connect_configured,
     google_connect_router,
@@ -161,9 +162,14 @@ def create_app(
         if supabase_rest_configured(settings):
             app.include_router(create_router(settings))
         if google_connect_configured(settings):
-            app.include_router(google_connect_router(settings))
+            # Drop the cached access token for an organizer as soon as they reconnect Google.
+            tokens = events.distributor.tokens if events and events.distributor else None
+            app.include_router(
+                google_connect_router(settings, on_change=getattr(tokens, "forget", None))
+            )
         if supabase and events is not None:
             register_asset_services(app, mcp, settings, events)
+            register_distribution_routes(app, settings, events)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

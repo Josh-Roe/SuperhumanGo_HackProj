@@ -6,6 +6,8 @@ Current branch: `codex/member-1-live-adapter`, based on merged main `1752141`. E
 
 Read [global context](../../PROJECT_CONTEXT.md), [AGENTS](../../AGENTS.md), all four member contexts, [contract](../INTEGRATION_CONTRACT.md), and [assigned prompt](../prompts/01_FRONTEND.md) before work. Write only this personal context. Preserve other members' changes.
 
+**2026-10-16 | implemented, mocked (A17, `ef6883b`):** `frontend/src/InclusionEditor.tsx` + `inclusion.ts` edit facts in the A10 server form via GET/PUT `/inclusion` with version-conflict reload; findings now come from `/inclusion`.
+
 **2026-10-16 | implemented, mocked (A16, `c308e0e`):** `frontend/src/ProviderPanels.tsx` + `providers.ts`: exact-digest flyer approve/abandon, Google/Canva connect + status, A13 callback notice, distribution blockers. Proposed for Owner 3: `GET /api/events/{id}/distribution/preview` returning `DistributionPlan` (only the MCP tool exists).
 
 ## CalSpork-inspired light blue glass UI — 2026-10-16
@@ -184,3 +186,7 @@ Claims were pushed on `main` before work, one at a time, per MASTER_TODO §5: A1
 **Local evidence:** `npm --prefix frontend run dev` on loopback; isolated Chrome 1440×1000, browser accessibility tree + real keyboard Enter on the skip link; axe-core 4.10.3 WCAG 2 A/AA and 2.1 AA checks on dashboard, details, review, distribution, Settings and Profile report zero violations before/after. Axe marks color-contrast incomplete on all six screens because manual visual analysis remains necessary; no contrast certification is claimed. Temporary machine-readable report is `/private/tmp/user3-a11y-report.json`, outside Git. Final frontend suite: 52 tests; lint and production build pass. Phones were excluded per user direction; glass styles unchanged.
 
 **M9 not complete:** actual VoiceOver/speech-output testing could not run. Native computer access failed with `Sky Computer Use native pipe startup failed`, exposing no apps/browsers and no screen-reader control. VoiceOver exists on this Mac, but accessibility-tree/axe checks are not a screen-reader pass. Remaining manual verification is desktop VoiceOver (local build is sufficient): headings/landmarks, tab order/skip link, form errors, step announcements, token focus, approval status and RSVP table reading. No deployment or teammate dependency was invented; this is a local tool-access limitation. No external sends or account changes were performed. Existing untracked backend files remain untouched.
+
+## User 1 lane L3 — Canva, 2026-10-16
+
+- `tested` (mocked): A19 `ad38df3` export poll; A11 Canva OAuth `aa6232b`/`25baa36` + durable flyer jobs `c6f7d50` (migration `20261017030000_canva_flyer_jobs.sql`, not applied); A9 `5abc261` `flyer_pending_approval`/`flyer_stale` in asset status. Live waits on M6, an organizer Canva connection and User 2 applying migrations.

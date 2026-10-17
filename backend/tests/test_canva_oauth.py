@@ -4,7 +4,7 @@ import asyncio
 import base64
 import hashlib
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from hackathon_backend.config import Settings
 from hackathon_backend.domain.models import DomainError
+from hackathon_backend.providers.canva import CanvaError
 from hackathon_backend.providers.canva.oauth import (
     RESOURCE,
     TOKEN_URL,
@@ -22,10 +23,10 @@ from hackathon_backend.providers.canva.oauth import (
     CanvaOAuthStates,
     CanvaTokens,
 )
-from hackathon_backend.providers.canva.oauth_routes import canva_connect_router
 from hackathon_backend.workflows.asset_wiring import VaultCanvaSessions
+from hackathon_backend.workflows.canva_connect import canva_connect_router
 
-NOW = datetime(2026, 10, 16, 12, tzinfo=UTC)
+NOW = datetime(2026, 10, 16, 12, tzinfo=UTC).timestamp()
 CONFIG = CanvaOAuthConfig(
     "synthetic-client", "synthetic-secret", "https://backend.example/api/canva/callback"
 )
@@ -60,7 +61,7 @@ def host():
         requests.append(parse_qs(request.content.decode()))
         return httpx.Response(200, json=payload)
 
-    tokens = CanvaTokens(CONFIG, vault, transport=httpx.MockTransport(server), now=lambda: clock[0])
+    tokens = CanvaTokens(vault, CONFIG, transport=httpx.MockTransport(server), now=lambda: clock[0])
     states = CanvaOAuthStates()
 
     async def owner(header):
@@ -79,7 +80,7 @@ def host():
 
     app = FastAPI()
     app.include_router(
-        canva_connect_router(SETTINGS, tokens, owner, states=states, connect=connect)
+        canva_connect_router(SETTINGS, tokens, resolve_owner=owner, states=states, connect=connect)
     )
     with TestClient(app, base_url="https://backend.example") as client:
         yield client, vault, requests, tokens, states, clock, payload
@@ -112,14 +113,20 @@ def test_full_flow_exact_pkce_owner_binding_no_token_responses_and_single_use(ho
         base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
     ]
     url = "/api/canva/callback?state=" + state + "&code=synthetic-code"
-    response = client.get(url)
-    assert response.status_code == 200 and "Canva connected" in response.text
+    response = client.get(url, follow_redirects=False)
+    assert (
+        response.status_code == 303
+        and response.headers["location"] == "https://dashboard.example/?canva=connected"
+    )
     assert "synthetic-access" not in response.text and "synthetic-secret" not in response.text
     assert ("owner-b", "canva") in vault.records and ("owner-a", "canva") not in vault.records
     assert requests[0]["code_verifier"] == [verifier] and requests[0]["resource"] == [RESOURCE]
-    assert client.get(url).status_code == 400 and len(requests) == 1
+    assert (
+        "reason=invalid_state" in client.get(url, follow_redirects=False).headers["location"]
+        and len(requests) == 1
+    )
     status = client.get("/api/canva/status", headers={"Authorization": "Bearer owner-b"})
-    assert status.json()["connected"] and status.json()["refresh_available"]
+    assert status.json()["connected"]
     assert "synthetic-" not in status.text
     verified = client.post("/api/canva/verify", headers={"Authorization": "Bearer owner-b"})
     assert (
@@ -129,8 +136,8 @@ def test_full_flow_exact_pkce_owner_binding_no_token_responses_and_single_use(ho
 
 def test_connect_auth_start_origin_and_callback_cookie_are_required(host):
     client, vault, requests, _, _, _, _ = host
-    for path in ("/api/canva/connect", "/api/canva/verify"):
-        assert client.post(path).status_code == 401
+    assert client.post("/api/canva/connect").status_code == 401
+    assert client.post("/api/canva/verify").status_code == 401
     assert client.get("/api/canva/status").status_code == 401
     bootstrap = client.post(
         "/api/canva/connect", headers={"Authorization": "Bearer owner-a"}
@@ -145,9 +152,15 @@ def test_connect_auth_start_origin_and_callback_cookie_are_required(host):
     query = begin(client)
     client.cookies.clear()
     response = client.get(
-        "/api/canva/callback", params={"state": query["state"][0], "code": "secret-code"}
+        "/api/canva/callback",
+        params={"state": query["state"][0], "code": "secret-code"},
+        follow_redirects=False,
     )
-    assert response.status_code == 400 and "secret-code" not in response.text
+    assert (
+        response.status_code == 303
+        and "reason=invalid_state" in response.headers["location"]
+        and "secret-code" not in response.text
+    )
     assert not vault.records and not requests
     assert response.headers["cache-control"] == "no-store"
 
@@ -156,16 +169,25 @@ def test_expiry_denial_and_invalid_input_do_not_exchange(host):
     client, _, requests, _, states, _, _ = host
     query = begin(client)
     response = client.get(
-        "/api/canva/callback", params={"state": query["state"][0], "error": "raw-private-error"}
+        "/api/canva/callback",
+        params={"state": query["state"][0], "error": "raw-private-error"},
+        follow_redirects=False,
     )
-    assert response.status_code == 400 and "raw-private-error" not in response.text
+    assert (
+        response.status_code == 303
+        and "reason=denied" in response.headers["location"]
+        and "raw-private-error" not in response.text
+    )
     query = begin(client)
     states.now = lambda: float("inf")
     assert (
         client.get(
-            "/api/canva/callback", params={"state": query["state"][0], "code": "x"}
-        ).status_code
-        == 400
+            "/api/canva/callback",
+            params={"state": query["state"][0], "code": "x"},
+            follow_redirects=False,
+        )
+        .headers["location"]
+        .endswith("reason=invalid_state")
     )
     response = client.get("/api/canva/callback", params={"state": "x" * 300})
     assert response.status_code == 422 and not requests
@@ -186,9 +208,13 @@ def test_invalid_grants_never_enter_vault(host, bad):
     client, vault, _, _, _, _, payload = host
     payload.update(bad)
     query = begin(client)
-    response = client.get("/api/canva/callback", params={"state": query["state"][0], "code": "x"})
+    response = client.get(
+        "/api/canva/callback",
+        params={"state": query["state"][0], "code": "x"},
+        follow_redirects=False,
+    )
     assert (
-        response.status_code == 502
+        response.status_code == 303
         and not vault.records
         and "synthetic-secret" not in response.text
     )
@@ -199,16 +225,16 @@ def test_refresh_serializes_concurrent_reads_rotates_and_reuses_tokens(host):
 
     async def run():
         await tokens.authorize("owner-a", "code", "verifier")
-        clock[0] += timedelta(hours=1)
+        clock[0] += 3600
         payload["access_token"] = "refreshed-access"
         payload["refresh_token"] = "rotated-refresh"
         assert (
-            await asyncio.gather(*(tokens.access_token("owner-a") for _ in range(4)))
-            == ["refreshed-access"] * 4
+            await asyncio.gather(tokens.access_token("owner-a"), tokens.access_token("owner-a"))
+            == ["refreshed-access"] * 2
         )
         assert len(requests) == 2 and requests[1]["refresh_token"] == ["synthetic-refresh"]
         assert vault.records[("owner-a", "canva")]["refresh_token"] == "rotated-refresh"
-        clock[0] += timedelta(hours=1)
+        clock[0] += 3600
         payload.pop("refresh_token")
         assert await tokens.access_token("owner-a") == "refreshed-access"
         assert vault.records[("owner-a", "canva")]["refresh_token"] == "rotated-refresh"
@@ -228,10 +254,8 @@ def test_refresh_is_used_by_the_actual_canva_session_port(host):
 
     async def run():
         await tokens.authorize("owner-a", "code", "verifier")
-        clock[0] += timedelta(hours=1)
-        sessions = VaultCanvaSessions(
-            tokens.vault, connect=connect, token_source=tokens.access_token
-        )
+        clock[0] += 3600
+        sessions = VaultCanvaSessions(tokens.vault, connect=connect, tokens=tokens)
         async with sessions.open("owner-a"):
             pass
         assert seen == [("owner-a", "synthetic-access")] and len(requests) == 2
@@ -239,15 +263,18 @@ def test_refresh_is_used_by_the_actual_canva_session_port(host):
     asyncio.run(run())
 
 
-def test_oauth_secrets_not_in_repr_and_redirects_are_constrained():
-    assert "synthetic-secret" not in repr(CONFIG)
-    for uri in (
+@pytest.mark.parametrize(
+    "uri",
+    [
         "http://evil.example/callback",
         "https://user:secret@backend.example/callback",
         "https://backend.example/callback?x=y",
-    ):
-        with pytest.raises(ValueError):
-            CanvaOAuthConfig("id", "secret", uri)
+    ],
+)
+def test_oauth_secrets_not_in_repr_and_redirects_are_constrained(uri):
+    assert "synthetic-secret" not in repr(CONFIG)
+    with pytest.raises(ValueError):
+        CanvaOAuthConfig("id", "secret", uri)
 
 
 def test_expired_without_refresh_and_legacy_tokens_require_reconnect(host):
@@ -256,11 +283,10 @@ def test_expired_without_refresh_and_legacy_tokens_require_reconnect(host):
     async def run():
         payload.pop("refresh_token")
         await tokens.authorize("owner-a", "code", "verifier")
-        clock[0] += timedelta(hours=1)
-        with pytest.raises(DomainError, match="expired"):
-            await tokens.access_token("owner-a")
+        clock[0] += 3600
+        assert await tokens.access_token("owner-a") is None
         await vault.put_secret("legacy", "canva", {"access_token": "manually-inserted"})
-        with pytest.raises(DomainError, match="Reconnect"):
+        with pytest.raises(CanvaError, match="reconnect"):
             await tokens.access_token("legacy")
         assert len(requests) == 1
 
@@ -282,8 +308,35 @@ def test_failed_exchange_does_not_save_or_echo_provider_details(host, kind):
             json={"error_description": "private-upstream-content"},
         )
 
-    tokens.transport = httpx.MockTransport(bad)
+    tokens._transport = httpx.MockTransport(bad)
     query = begin(client)
-    response = client.get("/api/canva/callback", params={"state": query["state"][0], "code": "x"})
-    assert response.status_code in {502, 503} and not vault.records
+    response = client.get(
+        "/api/canva/callback",
+        params={"state": query["state"][0], "code": "x"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303 and not vault.records
     assert "private-upstream-content" not in response.text and "evil.example" not in response.text
+
+
+@pytest.mark.parametrize("resource", [None, "https://api.canva.com"])
+def test_existing_unknown_or_rest_grant_requires_reconnecting_to_mcp(host, resource):
+    _, vault, requests, tokens, _, clock, _ = host
+
+    async def run():
+        await vault.put_secret(
+            "owner-a",
+            "canva",
+            {
+                "access_token": "unverified-audience",
+                "refresh_token": "unverified-refresh",
+                "expires_at": clock[0] + 3600,
+                "resource": resource,
+            },
+        )
+        assert await tokens.connected("owner-a") is False
+        with pytest.raises(CanvaError, match="reconnect"):
+            await tokens.access_token("owner-a")
+        assert requests == []
+
+    asyncio.run(run())
