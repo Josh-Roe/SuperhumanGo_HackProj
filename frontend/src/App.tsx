@@ -43,61 +43,27 @@ const steps: { id: Step; name: string }[] = [
 const GO_URL = "https://go.superhuman.com/";
 // Name of the Pack installed in Go (integrations/superhuman, pack 72744).
 const CONNECTOR_NAME = "Hackathon Workspace";
+// Bird art: Microsoft Fluent Emoji 3D (MIT), see public/flock/LICENSE.txt.
+function flock(name: string) {
+  return `/flock/${name}.png`;
+}
 function GatheringIllustration() {
   return (
     <div className="hero-art" aria-hidden="true">
-      <div className="hero-orbit" />
-      <div className="hero-calendar">
-        <div className="hero-calendar-top">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-          >
-            <rect x="3" y="5" width="18" height="16" rx="4" />
-            <path d="M7 3v5m10-5v5M3 11h18" />
-          </svg>
-          <span />
-        </div>
-        <div className="hero-calendar-grid">
-          {Array.from({ length: 12 }, (_, i) => (
-            <span key={i} />
-          ))}
-        </div>
-      </div>
-      <div className="hero-float hero-mail">
-        <svg
-          viewBox="0 0 32 32"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="4" y="7" width="24" height="18" rx="5" />
-          <path d="m5 9 9 8a3 3 0 0 0 4 0l9-8" />
-        </svg>
-      </div>
-      <div className="hero-float hero-people">
-        <svg
-          viewBox="0 0 32 32"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        >
-          <circle cx="13" cy="11" r="4" />
-          <path d="M5 26v-3a8 8 0 0 1 16 0v3m1-19a4 4 0 0 1 0 8m3 4a7 7 0 0 1 3 7" />
-        </svg>
-      </div>
-      <svg className="hero-spark" viewBox="0 0 40 40" fill="none">
-        <path
-          d="M20 4c0 10-6 16-16 16 10 0 16 6 16 16 0-10 6-16 16-16C26 20 20 14 20 4Z"
-          fill="currentColor"
-          opacity=".55"
-        />
-      </svg>
+      <img className="hero-cloud hero-cloud-one" src={flock("cloud")} alt="" />
+      <img className="hero-cloud hero-cloud-two" src={flock("cloud")} alt="" />
+      <img className="hero-bird hero-bird-main" src={flock("bird")} alt="" />
+      <img className="hero-bird hero-bird-dove" src={flock("dove")} alt="" />
+      <img
+        className="hero-bird hero-bird-chick"
+        src={flock("baby-chick")}
+        alt=""
+      />
+      <img
+        className="hero-bird hero-bird-mail"
+        src={flock("envelope-with-arrow")}
+        alt=""
+      />
     </div>
   );
 }
@@ -1243,8 +1209,8 @@ function Rsvps({ record }: { record: WorkspaceEvent }) {
       <p className="eyebrow">PRIVATE / ORGANIZER ONLY</p>
       <h2>Who’s coming along?</h2>
       <p className="muted">
-        Guests answer Yes, Maybe or No on the Google Calendar invite. Email
-        replies aren’t counted yet.
+        Calendar responses and Go-classified replies retain their source.
+        Ambiguous or conflicting replies need organizer review.
       </p>
       {record.live?.rsvpsAvailable !== false && (
         <div className="metric-grid">
@@ -1634,7 +1600,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
       editing && page === "events"
         ? ` · ${steps.find((item) => item.id === step)?.name}`
         : "";
-    document.title = `${title}${stage} · Event Workspace · Superhuman Go`;
+    document.title = `${title}${stage} · Flockk`;
   }, [title, editing, page, step]);
   return (
     <div className="app-shell">
@@ -1651,25 +1617,15 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
           }}
         >
           <span className="brand-icon" aria-hidden="true">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="4" y="5" width="16" height="16" rx="4" />
-              <path d="M8 3v5m8-5v5M4 11h16m-12 5 3 2 5-4" />
-            </svg>
+            <img src={flock("bird")} alt="" />
           </span>
-          Event Workspace
+          Flockk
         </a>
         <nav aria-label="Workspace">
           {(
             [
-              { id: "events", name: "Your events", icon: "▦" },
-              { id: "settings", name: "Settings", icon: "⚙" },
+              { id: "events", name: "Your events", icon: "nest-with-eggs" },
+              { id: "settings", name: "Settings", icon: "feather" },
             ] as const
           ).map((item) => (
             <button
@@ -1679,7 +1635,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
               disabled={busy}
               onClick={() => navigate(item.id)}
             >
-              <span aria-hidden="true">{item.icon}</span>
+              <span aria-hidden="true">
+                <img src={flock(item.icon)} alt="" />
+              </span>
               {item.name}
             </button>
           ))}
@@ -1687,8 +1645,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
         <div className="sidebar-caption">
           <span>POWERED BY SUPERHUMAN GO</span>
           <p>
-            A little more clarity.
-            <br />A lot more connection.
+            Birds of a feather
+            <br />
+            plan together.
           </p>
         </div>
         <div className="sidebar-profile">
@@ -1732,7 +1691,7 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                     ? "Describe the plan in Go, then review it here."
                     : editing
                       ? `Step ${steps.findIndex((item) => item.id === step) + 1} of 3: ${steps.find((item) => item.id === step)?.name}.`
-                      : "All your gatherings, in one place."}
+                      : "All your gatherings, in one cozy nest."}
               </p>
             </div>
             {page === "events" && (
@@ -1829,12 +1788,12 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
               >
                 <div className="hero-copy">
                   <span className="eyebrow">
-                    LESS PLANNING. MORE POSSIBILITY.
+                    LESS PLANNING. MORE GATHERING.
                   </span>
                   <h2 id="gathering-heading">
-                    Good plans.
+                    Round up
                     <br />
-                    <span>Great gatherings.</span>
+                    <span>your flock.</span>
                   </h2>
                   <p>
                     Superhuman Go runs every event: it gathers the details,
@@ -1909,7 +1868,9 @@ function App({ eventGateway }: { eventGateway?: EventGateway } = {}) {
                 </button>
               </div>
               <div className="go-shortcut">
-                <span aria-hidden="true">✳</span>
+                <span aria-hidden="true">
+                  <img src={flock("dove")} alt="" />
+                </span>
                 <p>
                   Every event is planned in Superhuman Go. Connect this
                   workspace once; this page shows where each event is.

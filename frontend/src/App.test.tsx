@@ -28,7 +28,7 @@ describe("simplified event workspace", () => {
       within(nav)
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toEqual(["▦Your events", "⚙Settings"]);
+    ).toEqual(["Your events", "Settings"]);
     expect(screen.getByRole("button", { name: "Add event" })).toBeVisible();
     expect(
       screen.queryByText("A little planning. A great gathering."),

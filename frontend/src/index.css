@@ -147,44 +147,92 @@ strong {
   font-weight: 600;
 }
 
-/* Editorial foundation: warm paper, dark ink, restrained terracotta. */
+/* Flockk foundation: cream nest, sky blue, berry-bird accent, rounded type. */
 :root {
-  color: #15171b;
-  background: #faf9f6;
-  --ink: #15171b;
-  --muted: #62615f;
-  --blue: #b94129;
-  --blue-dark: #97341f;
-  --line: #dedbd5;
-  --glass: #faf9f6;
-  --glass-edge: #dedbd5;
-  --glass-shadow: none;
+  font-family: "Nunito", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  font-size: 15px;
+  color: #2a2346;
+  background: #fffbf4;
+  --ink: #2a2346;
+  --muted: #5f5873;
+  --blue: #c2305a;
+  --blue-dark: #9c2247;
+  --berry: #c2305a;
+  --berry-dark: #8e1e40;
+  --berry-soft: #ffe3ea;
+  --sky: #ddf0fb;
+  --sky-ink: #1f5f87;
+  --yolk: #fff3cc;
+  --yolk-edge: #f2c64b;
+  --yolk-ink: #6b4a00;
+  --leaf: #f2faec;
+  --leaf-ink: #2f6b1f;
+  --straw: #fff4e4;
+  --line: #efe4d4;
+  --glass: #ffffff;
+  --glass-edge: #efe4d4;
+  --glass-shadow: 0 5px 0 #f3eadc;
+  --display: "Fredoka", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+}
+body {
+  background: #fffbf4;
 }
 h1,
 h2,
 h3 {
-  font-family:
-    "Iowan Old Style", "Baskerville", "Palatino Linotype", Georgia, serif;
-  font-weight: 400;
-  letter-spacing: -0.035em;
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+h1 {
+  font-size: clamp(32px, 3.4vw, 42px);
+}
+h2 {
+  font-size: 24px;
+}
+h3 {
+  font-size: 18px;
+}
+em {
+  font-family: inherit;
+  font-style: italic;
+  font-weight: 700;
+}
+strong {
+  font-weight: 800;
+}
+label {
+  font-size: 14px;
+  font-weight: 700;
 }
 input,
 textarea,
 select {
-  background: #fbfaf7;
-  border-color: var(--line);
-  border-radius: 5px;
-  box-shadow: none;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 14px;
   padding: 12px 14px;
+  box-shadow: none;
 }
 input::placeholder,
 textarea::placeholder {
-  color: #7c7974;
+  color: #7a7390;
 }
 input:hover,
 textarea:hover,
 select:hover {
-  border-color: #aaa59b;
+  border-color: #dcc9ad;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #7cc2ea;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--berry);
 }
 button:focus-visible,
 a:focus-visible,
@@ -192,9 +240,10 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline-color: #a73822;
+  outline: 3px solid #3a9bd5;
+  outline-offset: 3px;
 }
 ::selection {
-  background: #eed3c8;
-  color: #15171b;
+  background: #ffd3df;
+  color: #2a2346;
 }
