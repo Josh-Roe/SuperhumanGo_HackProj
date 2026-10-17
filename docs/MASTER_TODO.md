@@ -43,7 +43,7 @@ Tags: `[MANUAL]` needs a human with an account, browser, dashboard or judgment. 
 | Publish (Calendar + Gmail) | Live in dev mode: real Calendar event + Gmail send to one test inbox, retry idempotent. | Re-run on Supabase via website approval |
 | Change time/location | Live in dev mode: same Calendar ID patched, change notice in same Gmail thread. | Same, plus Canva revision |
 | RSVP | `sync_rsvps` live returns `no_response`. Reply classification is not live-verified. | M8 |
-| Grammarly | Not demonstrated. | M7 |
+| Grammarly | Dropped (user decision 2026-10-16). | None |
 | Tests | 313 backend tests pass on `e052761` (rerun by Member 3); frontend 51 tests pass (Member 1 context). | Keep green |
 
 ## 2. Manual tasks `[MANUAL]`
@@ -68,11 +68,11 @@ Do these roughly in order. Each one that unblocks an `[AGENT]` item names it.
 - [ ] **M5 — Organizer account setup.** Each demo organizer: sign in at the website, Settings → "Create personal Go token" (use it in M4), then Connect Google (`POST /api/google/connect`) and check that `GET /api/google/status` shows connected.
 - [ ] **M6 — Canva.** Owner 4. Get an eligible Canva account, the flyer template and its fields, and the Canva app credentials. Record their names (never values) in the 04 context. Unblocks A7 and A8.
   - Note (user decision, 2026-10-16): no team Canva account and no template. Each organizer connects **their own** Canva (per-organizer token in the vault, already how `connect_canva` works; custom design per event per the 04 context). What M6 still needs is only a registered Canva OAuth client (app client ID/secret, plus redirect URI) so organizers can connect their Canva via A11's connect flow. Record names, never values.
-- [ ] **M7 — Grammarly proof.** Owner 3 or 4. In a supported Grammarly or Superhuman client, show Grammarly assistance on Go-written event prose. Record a screenshot outside Git and note it in the context.
+- [x] ~~**M7 — Grammarly proof.** Owner 3 or 4. In a supported Grammarly or Superhuman client, show Grammarly assistance on Go-written event prose. Record a screenshot outside Git and note it in the context.~~ **Dropped:** user decision 2026-10-16, Grammarly is out of scope entirely.
 
 ### Live proof and submission
 
-- [ ] **M8 — Full live rehearsal on Supabase.** Everyone. Use authorized test inboxes only. Steps: ask Go to create an event (open its `dashboard_url`) → prepare assets → website inclusion review → website approval → Go `execute_distribution` → change the time and location through Go or the website → re-prepare, approve and execute → a second test account replies "yes" and accepts in Calendar → `sync_rsvps`/`list_rsvps`. Capture receipt IDs (Calendar event ID, Gmail message/thread IDs, Canva design/export IDs, revisions) in the 03 context. Requires M1–M7 and A2, A3 and A5.
+- [ ] **M8 — Full live rehearsal on Supabase.** Everyone. Use authorized test inboxes only. Steps: ask Go to create an event (open its `dashboard_url`) → prepare assets → website inclusion review → website approval → Go `execute_distribution` → change the time and location through Go or the website → re-prepare, approve and execute → a second test account replies "yes" and accepts in Calendar → `sync_rsvps`/`list_rsvps`. Capture receipt IDs (Calendar event ID, Gmail message/thread IDs, Canva design/export IDs, revisions) in the 03 context. Requires M1–M6 and A2, A3 and A5.
 - [ ] **M9 — Accessibility audit.** Owner 1. ~~Real phone check and~~ a screen-reader pass on the deployed site.
   - Note (user decision, 2026-10-16): phones are not a target; desktop only. Phone check dropped.
 - [ ] **M10 — Devpost by 8 PM PT.** Team lead. Fill in: name (still undecided), primary track (working pick: Productivity), description, agent-integration write-up, demo video recorded from M8, repo plus working demo link and setup steps, all four member names, tools and credits including the **pre-existing scaffold disclosure** (HACKATHON.md). Before submitting, check that no link exposes keys or private data. Prepare the 2-minute live pitch ([PRESENTATION.md](PRESENTATION.md)).
@@ -123,7 +123,7 @@ A1 (Dockerfile PORT) ─┬─> M1 Render answers ─┬─> M2 Vercel BACKEND_O
 A5, A6, A2 ───────────┴──────────────────────────────────────────────┐
 M6 Canva ─> A7 ─> A8 ────────────────────────────────────────────────┤
 A9/A16 UI for flyer + inclusion ─────────────────────────────────────┤
-M7 Grammarly ────────────────────────────────────────────────────────┴─> M8 live rehearsal ─> M10 Devpost video + submit (8 PM PT)
+─────────────────────────────────────────────────────────────────────┴─> M8 live rehearsal ─> M10 Devpost video + submit (8 PM PT)
 ```
 
 If time runs short, cut in this order. Each cut must be stated honestly in the demo and on Devpost:
@@ -144,7 +144,7 @@ User decision, 2026-10-16: finish every coding task before writing any documenta
 | --- | --- | --- | --- |
 | **1** | A14, A1, A10, A18, A11, A19, A9, A16, A17 (the lanes below) | M3 Google OAuth client, M4 Go connector release, M5 organizer accounts and test inboxes | — |
 | **2** | A2 live Supabase check; review and apply the migrations from A10 and A11 | M1 Render env, M2 Vercel env, M11 Gemini/Notion migration | A3 contract docs, README |
-| **3** | A15 `?event=` deep link | M7 Grammarly proof, M9 screen-reader audit (on a local build; no deploy needed) | — |
+| **3** | A15 `?event=` deep link | M9 screen-reader audit (on a local build; no deploy needed) | — |
 | **4** | A7 live Canva export, A8 Canva revision on change | M6 Canva OAuth client, M10 Devpost | A12 pitch |
 | **All** | | M8 live rehearsal (User 2 drives it, everyone joins) | |
 
@@ -169,4 +169,4 @@ All lanes share one checkout on `main` (no worktrees, per the user's CLAUDE.md).
 - M1 and M2 (User 2) and M3 (User 1): together they gate live Google and the website.
 - M11 (User 2): it gates live L2 work and A2.
 
-After those come M4 and M5 (User 1). User 3's tasks have no dependencies on anyone, so User 3 can start all of them now. M7 and M9 can happen whenever someone is free. M10 depends on the M8 recording.
+After those come M4 and M5 (User 1). User 3's tasks have no dependencies on anyone, so User 3 can start all of them now. M9 can happen whenever someone is free. M10 depends on the M8 recording.
