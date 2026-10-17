@@ -21,9 +21,11 @@ import httpx
 from hackathon_backend.domain.models import DomainError
 from hackathon_backend.providers.canva import CanvaError
 
-AUTHORIZE_URL = "https://mcp.canva.com/authorize"
-TOKEN_URL = "https://mcp.canva.com/token"
-RESOURCE = "https://mcp.canva.com/mcp"
+# Developer Portal clients use the resource and authorization server advertised by
+# api.canva.com/.well-known/oauth-protected-resource/connect/v1/mcp.
+AUTHORIZE_URL = "https://www.canva.com/api/oauth/authorize"
+TOKEN_URL = "https://api.canva.com/auth/v1/oauth/token"
+RESOURCE = "https://api.canva.com/connect/v1/mcp"
 CANVA_SECRET = "canva"
 # Create/read/edit designs and export them; scopes must also be enabled on the Canva app.
 DEFAULT_SCOPES = (

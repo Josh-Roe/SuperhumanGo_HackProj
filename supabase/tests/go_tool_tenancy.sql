@@ -46,13 +46,13 @@ begin
 
   -- A10 inclusion facts follow the same owner rule and version CAS.
   begin
-    perform public.organizer_save_inclusion(b,a_event,0,'{}');
+    perform public.organizer_save_inclusion_facts(b,a_event,0,'{}');
     raise exception 'Cross-organizer inclusion save accepted';
   exception when raise_exception then if sqlerrm<>'not_found' then raise; end if; end;
-  f=public.organizer_save_inclusion(a,a_event,0,'{"traditions":[]}');
+  f=public.organizer_save_inclusion_facts(a,a_event,0,'{"traditions":[]}');
   assert (f->>'version')::int=1, 'First inclusion save is not version 1';
   begin
-    perform public.organizer_save_inclusion(a,a_event,0,'{"traditions":["jewish"]}');
+    perform public.organizer_save_inclusion_facts(a,a_event,0,'{"traditions":["jewish"]}');
     raise exception 'Stale inclusion version accepted';
   exception when raise_exception then if sqlerrm<>'revision_conflict' then raise; end if; end;
 

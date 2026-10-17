@@ -99,5 +99,35 @@ class Database:
     async def rpc(self, name: str, **params: Any) -> Any:
         return await self.request("POST", f"/rest/v1/rpc/{name}", json=params)
 
+    async def download(self, path: str, *, max_bytes: int) -> bytes:
+        """Bound private object reads while streaming, before buffering the body."""
+        if not path.startswith("/storage/v1/object/") or not 0 < max_bytes <= 10_000_000:
+            raise ValueError("Invalid private object download")
+        headers = {"apikey": self._key}
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
+        try:
+            async with httpx.AsyncClient(
+                base_url=self.settings.supabase_url,
+                timeout=15,
+                follow_redirects=False,
+                transport=self.transport,
+            ) as client:
+                async with client.stream("GET", path, headers=headers) as response:
+                    if response.status_code != 200:
+                        raise DomainError(
+                            "provider_failed", "Unable to load private event asset", 502
+                        )
+                    content = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        content.extend(chunk)
+                        if len(content) > max_bytes:
+                            raise DomainError("needs_review", "Event asset exceeds the byte limit")
+                    return bytes(content)
+        except httpx.RequestError:
+            raise DomainError(
+                "provider_unavailable", "Private Storage could not be reached", 503
+            ) from None
+
     async def rows(self, table: str, **filters: Any) -> list[dict[str, Any]]:
         return await self.request("GET", f"/rest/v1/{table}", params=filters)

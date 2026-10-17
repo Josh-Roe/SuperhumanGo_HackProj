@@ -3,6 +3,9 @@
 .ruff_cache/
 __pycache__/
 .env
+.env.*
+!.env.example
+tests/
 *.onnx
 .env.*
 !.env.example
